@@ -22,41 +22,39 @@ const taskWorkflow = defineWorkflow("task", {
 	},
 });
 
-const router = new WorkflowRouter(taskWorkflow);
-
-router.state("Todo", (state) => {
-	state.on("Assign", (ctx) => {
-		ctx.update({ assignee: ctx.command.payload.assignee });
-		ctx.emit({
-			type: "TaskAssigned",
-			data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+const router = new WorkflowRouter(taskWorkflow)
+	.state("Todo", (state) => {
+		state
+			.on("Assign", (ctx) => {
+				ctx.update({ assignee: ctx.command.payload.assignee });
+				ctx.emit({
+					type: "TaskAssigned",
+					data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+				});
+			})
+			.on("Start", (ctx) => {
+				const assignee = ctx.data.assignee;
+				if (!assignee) {
+					ctx.error({ code: "NotAssigned", data: {} });
+				}
+				ctx.transition("InProgress", {
+					title: ctx.data.title,
+					assignee,
+					startedAt: new Date(),
+				});
+				ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
+			});
+	})
+	.state("InProgress", (state) => {
+		state.on("Complete", (ctx) => {
+			ctx.transition("Done", {
+				title: ctx.data.title,
+				assignee: ctx.data.assignee,
+				completedAt: new Date(),
+			});
+			ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
 		});
 	});
-
-	state.on("Start", (ctx) => {
-		const assignee = ctx.data.assignee;
-		if (!assignee) {
-			ctx.error({ code: "NotAssigned", data: {} });
-		}
-		ctx.transition("InProgress", {
-			title: ctx.data.title,
-			assignee,
-			startedAt: new Date(),
-		});
-		ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
-	});
-});
-
-router.state("InProgress", (state) => {
-	state.on("Complete", (ctx) => {
-		ctx.transition("Done", {
-			title: ctx.data.title,
-			assignee: ctx.data.assignee,
-			completedAt: new Date(),
-		});
-		ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
-	});
-});
 
 type TaskWorkflow = Workflow<typeof taskWorkflow.config>;
 

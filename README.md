@@ -11,6 +11,7 @@ Type-safe workflow engine with Zod validation and middleware pipelines.
 - **Checking `workflow.state` narrows `workflow.data`** -- TypeScript knows exactly which data shape each state has. Discriminated unions, not type casts.
 - **`ctx.error()` is type-checked** -- you can only raise error codes that exist in your definition, with the correct data shape. Domain failures are part of the contract.
 - **Koa-style middleware** -- global, state-scoped, and inline middleware with the onion model. Add auth, logging, or validation without touching handlers.
+- **Fluent builder API** -- chain `.state()`, `.on()`, `.use()` calls. Every method returns `this`.
 - **Composable routers** -- split handlers across files and compose them with `.use()`. Routers are routers.
 - **Zero platform lock-in** -- pure logic with no runtime dependencies beyond Zod. Works on Node.js, Bun, and Deno.
 
@@ -36,20 +37,19 @@ const taskWorkflow = defineWorkflow("task", {
   },
 });
 
-const router = new WorkflowRouter(taskWorkflow);
-
-router.state("Todo", (state) => {
-  state.on("Complete", (ctx) => {
-    if (!ctx.data.assignee) {
-      ctx.error({ code: "NotAssigned", data: { title: ctx.data.title } });
-    }
-    ctx.transition("Done", {
-      title: ctx.data.title,
-      completedAt: new Date(),
+const router = new WorkflowRouter(taskWorkflow)
+  .state("Todo", (state) => {
+    state.on("Complete", (ctx) => {
+      if (!ctx.data.assignee) {
+        ctx.error({ code: "NotAssigned", data: { title: ctx.data.title } });
+      }
+      ctx.transition("Done", {
+        title: ctx.data.title,
+        completedAt: new Date(),
+      });
+      ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
     });
-    ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
   });
-});
 
 const task = taskWorkflow.createWorkflow("task-1", {
   initialState: "Todo",

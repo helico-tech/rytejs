@@ -30,44 +30,42 @@ const taskWorkflow = defineWorkflow("task", {
 
 ## Create the Router
 
+All methods return `this`, so you can chain `.state()` calls fluently:
+
 ```ts
-const router = new WorkflowRouter(taskWorkflow);
-
-// Todo: can be renamed or started
-router.state("Todo", (state) => {
-  state.on("Rename", (ctx) => {
-    ctx.update({ title: ctx.command.payload.title });
-    ctx.emit({
-      type: "TaskRenamed",
-      data: { taskId: ctx.workflow.id, title: ctx.command.payload.title },
+const router = new WorkflowRouter(taskWorkflow)
+  .state("Todo", (state) => {
+    state
+      .on("Rename", (ctx) => {
+        ctx.update({ title: ctx.command.payload.title });
+        ctx.emit({
+          type: "TaskRenamed",
+          data: { taskId: ctx.workflow.id, title: ctx.command.payload.title },
+        });
+      })
+      .on("Start", (ctx) => {
+        ctx.transition("InProgress", {
+          title: ctx.data.title,
+          assignee: ctx.command.payload.assignee,
+        });
+        ctx.emit({
+          type: "TaskStarted",
+          data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+        });
+      });
+  })
+  .state("InProgress", (state) => {
+    state.on("Complete", (ctx) => {
+      ctx.transition("Done", {
+        title: ctx.data.title,
+        completedAt: new Date(),
+      });
+      ctx.emit({
+        type: "TaskCompleted",
+        data: { taskId: ctx.workflow.id },
+      });
     });
   });
-
-  state.on("Start", (ctx) => {
-    ctx.transition("InProgress", {
-      title: ctx.data.title,
-      assignee: ctx.command.payload.assignee,
-    });
-    ctx.emit({
-      type: "TaskStarted",
-      data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
-    });
-  });
-});
-
-// InProgress: can be completed
-router.state("InProgress", (state) => {
-  state.on("Complete", (ctx) => {
-    ctx.transition("Done", {
-      title: ctx.data.title,
-      completedAt: new Date(),
-    });
-    ctx.emit({
-      type: "TaskCompleted",
-      data: { taskId: ctx.workflow.id },
-    });
-  });
-});
 ```
 
 ## Dispatch Commands
