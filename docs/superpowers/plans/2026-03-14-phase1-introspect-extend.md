@@ -2146,3 +2146,476 @@ git commit -m "feat: complete Phase 1 — introspection, hooks, plugins, viz"
 ```bash
 git push
 ```
+
+---
+
+## Chunk 4: Documentation
+
+### Task 13: Introspection Guide
+
+Write a new guide page for the introspection API.
+
+**Files:**
+- Create: `docs/guide/introspection.md`
+- Modify: `docs/.vitepress/config.ts` (add to sidebar)
+
+- [ ] **Step 1: Write the introspection guide**
+
+Create `docs/guide/introspection.md`. Follow the existing guide style: short intro sentence, then sections with code examples. Import from `@rytejs/core`.
+
+```md
+# Introspection
+
+Introspection exposes the static shape and transition graph of your workflows programmatically.
+
+## Definition Info
+
+Every workflow definition has an `inspect()` method that returns its states, commands, events, and error codes:
+
+~~~ts
+import { defineWorkflow } from "@rytejs/core";
+import { z } from "zod";
+
+const definition = defineWorkflow("order", {
+  states: {
+    Draft: z.object({ items: z.array(z.string()) }),
+    Placed: z.object({ items: z.array(z.string()), placedAt: z.coerce.date() }),
+    Shipped: z.object({ items: z.array(z.string()), trackingId: z.string() }),
+  },
+  commands: {
+    PlaceOrder: z.object({}),
+    ShipOrder: z.object({ trackingId: z.string() }),
+  },
+  events: {
+    OrderPlaced: z.object({ id: z.string() }),
+  },
+  errors: {
+    OutOfStock: z.object({ item: z.string() }),
+  },
+});
+
+const info = definition.inspect();
+info.name;     // "order"
+info.states;   // ["Draft", "Placed", "Shipped"]
+info.commands; // ["PlaceOrder", "ShipOrder"]
+info.events;   // ["OrderPlaced"]
+info.errors;   // ["OutOfStock"]
+~~~
+
+The return type is `DefinitionInfo<TConfig>` — a plain object with typed arrays.
+
+## Transition Graph
+
+The router's `inspect()` method returns the full transition graph, built from registered handlers and their declared targets:
+
+~~~ts
+import { WorkflowRouter } from "@rytejs/core";
+
+const router = new WorkflowRouter(definition);
+router.state("Draft", (state) => {
+  state.on("PlaceOrder", { targets: ["Placed"] }, (ctx) => {
+    ctx.transition("Placed", { items: ctx.data.items, placedAt: new Date() });
+  });
+});
+router.state("Placed", (state) => {
+  state.on("ShipOrder", { targets: ["Shipped"] }, (ctx) => {
+    ctx.transition("Shipped", {
+      items: ctx.data.items,
+      trackingId: ctx.command.payload.trackingId,
+    });
+  });
+});
+
+const graph = router.inspect();
+graph.transitions;
+// [
+//   { from: "Draft", command: "PlaceOrder", to: ["Placed"] },
+//   { from: "Placed", command: "ShipOrder", to: ["Shipped"] },
+// ]
+~~~
+
+### Declaring Targets
+
+Targets are declared as an options object before the handler (and any inline middleware):
+
+~~~ts
+// Without targets (transitions unknown to introspection)
+state.on("PlaceOrder", (ctx) => { ... });
+
+// With targets
+state.on("PlaceOrder", { targets: ["Placed"] }, (ctx) => { ... });
+
+// With targets and inline middleware
+state.on("PlaceOrder", { targets: ["Placed"] }, authMiddleware, (ctx) => { ... });
+
+// Wildcard handlers support targets too
+router.on("*", "Cancel", { targets: ["Cancelled"] }, (ctx) => { ... });
+~~~
+
+Targets are optional — handlers without targets still work, but `inspect()` reports their transitions with an empty `to` array.
+
+### Priority in the Graph
+
+The transition graph respects the same priority rules as dispatch:
+
+1. **Single-state handlers** take precedence
+2. **Multi-state handlers** fill in where no single-state handler exists
+3. **Wildcard handlers** expand to every state not already covered
+
+## Use Cases
+
+The introspection output is plain data. You can use it for:
+
+- **Visualization** — generate state diagrams with `@rytejs/viz`
+- **Validation** — verify that all states are reachable
+- **Documentation** — auto-generate workflow docs
+- **Testing** — assert expected transitions exist
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add docs/guide/introspection.md
+git commit -m "docs: add introspection guide"
+```
+
+---
+
+### Task 14: Hooks & Plugins Guide
+
+Write a new guide page covering lifecycle hooks and the plugin system.
+
+**Files:**
+- Create: `docs/guide/hooks-and-plugins.md`
+
+- [ ] **Step 1: Write the hooks & plugins guide**
+
+Create `docs/guide/hooks-and-plugins.md`:
+
+```md
+# Hooks & Plugins
+
+Lifecycle hooks observe dispatch events without affecting the pipeline. Plugins package hooks and middleware into reusable units.
+
+## Lifecycle Hooks
+
+Register hooks with `router.on()`:
+
+~~~ts
+import { WorkflowRouter } from "@rytejs/core";
+
+const router = new WorkflowRouter(definition);
+
+router.on("dispatch:start", (ctx) => {
+  console.log(`→ ${ctx.command.type}`);
+});
+
+router.on("dispatch:end", (ctx, result) => {
+  console.log(`← ${result.ok ? "ok" : "error"}`);
+});
+
+router.on("transition", (from, to, workflow) => {
+  console.log(`${from} → ${to}`);
+});
+
+router.on("error", (error, ctx) => {
+  console.log(`error: ${error.category}`);
+});
+
+router.on("event", (event, workflow) => {
+  console.log(`event: ${event.type}`);
+});
+~~~
+
+### Hook Events
+
+| Event | When | Parameters |
+|-------|------|------------|
+| `dispatch:start` | After context created, before handler | `(ctx)` |
+| `dispatch:end` | After dispatch completes (always) | `(ctx, result)` |
+| `transition` | After a state change | `(from, to, workflow)` |
+| `error` | On domain or validation error | `(error, ctx)` |
+| `event` | For each emitted event | `(event, workflow)` |
+
+### Hooks vs Middleware
+
+| | Middleware | Hooks |
+|---|-----------|-------|
+| **Role** | In the pipeline — can modify, short-circuit | Observer — reacts after the fact |
+| **Errors** | Propagate and affect dispatch | Caught, never affect dispatch |
+| **Context** | Full `Context` | `ReadonlyContext` (no `update`, `transition`, `emit`, `error`) |
+| **Use for** | Auth, validation, wrapping | Telemetry, logging, devtools |
+
+Hooks receive a `ReadonlyContext` — it has `command`, `workflow`, `deps`, `data`, `events`, and context-key access (`set`/`get`/`getOrNull`), but no mutation methods.
+
+### Error Isolation
+
+Hook errors never affect the dispatch result. By default they are logged to `console.error`. You can provide a custom handler:
+
+~~~ts
+const router = new WorkflowRouter(definition, deps, {
+  onHookError: (err) => myLogger.warn("Hook error:", err),
+});
+~~~
+
+### Execution Order
+
+Hooks run in registration order. Multiple hooks on the same event all fire, even if one throws.
+
+`dispatch:end` is guaranteed to fire whenever `dispatch:start` fires, even if the handler throws an unexpected error.
+
+## Plugins
+
+A plugin is a function that receives the router and configures it — registering hooks, middleware, or both.
+
+### Defining a Plugin
+
+~~~ts
+import { definePlugin } from "@rytejs/core";
+
+const loggingPlugin = definePlugin((router) => {
+  router.on("dispatch:start", (ctx) => {
+    console.log(`[${new Date().toISOString()}] → ${ctx.command.type}`);
+  });
+  router.on("dispatch:end", (_ctx, result) => {
+    console.log(`[${new Date().toISOString()}] ← ${result.ok ? "ok" : "error"}`);
+  });
+});
+~~~
+
+### Using a Plugin
+
+Pass it to `router.use()`:
+
+~~~ts
+const router = new WorkflowRouter(definition);
+router.use(loggingPlugin);
+~~~
+
+### How `.use()` Discriminates
+
+`router.use()` accepts three things:
+
+| Argument | What happens |
+|----------|-------------|
+| `WorkflowRouter` instance | Merges handlers (composable routers) |
+| `definePlugin()` result | Calls the plugin function with the router |
+| Plain function `(ctx, next) => ...` | Adds as global middleware |
+
+Plugins are branded with a symbol by `definePlugin()`, so the router can tell them apart from middleware at runtime.
+
+### Plugin + Middleware
+
+Plugins can register both hooks and middleware:
+
+~~~ts
+const authPlugin = definePlugin((router) => {
+  // Middleware: runs in the dispatch pipeline
+  router.use(async (ctx, next) => {
+    if (!ctx.deps.currentUser) throw new Error("Unauthorized");
+    await next();
+  });
+
+  // Hook: observes after the fact
+  router.on("dispatch:end", (ctx, result) => {
+    auditLog.record(ctx.command, result);
+  });
+});
+~~~
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add docs/guide/hooks-and-plugins.md
+git commit -m "docs: add hooks and plugins guide"
+```
+
+---
+
+### Task 15: Visualization Guide
+
+Write a new guide page for `@rytejs/viz`.
+
+**Files:**
+- Create: `docs/guide/visualization.md`
+
+- [ ] **Step 1: Write the visualization guide**
+
+Create `docs/guide/visualization.md`:
+
+```md
+# Visualization
+
+`@rytejs/viz` generates state diagrams from your workflow's introspection data. It outputs source code for [Mermaid](https://mermaid.js.org/) and [D2](https://d2lang.com/) — paste into docs, pipe to a CLI, or feed into devtools.
+
+## Installation
+
+~~~bash
+npm install @rytejs/viz
+# or
+pnpm add @rytejs/viz
+~~~
+
+`@rytejs/core` is a peer dependency.
+
+## Generating Diagrams
+
+Use `router.inspect()` to get the transition graph, then pass it to `toMermaid()` or `toD2()`:
+
+~~~ts
+import { WorkflowRouter } from "@rytejs/core";
+import { toMermaid, toD2 } from "@rytejs/viz";
+
+const router = new WorkflowRouter(definition);
+// ... register handlers with targets ...
+
+const graph = router.inspect();
+~~~
+
+### Mermaid
+
+~~~ts
+console.log(toMermaid(graph));
+~~~
+
+Output:
+
+~~~mermaid
+stateDiagram-v2
+    Draft --> Placed : PlaceOrder
+    Draft --> Cancelled : CancelOrder
+    Placed --> Shipped : ShipOrder
+    Shipped --> Delivered : ConfirmDelivery
+~~~
+
+GitHub renders Mermaid natively in markdown — paste the output into a `~~~mermaid` block in your README.
+
+### D2
+
+~~~ts
+console.log(toD2(graph));
+~~~
+
+Output:
+
+~~~
+Draft
+Placed
+Shipped
+Delivered
+Cancelled
+
+Draft -> Placed: PlaceOrder
+Draft -> Cancelled: CancelOrder
+Placed -> Shipped: ShipOrder
+Shipped -> Delivered: ConfirmDelivery
+~~~
+
+## Options
+
+Both functions accept an optional second argument:
+
+~~~ts
+toMermaid(graph, {
+  title: "Order Flow",          // adds a title to the diagram
+  highlightTerminal: true,      // marks states with no outgoing transitions
+});
+~~~
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `title` | none | Adds a title (Mermaid frontmatter / D2 comment) |
+| `highlightTerminal` | `false` | Highlights states with no outgoing transitions |
+
+### Terminal States
+
+With `highlightTerminal: true`, states that have no outgoing transitions are marked:
+
+- **Mermaid:** `Delivered --> [*]` (end pseudostate)
+- **D2:** `Delivered.style.fill: "#e0e0e0"` (gray fill)
+
+## Targets Required
+
+The diagram quality depends on declaring `targets` on your handlers. Without targets, `inspect()` reports transitions with an empty `to` array and the diagram shows no edges for those handlers.
+
+~~~ts
+// This handler IS visible in the diagram
+state.on("PlaceOrder", { targets: ["Placed"] }, handler);
+
+// This handler is NOT visible (no targets declared)
+state.on("PlaceOrder", handler);
+~~~
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add docs/guide/visualization.md
+git commit -m "docs: add visualization guide"
+```
+
+---
+
+### Task 16: Update Sidebar, API Reference, and Concepts
+
+Update the VitePress sidebar config to include the new guide pages, update the API reference with new exports, and add hooks/plugins/introspection to the concepts page.
+
+**Files:**
+- Modify: `docs/.vitepress/config.ts`
+- Modify: `docs/api/index.md`
+- Modify: `docs/guide/concepts.md`
+
+- [ ] **Step 1: Update VitePress sidebar**
+
+In `docs/.vitepress/config.ts`, add the new pages to the "Advanced" section:
+
+```ts
+{
+  text: "Advanced",
+  items: [
+    { text: "Middleware", link: "/guide/middleware" },
+    { text: "Error Handling", link: "/guide/error-handling" },
+    { text: "Events", link: "/guide/events" },
+    { text: "Dependency Injection", link: "/guide/dependency-injection" },
+    { text: "Context Keys", link: "/guide/context-keys" },
+    { text: "Introspection", link: "/guide/introspection" },
+    { text: "Hooks & Plugins", link: "/guide/hooks-and-plugins" },
+    { text: "Visualization", link: "/guide/visualization" },
+  ],
+},
+```
+
+- [ ] **Step 2: Update API reference**
+
+Add the following sections to `docs/api/index.md` covering the new Phase 1 exports:
+
+- `definition.inspect()` → returns `DefinitionInfo<TConfig>`
+- `router.inspect()` → returns `RouterGraph<TConfig>`
+- `TransitionInfo<TConfig>` type
+- `ReadonlyContext` type
+- `RouterOptions` interface
+- `HookEvent` type (union of hook event names)
+- `definePlugin()` function
+- `isPlugin()` function
+- `Plugin<TConfig, TDeps>` type
+- `@rytejs/viz` exports: `toMermaid()`, `toD2()`, `GraphInput`, `DiagramOptions`
+
+Follow the existing API reference format — each export gets a heading, its signature, and a brief description.
+
+- [ ] **Step 3: Update concepts page**
+
+Add brief mentions of introspection, hooks, and plugins to `docs/guide/concepts.md` in the appropriate sections, linking to the dedicated guide pages.
+
+- [ ] **Step 4: Run docs build to verify**
+
+Run: `cd /home/ralph/ryte/docs && npx vitepress build`
+Expected: Build succeeds with no broken links
+
+- [ ] **Step 5: Commit and push**
+
+```bash
+git add docs/
+git commit -m "docs: update sidebar, API reference, and concepts for Phase 1"
+git push
+```
