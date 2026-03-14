@@ -2,7 +2,6 @@ import { compose } from "./compose.js";
 import { type Context, createContext } from "./context.js";
 import type { WorkflowDefinition } from "./definition.js";
 import { HOOK_EVENTS, HookRegistry } from "./hooks.js";
-import type { RouterGraph, TransitionInfo } from "./introspection.js";
 import type { Plugin } from "./plugin.js";
 import { isPlugin } from "./plugin.js";
 import type { ReadonlyContext } from "./readonly-context.js";
@@ -27,7 +26,6 @@ type AnyHandler = (ctx: any) => void | Promise<void>;
 type HandlerEntry = {
 	inlineMiddleware: AnyMiddleware[];
 	handler: AnyMiddleware;
-	targets?: string[];
 };
 
 export interface RouterOptions {
@@ -40,32 +38,15 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 
 	on<C extends CommandNames<TConfig>>(
 		command: C,
-		options: { targets: readonly string[] },
 		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
-	): this;
-	on<C extends CommandNames<TConfig>>(
-		command: C,
-		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
-	): this;
-	on(command: string, ...fns: unknown[]): this {
-		// biome-ignore lint/suspicious/noExplicitAny: runtime type discrimination for options object
-		const args = [...fns] as any[];
-		let targets: string[] | undefined;
-		if (
-			args.length > 0 &&
-			typeof args[0] === "object" &&
-			args[0] !== null &&
-			"targets" in args[0]
-		) {
-			targets = (args.shift() as { targets: string[] }).targets;
-		}
-		if (args.length === 0) throw new Error("on() requires at least a handler");
-		const handler = args.pop() as AnyHandler;
-		const inlineMiddleware = args as AnyMiddleware[];
+	): this {
+		if (fns.length === 0) throw new Error("on() requires at least a handler");
+		const handler = fns.pop() as AnyHandler;
+		const inlineMiddleware = fns as AnyMiddleware[];
 		const wrappedHandler: AnyMiddleware = async (ctx, _next) => {
 			await handler(ctx);
 		};
-		this.handlers.set(command as string, { inlineMiddleware, handler: wrappedHandler, targets });
+		this.handlers.set(command as string, { inlineMiddleware, handler: wrappedHandler });
 		return this;
 	}
 
@@ -135,7 +116,6 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 				this.wildcardHandlers.set(command, {
 					inlineMiddleware: [...entry.inlineMiddleware],
 					handler: entry.handler,
-					targets: entry.targets ? [...entry.targets] : undefined,
 				});
 			}
 		}
@@ -161,7 +141,6 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 					parentBuilder.handlers.set(command, {
 						inlineMiddleware: [...entry.inlineMiddleware],
 						handler: entry.handler,
-						targets: entry.targets ? [...entry.targets] : undefined,
 					});
 				}
 			}
@@ -195,57 +174,6 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			setup(router as any);
 		}
 		return this;
-	}
-
-	/** Returns the transition graph built from registered handlers and their declared targets. */
-	inspect(): RouterGraph<TConfig> {
-		const transitions: TransitionInfo<TConfig>[] = [];
-		const allStates = Object.keys(this.definition.config.states) as StateNames<TConfig>[];
-
-		// Single-state handlers
-		for (const [stateName, builder] of this.singleStateBuilders) {
-			for (const [command, entry] of builder.handlers) {
-				transitions.push({
-					from: stateName as StateNames<TConfig>,
-					command: command as CommandNames<TConfig>,
-					to: (entry.targets ?? []) as StateNames<TConfig>[],
-				});
-			}
-		}
-
-		// Multi-state handlers
-		for (const [stateName, builder] of this.multiStateBuilders) {
-			for (const [command, entry] of builder.handlers) {
-				const hasSingle = this.singleStateBuilders.get(stateName)?.handlers.has(command);
-				if (!hasSingle) {
-					transitions.push({
-						from: stateName as StateNames<TConfig>,
-						command: command as CommandNames<TConfig>,
-						to: (entry.targets ?? []) as StateNames<TConfig>[],
-					});
-				}
-			}
-		}
-
-		// Wildcard handlers — produce a transition for each state not already covered
-		for (const [command, entry] of this.wildcardHandlers) {
-			for (const stateName of allStates) {
-				const hasSingle = this.singleStateBuilders.get(stateName)?.handlers.has(command);
-				const hasMulti = this.multiStateBuilders.get(stateName)?.handlers.has(command);
-				if (!hasSingle && !hasMulti) {
-					transitions.push({
-						from: stateName,
-						command: command as CommandNames<TConfig>,
-						to: (entry.targets ?? []) as StateNames<TConfig>[],
-					});
-				}
-			}
-		}
-
-		return {
-			definition: this.definition.inspect(),
-			transitions,
-		};
 	}
 
 	/** Registers a lifecycle hook callback. */
@@ -286,15 +214,6 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	on<C extends CommandNames<TConfig>>(
 		state: "*",
 		command: C,
-		options: { targets: readonly string[] },
-		...fns: [
-			...AnyMiddleware[],
-			(ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
-		]
-	): this;
-	on<C extends CommandNames<TConfig>>(
-		state: "*",
-		command: C,
 		...fns: [
 			...AnyMiddleware[],
 			(ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
@@ -312,26 +231,16 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 
 		if (first === "*") {
 			const command = args[1] as string;
-			const rest = args.slice(2) as unknown[];
-			let targets: string[] | undefined;
-			if (
-				rest.length > 0 &&
-				typeof rest[0] === "object" &&
-				rest[0] !== null &&
-				"targets" in rest[0]
-			) {
-				targets = (rest.shift() as { targets: string[] }).targets;
-			}
-			if (rest.length === 0) throw new Error("on() requires at least a handler");
-			const handler = rest.pop() as AnyHandler;
-			const inlineMiddleware = rest as AnyMiddleware[];
+			const fns = args.slice(2) as unknown[];
+			if (fns.length === 0) throw new Error("on() requires at least a handler");
+			const handler = fns.pop() as AnyHandler;
+			const inlineMiddleware = fns as AnyMiddleware[];
 			const wrappedHandler: AnyMiddleware = async (ctx, _next) => {
 				await handler(ctx);
 			};
 			this.wildcardHandlers.set(command, {
 				inlineMiddleware,
 				handler: wrappedHandler,
-				targets,
 			});
 			return this;
 		}

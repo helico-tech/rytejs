@@ -1,13 +1,5 @@
 import type { ZodType, z } from "zod";
-import type { DefinitionInfo } from "./introspection.js";
-import type {
-	CommandNames,
-	ErrorCodes,
-	EventNames,
-	StateNames,
-	WorkflowConfig,
-	WorkflowOf,
-} from "./types.js";
+import type { StateNames, WorkflowConfig, WorkflowOf } from "./types.js";
 
 /** The result of defineWorkflow() — holds schemas and creates workflow instances. */
 export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowConfig> {
@@ -22,7 +14,6 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	getEventSchema(eventName: string): ZodType;
 	getErrorSchema(errorCode: string): ZodType;
 	hasState(stateName: string): boolean;
-	inspect(): DefinitionInfo<TConfig>;
 }
 
 /**
@@ -82,16 +73,6 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 
 		hasState(stateName: string): boolean {
 			return stateName in config.states;
-		},
-
-		inspect(): DefinitionInfo<TConfig> {
-			return {
-				name,
-				states: Object.keys(config.states) as StateNames<TConfig>[],
-				commands: Object.keys(config.commands) as CommandNames<TConfig>[],
-				events: Object.keys(config.events) as EventNames<TConfig>[],
-				errors: Object.keys(config.errors) as ErrorCodes<TConfig>[],
-			};
 		},
 	};
 }

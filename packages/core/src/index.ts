@@ -3,7 +3,6 @@ export type { WorkflowDefinition } from "./definition.js";
 export { defineWorkflow } from "./definition.js";
 export type { Handler } from "./handler.js";
 export type { HookEvent } from "./hooks.js";
-export type { DefinitionInfo, RouterGraph, TransitionInfo } from "./introspection.js";
 export type { ContextKey } from "./key.js";
 export { createKey } from "./key.js";
 export type { Middleware } from "./middleware.js";
