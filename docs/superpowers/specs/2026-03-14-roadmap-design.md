@@ -31,7 +31,9 @@ Every release ships something developers can feel AND something that strengthens
 
 Expose the static shape of a workflow definition and the dynamic transition graph of a router programmatically.
 
-**Definition-level introspection:**
+Two complementary `inspect()` methods at different levels:
+
+**Definition-level introspection** — returns the static shape (what states, commands, events, and errors exist). This is a new method on the `WorkflowDefinition` object returned by `defineWorkflow()`, derived from the config's schema keys.
 
 ```ts
 const info = orderWorkflow.inspect();
@@ -42,7 +44,7 @@ info.events      // ['OrderPlaced', 'OrderShipped', ...]
 info.errors      // ['OutOfStock', 'PaymentFailed', ...]
 ```
 
-**Router-level introspection (transition map):**
+**Router-level introspection** — returns the dynamic transition map (which commands are handled in which states, and what transitions are possible). This lives on `WorkflowRouter` because only the router knows actual handler registrations and their declared targets.
 
 ```ts
 const graph = router.inspect();
@@ -55,8 +57,7 @@ graph.transitions
 // ]
 ```
 
-- Lives on `WorkflowRouter` because only the router knows actual handler registrations
-- Returns plain objects — no methods, no classes
+- Both return plain objects — no methods, no classes
 - Foundation for visualization, devtools, and testing packages
 
 ### 1.2 Lifecycle Hooks / Plugin System (core)
@@ -65,8 +66,11 @@ Extension points for events outside the dispatch pipeline.
 
 **Hook points and signatures:**
 
+**`ReadonlyContext`** — a subset of `Context` that exposes read-only properties and context-key access, but no dispatch mutation methods:
+- **Included:** `command`, `workflow`, `deps`, `data`, `events`, `get()`, `getOrNull()`, `set()` (context-key storage is metadata, not dispatch mutation)
+- **Excluded:** `update()`, `transition()`, `emit()`, `error()`
+
 ```ts
-// ctx is a read-only subset of Context (no update/transition/emit methods)
 router.on('dispatch:start', (ctx: ReadonlyContext) => void)
 
 // result is the same DispatchResult the caller receives
@@ -84,7 +88,7 @@ router.on('event', (event: { name: EventNames; data: EventData }, workflow: Work
 
 **Hook execution and error policy:**
 - Hooks registered for the same event run in `.use()` / `.on()` registration order
-- Hook errors are caught and forwarded to a configurable `onHookError` callback on the router (defaults to `console.error`). They never affect the dispatch result.
+- Hook errors are caught and forwarded to a configurable `onHookError` callback on the router (defaults to `console.error`). They never affect the dispatch result. The `onHookError` callback is provided via an options object on the `WorkflowRouter` constructor: `new WorkflowRouter(definition, deps, { onHookError: (err) => { ... } })`.
 - Hooks cannot unregister themselves (simplicity over flexibility; revisit if needed)
 
 **How hooks differ from middleware:**
@@ -227,7 +231,7 @@ const result = definition.restore(snapshot);
 - **`restore()` validates through Zod schemas** — schema evolution is handled naturally; if the shape changed, you get a typed validation error
 - **`version` field** — a schema version declared on the workflow definition (e.g., `defineWorkflow({ version: 1, ... })`), stamped onto every snapshot. This is a schema version, not a per-snapshot sequence number. When the workflow's state schemas change, the developer bumps the version. Userland migration code can check the version before calling `restore()` and transform the snapshot accordingly.
 - **Date serialization** — `createdAt` and `updatedAt` are serialized as ISO 8601 strings in the snapshot. `restore()` reconstructs `Date` objects from these strings.
-- **`restore()` error type** — returns `{ ok: false, error: ValidationError }` using the existing `ValidationError` class with `source: 'restore'`.
+- **`restore()` error type** — returns `{ ok: false, error: ValidationError }` using the existing `ValidationError` class with `source: 'restore'`. This requires extending the `ValidationError.source` type union (currently `"command" | "state" | "event" | "transition"`) to include `"restore"`. Note: `restore()` errors are standalone `ValidationError` instances, not wrapped in `PipelineError` — they exist outside the dispatch pipeline.
 - **Lives on `WorkflowDefinition`** — the definition owns the schemas, so it's the natural home. Both `snapshot()` and `restore()` are methods on the definition object returned by `defineWorkflow()`.
 - **Persistence is userland** — storing and retrieving snapshots is trivial (`JSON.stringify` + any storage); no `@rytejs/persist-*` packages needed
 
