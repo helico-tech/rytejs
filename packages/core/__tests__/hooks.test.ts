@@ -1,5 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
+import { z } from "zod";
+import { defineWorkflow } from "../src/definition.js";
 import { HookRegistry } from "../src/hooks.js";
+import { WorkflowRouter } from "../src/router.js";
 
 describe("HookRegistry", () => {
 	test("registers and emits a hook", async () => {
@@ -76,5 +79,183 @@ describe("HookRegistry", () => {
 
 		await parent.emit("transition", console.error, "a", "b", {});
 		expect(callback).toHaveBeenCalledWith("a", "b", {});
+	});
+});
+
+const definition = defineWorkflow("hook-test", {
+	states: {
+		Draft: z.object({ title: z.string().optional() }),
+		Published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
+	},
+	commands: {
+		Publish: z.object({ title: z.string() }),
+		Update: z.object({ title: z.string() }),
+	},
+	events: {
+		Published: z.object({ id: z.string() }),
+	},
+	errors: {
+		TitleRequired: z.object({}),
+	},
+});
+
+describe("router hook integration", () => {
+	test("dispatch:start fires before handler", async () => {
+		const order: string[] = [];
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:start", () => {
+			order.push("hook:start");
+		});
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				order.push("handler");
+				ctx.transition("Published", {
+					title: ctx.command.payload.title,
+					publishedAt: new Date(),
+				});
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(order).toEqual(["hook:start", "handler"]);
+	});
+
+	test("dispatch:end fires after handler with result", async () => {
+		let capturedResult: unknown;
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:end", (_ctx, result) => {
+			capturedResult = result;
+		});
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", {
+					title: ctx.command.payload.title,
+					publishedAt: new Date(),
+				});
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, {
+			type: "Publish",
+			payload: { title: "Hello" },
+		});
+		expect(capturedResult).toEqual(result);
+	});
+
+	test("transition hook fires on state change", async () => {
+		let captured: { from: string; to: string } | undefined;
+		const router = new WorkflowRouter(definition);
+		router.on("transition", (from, to, _workflow) => {
+			captured = { from, to };
+		});
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", {
+					title: ctx.command.payload.title,
+					publishedAt: new Date(),
+				});
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(captured).toEqual({ from: "Draft", to: "Published" });
+	});
+
+	test("transition hook does not fire on in-place update", async () => {
+		const transitionHook = vi.fn();
+		const router = new WorkflowRouter(definition);
+		router.on("transition", transitionHook);
+		router.state("Draft", (state) => {
+			state.on("Update", (ctx) => {
+				ctx.update({ title: ctx.command.payload.title });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Update", payload: { title: "Hello" } });
+		expect(transitionHook).not.toHaveBeenCalled();
+	});
+
+	test("event hook fires for each emitted event", async () => {
+		const events: unknown[] = [];
+		const router = new WorkflowRouter(definition);
+		router.on("event", (event, _workflow) => {
+			events.push(event);
+		});
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", {
+					title: ctx.command.payload.title,
+					publishedAt: new Date(),
+				});
+				ctx.emit({ type: "Published", data: { id: ctx.workflow.id } });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(events).toEqual([{ type: "Published", data: { id: "wf-1" } }]);
+	});
+
+	test("error hook fires on domain error", async () => {
+		let capturedError: unknown;
+		const router = new WorkflowRouter(definition);
+		router.on("error", (error, _ctx) => {
+			capturedError = error;
+		});
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.error({ code: "TitleRequired", data: {} });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, {
+			type: "Publish",
+			payload: { title: "Hello" },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(capturedError).toEqual(result.error);
+		}
+	});
+
+	test("hook errors are forwarded to onHookError", async () => {
+		const errors: unknown[] = [];
+		const router = new WorkflowRouter(definition, {}, { onHookError: (err) => errors.push(err) });
+		const hookError = new Error("hook broke");
+		router.on("dispatch:start", () => {
+			throw hookError;
+		});
+		router.state("Draft", (state) => {
+			state.on("Update", (ctx) => {
+				ctx.update({ title: ctx.command.payload.title });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, {
+			type: "Update",
+			payload: { title: "Hello" },
+		});
+		expect(result.ok).toBe(true);
+		expect(errors).toEqual([hookError]);
+	});
+
+	test("hooks do not fire on early validation/routing errors", async () => {
+		const startHook = vi.fn();
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:start", startHook);
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, {
+			type: "Publish",
+			payload: { title: "Hello" },
+		});
+		expect(result.ok).toBe(false);
+		expect(startHook).not.toHaveBeenCalled();
 	});
 });

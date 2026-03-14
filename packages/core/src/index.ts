@@ -8,6 +8,7 @@ export type { ContextKey } from "./key.js";
 export { createKey } from "./key.js";
 export type { Middleware } from "./middleware.js";
 export type { ReadonlyContext } from "./readonly-context.js";
+export type { RouterOptions } from "./router.js";
 export { WorkflowRouter } from "./router.js";
 export type {
 	CommandNames,

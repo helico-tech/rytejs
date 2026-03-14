@@ -1,12 +1,16 @@
 import { compose } from "./compose.js";
 import { type Context, createContext } from "./context.js";
 import type { WorkflowDefinition } from "./definition.js";
+import { HOOK_EVENTS, HookRegistry } from "./hooks.js";
 import type { RouterGraph, TransitionInfo } from "./introspection.js";
+import type { ReadonlyContext } from "./readonly-context.js";
 import type {
 	CommandNames,
 	DispatchResult,
 	ErrorCodes,
 	ErrorData,
+	EventNames,
+	PipelineError,
 	StateNames,
 	Workflow,
 	WorkflowConfig,
@@ -23,6 +27,10 @@ type HandlerEntry = {
 	handler: AnyMiddleware;
 	targets?: string[];
 };
+
+export interface RouterOptions {
+	onHookError?: (error: unknown) => void;
+}
 
 class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNames<TConfig>> {
 	/** @internal */ readonly middleware: AnyMiddleware[] = [];
@@ -81,11 +89,16 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
 	private multiStateBuilders = new Map<string, StateBuilder<TConfig, TDeps, any>>();
 	private wildcardHandlers = new Map<string, HandlerEntry>();
+	private hookRegistry = new HookRegistry();
+	private readonly onHookError: (error: unknown) => void;
 
 	constructor(
 		private readonly definition: WorkflowDefinition<TConfig>,
 		private readonly deps: TDeps = {} as TDeps,
-	) {}
+		options: RouterOptions = {},
+	) {
+		this.onHookError = options.onHookError ?? console.error;
+	}
 
 	/** Adds global middleware or merges another router's handlers. */
 	use(
@@ -121,6 +134,8 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 				});
 			}
 		}
+
+		this.hookRegistry.merge(child.hookRegistry);
 	}
 
 	private mergeStateBuilders(
@@ -228,9 +243,43 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		};
 	}
 
+	/** Registers a lifecycle hook callback. */
+	on(
+		event: "dispatch:start",
+		callback: (ctx: ReadonlyContext<TConfig, TDeps>) => void | Promise<void>,
+	): this;
+	on(
+		event: "dispatch:end",
+		callback: (
+			ctx: ReadonlyContext<TConfig, TDeps>,
+			result: DispatchResult<TConfig>,
+		) => void | Promise<void>,
+	): this;
+	on(
+		event: "transition",
+		callback: (
+			from: StateNames<TConfig>,
+			to: StateNames<TConfig>,
+			workflow: Workflow<TConfig>,
+		) => void | Promise<void>,
+	): this;
+	on(
+		event: "error",
+		callback: (
+			error: PipelineError<TConfig>,
+			ctx: ReadonlyContext<TConfig, TDeps>,
+		) => void | Promise<void>,
+	): this;
+	on(
+		event: "event",
+		callback: (
+			event: { type: EventNames<TConfig>; data: unknown },
+			workflow: Workflow<TConfig>,
+		) => void | Promise<void>,
+	): this;
 	/** Registers a wildcard handler that matches any state. */
 	on<C extends CommandNames<TConfig>>(
-		_state: "*",
+		state: "*",
 		command: C,
 		options: { targets: readonly string[] },
 		...fns: [
@@ -239,37 +288,50 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		]
 	): this;
 	on<C extends CommandNames<TConfig>>(
-		_state: "*",
+		state: "*",
 		command: C,
 		...fns: [
 			...AnyMiddleware[],
 			(ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
 		]
 	): this;
-	on(_state: "*", command: string, ...fns: unknown[]): this {
-		// biome-ignore lint/suspicious/noExplicitAny: runtime type discrimination for options object
-		const args = [...fns] as any[];
-		let targets: string[] | undefined;
-		if (
-			args.length > 0 &&
-			typeof args[0] === "object" &&
-			args[0] !== null &&
-			"targets" in args[0]
-		) {
-			targets = (args.shift() as { targets: string[] }).targets;
+	// biome-ignore lint/suspicious/noExplicitAny: implementation signature must be loose to handle all overloads
+	on(...args: any[]): this {
+		const first = args[0] as string;
+
+		if (HOOK_EVENTS.has(first)) {
+			// biome-ignore lint/complexity/noBannedTypes: callbacks have varying signatures per hook event
+			this.hookRegistry.add(first, args[1] as Function);
+			return this;
 		}
-		if (args.length === 0) throw new Error("on() requires at least a handler");
-		const handler = args.pop() as AnyHandler;
-		const inlineMiddleware = args as AnyMiddleware[];
-		const wrappedHandler: AnyMiddleware = async (ctx, _next) => {
-			await handler(ctx);
-		};
-		this.wildcardHandlers.set(command as string, {
-			inlineMiddleware,
-			handler: wrappedHandler,
-			targets,
-		});
-		return this;
+
+		if (first === "*") {
+			const command = args[1] as string;
+			const rest = args.slice(2) as unknown[];
+			let targets: string[] | undefined;
+			if (
+				rest.length > 0 &&
+				typeof rest[0] === "object" &&
+				rest[0] !== null &&
+				"targets" in rest[0]
+			) {
+				targets = (rest.shift() as { targets: string[] }).targets;
+			}
+			if (rest.length === 0) throw new Error("on() requires at least a handler");
+			const handler = rest.pop() as AnyHandler;
+			const inlineMiddleware = rest as AnyMiddleware[];
+			const wrappedHandler: AnyMiddleware = async (ctx, _next) => {
+				await handler(ctx);
+			};
+			this.wildcardHandlers.set(command, {
+				inlineMiddleware,
+				handler: wrappedHandler,
+				targets,
+			});
+			return this;
+		}
+
+		throw new Error(`Unknown event or state: ${first}`);
 	}
 
 	/** Dispatches a command to the appropriate handler and returns the result. */
@@ -357,17 +419,42 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			this.deps,
 		);
 
+		// Hook: dispatch:start
+		await this.hookRegistry.emit("dispatch:start", this.onHookError, ctx);
+
+		// biome-ignore lint/suspicious/noExplicitAny: initialized to undefined; assigned in try/catch before finally uses it
+		let result: DispatchResult<TConfig> = undefined as any;
 		try {
 			const composed = compose(chain);
 			await composed(ctx);
-			return {
+			result = {
 				ok: true as const,
 				workflow: ctx.getWorkflowSnapshot(),
 				events: [...ctx.events],
 			};
+
+			// Hook: transition (if state changed)
+			if (result.ok && result.workflow.state !== workflow.state) {
+				await this.hookRegistry.emit(
+					"transition",
+					this.onHookError,
+					workflow.state,
+					result.workflow.state,
+					result.workflow,
+				);
+			}
+
+			// Hook: event (for each emitted event)
+			if (result.ok) {
+				for (const event of result.events) {
+					await this.hookRegistry.emit("event", this.onHookError, event, result.workflow);
+				}
+			}
+
+			return result;
 		} catch (err) {
 			if (err instanceof DomainErrorSignal) {
-				return {
+				result = {
 					ok: false as const,
 					error: {
 						category: "domain" as const,
@@ -375,9 +462,8 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 						data: err.data as ErrorData<TConfig, ErrorCodes<TConfig>>,
 					},
 				};
-			}
-			if (err instanceof ValidationError) {
-				return {
+			} else if (err instanceof ValidationError) {
+				result = {
 					ok: false as const,
 					error: {
 						category: "validation" as const,
@@ -386,8 +472,20 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 						message: err.message,
 					},
 				};
+			} else {
+				throw err;
 			}
-			throw err;
+
+			// Hook: error
+			await this.hookRegistry.emit("error", this.onHookError, result.error, ctx);
+
+			return result;
+		} finally {
+			// Hook: dispatch:end — always fires if dispatch:start fired
+			// result is undefined only when an unexpected error was re-thrown; skip dispatch:end in that case
+			if (result !== undefined) {
+				await this.hookRegistry.emit("dispatch:end", this.onHookError, ctx, result);
+			}
 		}
 	}
 }
