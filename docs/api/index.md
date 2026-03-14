@@ -179,6 +179,7 @@ Shape of the configuration object passed to `defineWorkflow()`.
 
 ```ts
 interface WorkflowConfig {
+  modelVersion?: number;
   states: Record<string, ZodType>;
   commands: Record<string, ZodType>;
   events: Record<string, ZodType>;
@@ -203,6 +204,10 @@ interface WorkflowDefinition<TConfig extends WorkflowConfig> {
   getEventSchema(eventName: string): ZodType;
   getErrorSchema(errorCode: string): ZodType;
   hasState(stateName: string): boolean;
+  snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>;
+  restore(snapshot: WorkflowSnapshot<TConfig>):
+    | { ok: true; workflow: Workflow<TConfig> }
+    | { ok: false; error: ValidationError };
 }
 ```
 
@@ -440,5 +445,101 @@ Type guard that checks whether a value is a branded plugin.
 
 ```ts
 function isPlugin(value: unknown): value is Plugin<WorkflowConfig, unknown>
+```
+
+### Serialization
+
+#### `WorkflowSnapshot<TConfig>`
+
+Plain JSON-safe representation of a workflow's state.
+
+```ts
+interface WorkflowSnapshot<TConfig extends WorkflowConfig> {
+  readonly id: string;
+  readonly definitionName: string;
+  readonly state: StateNames<TConfig>;
+  readonly data: unknown;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly modelVersion: number;
+}
+```
+
+#### `definition.snapshot(workflow)`
+
+Converts a workflow to a JSON-safe snapshot. Dates are serialized as ISO 8601 strings.
+
+```ts
+snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>
+```
+
+#### `definition.restore(snapshot)`
+
+Validates and reconstructs a workflow from a snapshot. Returns a result type.
+
+```ts
+restore(snapshot: WorkflowSnapshot<TConfig>):
+  | { ok: true; workflow: Workflow<TConfig> }
+  | { ok: false; error: ValidationError }
+```
+
+---
+
+## `@rytejs/testing`
+
+#### `createTestWorkflow(definition, state, data, options?)`
+
+Creates a workflow in any state without dispatching.
+
+```ts
+function createTestWorkflow<TConfig, S extends StateNames<TConfig>>(
+  definition: WorkflowDefinition<TConfig>,
+  state: S,
+  data: StateData<TConfig, S>,
+  options?: { id?: string },
+): Workflow<TConfig>
+```
+
+#### `expectOk(result, expectedState?)`
+
+Asserts a dispatch result is ok. Optionally checks state. Throws on failure.
+
+```ts
+function expectOk<TConfig>(
+  result: DispatchResult<TConfig>,
+  expectedState?: string,
+): asserts result is Extract<DispatchResult<TConfig>, { ok: true }>
+```
+
+#### `expectError(result, category, code?)`
+
+Asserts a dispatch result is an error with the given category. Optionally checks code.
+
+```ts
+function expectError<TConfig>(
+  result: DispatchResult<TConfig>,
+  category: "validation" | "domain" | "router",
+  code?: string,
+): asserts result is Extract<DispatchResult<TConfig>, { ok: false }>
+```
+
+#### `testPath(router, definition, steps)`
+
+Tests a sequence of commands and verifies the expected state after each.
+
+```ts
+function testPath<TConfig, TDeps>(
+  router: WorkflowRouter<TConfig, TDeps>,
+  definition: WorkflowDefinition<TConfig>,
+  steps: PathStep<TConfig>[],
+): Promise<void>
+```
+
+#### `createTestDeps(partial)`
+
+Creates a test dependencies object from a partial. Returns the partial cast to the full type.
+
+```ts
+function createTestDeps<T>(partial: Partial<T>): T
 ```
 
