@@ -185,7 +185,7 @@ describe("Content Publishing Integration", () => {
 
 	test("event accumulation is per-dispatch", async () => {
 		const router = createRouter({ canApprove: () => true });
-		let wf = publishWorkflow.createWorkflow("post-4", {
+		const wf = publishWorkflow.createWorkflow("post-4", {
 			initialState: "draft",
 			data: { title: "T", body: "B" },
 		});

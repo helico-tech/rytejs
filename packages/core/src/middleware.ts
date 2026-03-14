@@ -13,7 +13,4 @@ export type Middleware<
 	TDeps,
 	TState extends StateNames<TConfig> = StateNames<TConfig>,
 	TCommand extends CommandNames<TConfig> = CommandNames<TConfig>,
-> = (
-	ctx: Context<TConfig, TDeps, TState, TCommand>,
-	next: () => Promise<void>,
-) => Promise<void>;
+> = (ctx: Context<TConfig, TDeps, TState, TCommand>, next: () => Promise<void>) => Promise<void>;

@@ -14,7 +14,9 @@
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"sideEffects": false,
 	"repository": {
 		"type": "git",
@@ -23,7 +25,13 @@
 	},
 	"homepage": "https://helico-tech.github.io/ryte",
 	"bugs": "https://github.com/helico-tech/ryte/issues",
-	"keywords": ["workflow", "state-machine", "typescript", "zod", "middleware"],
+	"keywords": [
+		"workflow",
+		"state-machine",
+		"typescript",
+		"zod",
+		"middleware"
+	],
 	"peerDependencies": {
 		"zod": "^4.0.0"
 	},

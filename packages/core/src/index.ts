@@ -1,3 +1,11 @@
+export type { Context } from "./context.js";
+export type { WorkflowDefinition } from "./definition.js";
+export { defineWorkflow } from "./definition.js";
+export type { Handler } from "./handler.js";
+export type { ContextKey } from "./key.js";
+export { createKey } from "./key.js";
+export type { Middleware } from "./middleware.js";
+export { WorkflowRouter } from "./router.js";
 export type {
 	CommandNames,
 	CommandPayload,
@@ -14,11 +22,3 @@ export type {
 	WorkflowOf,
 } from "./types.js";
 export { DomainErrorSignal, ValidationError } from "./types.js";
-export type { ContextKey } from "./key.js";
-export { createKey } from "./key.js";
-export type { WorkflowDefinition } from "./definition.js";
-export { defineWorkflow } from "./definition.js";
-export type { Context } from "./context.js";
-export type { Middleware } from "./middleware.js";
-export type { Handler } from "./handler.js";
-export { WorkflowRouter } from "./router.js";

@@ -1,5 +1,5 @@
 import { compose } from "./compose.js";
-import { createContext, type Context } from "./context.js";
+import { type Context, createContext } from "./context.js";
 import type { WorkflowDefinition } from "./definition.js";
 import type {
 	CommandNames,
@@ -17,20 +17,13 @@ type AnyHandler = (ctx: any) => void | Promise<void>;
 
 type HandlerEntry = { inlineMiddleware: AnyMiddleware[]; handler: AnyMiddleware };
 
-class StateBuilder<
-	TConfig extends WorkflowConfig,
-	TDeps,
-	TState extends StateNames<TConfig>,
-> {
+class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNames<TConfig>> {
 	/** @internal */ readonly middleware: AnyMiddleware[] = [];
 	/** @internal */ readonly handlers = new Map<string, HandlerEntry>();
 
 	on<C extends CommandNames<TConfig>>(
 		command: C,
-		...fns: [
-			...AnyMiddleware[],
-			(ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>,
-		]
+		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
 	): this {
 		if (fns.length === 0) throw new Error("on() requires at least a handler");
 		const handler = fns.pop() as AnyHandler;
@@ -43,10 +36,7 @@ class StateBuilder<
 	}
 
 	use(
-		middleware: (
-			ctx: Context<TConfig, TDeps, TState>,
-			next: () => Promise<void>,
-		) => Promise<void>,
+		middleware: (ctx: Context<TConfig, TDeps, TState>, next: () => Promise<void>) => Promise<void>,
 	): this {
 		this.middleware.push(middleware as AnyMiddleware);
 		return this;

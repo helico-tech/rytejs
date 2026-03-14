@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter, createKey } from "../../src/index.js";
+import { createKey, defineWorkflow, WorkflowRouter } from "../../src/index.js";
 
 const orderWorkflow = defineWorkflow("order", {
 	states: {

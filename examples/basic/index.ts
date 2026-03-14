@@ -1,4 +1,4 @@
-import { defineWorkflow, WorkflowRouter } from "@ryte/core";
+import { defineWorkflow, type Workflow, WorkflowRouter } from "@ryte/core";
 import { z } from "zod";
 
 const taskWorkflow = defineWorkflow("task", {
@@ -34,12 +34,13 @@ router.state("todo", (state) => {
 	});
 
 	state.on("start", (ctx) => {
-		if (!ctx.data.assignee) {
+		const assignee = ctx.data.assignee;
+		if (!assignee) {
 			ctx.error({ code: "notAssigned", data: {} });
 		}
 		ctx.transition("inProgress", {
 			title: ctx.data.title,
-			assignee: ctx.data.assignee!,
+			assignee,
 			startedAt: new Date(),
 		});
 		ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
@@ -57,8 +58,10 @@ router.state("inProgress", (state) => {
 	});
 });
 
+type TaskWorkflow = Workflow<typeof taskWorkflow.config>;
+
 async function main() {
-	let task = taskWorkflow.createWorkflow("task-1", {
+	let task: TaskWorkflow = taskWorkflow.createWorkflow("task-1", {
 		initialState: "todo",
 		data: { title: "Write documentation" },
 	});
@@ -69,20 +72,20 @@ async function main() {
 		payload: { assignee: "alice" },
 	});
 	if (result.ok) {
-		task = result.workflow as any;
+		task = result.workflow;
 		console.log(`Assigned: ${task.state}`, task.data);
 		console.log("Events:", result.events);
 	}
 
 	result = await router.dispatch(task, { type: "start", payload: {} });
 	if (result.ok) {
-		task = result.workflow as any;
+		task = result.workflow;
 		console.log(`Started: ${task.state}`, task.data);
 	}
 
 	result = await router.dispatch(task, { type: "complete", payload: {} });
 	if (result.ok) {
-		task = result.workflow as any;
+		task = result.workflow;
 		console.log(`Done: ${task.state}`, task.data);
 	}
 }

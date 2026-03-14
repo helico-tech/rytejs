@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import { createContext } from "../src/context.js";
-import { createKey } from "../src/key.js";
 import { defineWorkflow } from "../src/definition.js";
+import { createKey } from "../src/key.js";
 import { DomainErrorSignal, ValidationError } from "../src/types.js";
 
 const definition = defineWorkflow("test", {
@@ -43,13 +43,23 @@ describe("createContext", () => {
 	describe("data and update", () => {
 		test("ctx.data returns current state data", () => {
 			const wf = create.draft({ title: "hello" });
-			const ctx = createContext(definition, wf, { type: "save", payload: { title: "hello" } }, deps);
+			const ctx = createContext(
+				definition,
+				wf,
+				{ type: "save", payload: { title: "hello" } },
+				deps,
+			);
 			expect(ctx.data).toEqual({ title: "hello" });
 		});
 
 		test("ctx.update merges data into current state", () => {
 			const wf = create.draft({ title: "hello" });
-			const ctx = createContext(definition, wf, { type: "save", payload: { title: "hello" } }, deps);
+			const ctx = createContext(
+				definition,
+				wf,
+				{ type: "save", payload: { title: "hello" } },
+				deps,
+			);
 			ctx.update({ body: "world" });
 			expect(ctx.data).toEqual({ title: "hello", body: "world" });
 		});
@@ -80,9 +90,7 @@ describe("createContext", () => {
 		test("ctx.transition throws for unknown target state", () => {
 			const wf = create.draft();
 			const ctx = createContext(definition, wf, { type: "submit", payload: {} }, deps);
-			expect(() => ctx.transition("nonexistent" as any, {})).toThrow(
-				"Unknown state: nonexistent",
-			);
+			expect(() => ctx.transition("nonexistent" as any, {})).toThrow("Unknown state: nonexistent");
 		});
 
 		test("transition discards prior ctx.update changes", () => {
@@ -128,9 +136,9 @@ describe("createContext", () => {
 		test("ctx.error throws DomainErrorSignal", () => {
 			const wf = create.draft();
 			const ctx = createContext(definition, wf, { type: "save", payload: { title: "x" } }, deps);
-			expect(() =>
-				ctx.error({ code: "incomplete", data: { missing: ["body"] } }),
-			).toThrow(DomainErrorSignal);
+			expect(() => ctx.error({ code: "incomplete", data: { missing: ["body"] } })).toThrow(
+				DomainErrorSignal,
+			);
 		});
 
 		test("ctx.error validates error data against schema", () => {

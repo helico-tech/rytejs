@@ -1,5 +1,5 @@
-import type { ContextKey } from "./key.js";
 import type { WorkflowDefinition } from "./definition.js";
+import type { ContextKey } from "./key.js";
 import type {
 	CommandNames,
 	CommandPayload,
