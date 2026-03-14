@@ -18,9 +18,37 @@ npm login
 npm org create rytejs
 ```
 
+## Versioning
+
+Use `npm version` from the package directory to bump the version. This updates `package.json`, creates a git commit, and tags it.
+
+```bash
+cd packages/core
+
+# Patch release (0.1.0 → 0.1.1) -- bug fixes
+npm version patch
+
+# Minor release (0.1.0 → 0.2.0) -- new features, backwards-compatible
+npm version minor
+
+# Major release (0.1.0 → 1.0.0) -- breaking changes
+npm version major
+```
+
+For a specific version:
+
+```bash
+npm version 1.0.0-beta.1
+```
+
 ## Publishing a Release
 
-1. **Update the version** in `packages/core/package.json`.
+1. **Bump the version:**
+
+   ```bash
+   cd packages/core
+   npm version patch  # or minor/major
+   ```
 
 2. **Run full checks** to make sure everything passes:
 
@@ -40,10 +68,9 @@ npm org create rytejs
    pnpm --filter @rytejs/core publish --access public
    ```
 
-5. **Tag the release** and push:
+5. **Push the commit and tag:**
 
    ```bash
-   git tag v<version>
    git push --tags
    ```
 
@@ -51,7 +78,7 @@ npm org create rytejs
 
 Documentation is built with VitePress and deployed to GitHub Pages.
 
-- **Automated:** GitHub Actions deploys on push to `main` (if configured).
+- **Automated:** GitHub Actions deploys on push to `master`.
 - **Manual:**
 
   ```bash
