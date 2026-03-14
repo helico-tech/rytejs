@@ -62,7 +62,7 @@ export interface WorkflowSnapshot<TConfig extends WorkflowConfig = WorkflowConfi
 	readonly data: unknown;
 	readonly createdAt: string;
 	readonly updatedAt: string;
-	readonly version: number;
+	readonly modelVersion: number;
 }
 ```
 
@@ -146,7 +146,7 @@ describe("snapshot()", () => {
 		expect(snap.data).toEqual({ items: ["apple"] });
 		expect(typeof snap.createdAt).toBe("string");
 		expect(typeof snap.updatedAt).toBe("string");
-		expect(snap.version).toBe(1);
+		expect(snap.modelVersion).toBe(1);
 	});
 
 	test("serializes dates as ISO 8601 strings", () => {
@@ -213,7 +213,7 @@ describe("restore()", () => {
 			data: { items: [] },
 			createdAt: "2026-01-15T10:00:00.000Z",
 			updatedAt: "2026-01-15T10:05:00.000Z",
-			version: 1,
+			modelVersion: 1,
 		};
 		const result = definition.restore(snap);
 
@@ -232,7 +232,7 @@ describe("restore()", () => {
 			data: { items: "not-an-array" }, // should be string[]
 			createdAt: "2026-01-15T10:00:00.000Z",
 			updatedAt: "2026-01-15T10:05:00.000Z",
-			version: 1,
+			modelVersion: 1,
 		};
 		const result = definition.restore(snap);
 
@@ -251,7 +251,7 @@ describe("restore()", () => {
 			data: {},
 			createdAt: "2026-01-15T10:00:00.000Z",
 			updatedAt: "2026-01-15T10:05:00.000Z",
-			version: 1,
+			modelVersion: 1,
 		};
 		const result = definition.restore(snap);
 
@@ -277,19 +277,19 @@ describe("restore()", () => {
 	});
 });
 
-describe("versioned definition", () => {
-	test("version defaults to 1", () => {
+describe("modelVersion", () => {
+	test("modelVersion defaults to 1", () => {
 		const wf = definition.createWorkflow("wf-1", {
 			initialState: "Draft",
 			data: { items: [] },
 		});
 		const snap = definition.snapshot(wf);
-		expect(snap.version).toBe(1);
+		expect(snap.modelVersion).toBe(1);
 	});
 
-	test("custom version is stamped on snapshots", () => {
+	test("custom modelVersion is stamped on snapshots", () => {
 		const versionedDef = defineWorkflow("order", {
-			version: 2,
+			modelVersion: 2,
 			states: {
 				Draft: z.object({ items: z.array(z.string()) }),
 			},
@@ -302,7 +302,7 @@ describe("versioned definition", () => {
 			data: { items: [] },
 		});
 		const snap = versionedDef.snapshot(wf);
-		expect(snap.version).toBe(2);
+		expect(snap.modelVersion).toBe(2);
 	});
 });
 ```
@@ -318,7 +318,7 @@ In `packages/core/src/types.ts`, add optional `version` to `WorkflowConfig`:
 
 ```ts
 export interface WorkflowConfig {
-	version?: number;
+	modelVersion?: number;
 	states: Record<string, ZodType>;
 	commands: Record<string, ZodType>;
 	events: Record<string, ZodType>;
@@ -356,7 +356,7 @@ snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig> {
 		data: workflow.data,
 		createdAt: workflow.createdAt.toISOString(),
 		updatedAt: workflow.updatedAt.toISOString(),
-		version: config.version ?? 1,
+		modelVersion: config.modelVersion ?? 1,
 	} as WorkflowSnapshot<TConfig>;
 },
 
