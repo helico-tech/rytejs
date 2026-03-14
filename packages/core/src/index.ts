@@ -21,3 +21,4 @@ export { defineWorkflow } from "./definition.js";
 export type { Context } from "./context.js";
 export type { Middleware } from "./middleware.js";
 export type { Handler } from "./handler.js";
+export { WorkflowRouter } from "./router.js";
