@@ -55,7 +55,7 @@ importers:
         specifier: ^4.0.0
         version: 4.3.6
 
-  packages/viz:
+  packages/testing:
     devDependencies:
       '@rytejs/core':
         specifier: workspace:*
