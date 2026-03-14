@@ -1,0 +1,38 @@
+name: E2E
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read package version
+        id: version
+        run: echo "version=$(node -p "require('./packages/core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Set @rytejs/core version in E2E project
+        run: |
+          cd examples/e2e
+          node -e "
+            const pkg = require('./package.json');
+            pkg.dependencies['@rytejs/core'] = '${{ steps.version.outputs.version }}';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Install E2E dependencies
+        run: |
+          cd examples/e2e
+          npm install
+
+      - name: Run E2E tests
+        run: |
+          cd examples/e2e
+          npx vitest run
