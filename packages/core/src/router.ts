@@ -422,12 +422,10 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		// Hook: dispatch:start
 		await this.hookRegistry.emit("dispatch:start", this.onHookError, ctx);
 
-		// biome-ignore lint/suspicious/noExplicitAny: initialized to undefined; assigned in try/catch before finally uses it
-		let result: DispatchResult<TConfig> = undefined as any;
 		try {
 			const composed = compose(chain);
 			await composed(ctx);
-			result = {
+			const result: DispatchResult<TConfig> = {
 				ok: true as const,
 				workflow: ctx.getWorkflowSnapshot(),
 				events: [...ctx.events],
@@ -451,8 +449,12 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 				}
 			}
 
+			// Hook: dispatch:end
+			await this.hookRegistry.emit("dispatch:end", this.onHookError, ctx, result);
+
 			return result;
 		} catch (err) {
+			let result: DispatchResult<TConfig>;
 			if (err instanceof DomainErrorSignal) {
 				result = {
 					ok: false as const,
@@ -479,13 +481,10 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			// Hook: error
 			await this.hookRegistry.emit("error", this.onHookError, result.error, ctx);
 
+			// Hook: dispatch:end
+			await this.hookRegistry.emit("dispatch:end", this.onHookError, ctx, result);
+
 			return result;
-		} finally {
-			// Hook: dispatch:end — always fires if dispatch:start fired
-			// result is undefined only when an unexpected error was re-thrown; skip dispatch:end in that case
-			if (result !== undefined) {
-				await this.hookRegistry.emit("dispatch:end", this.onHookError, ctx, result);
-			}
 		}
 	}
 }
