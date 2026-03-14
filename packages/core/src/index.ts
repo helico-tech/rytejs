@@ -16,3 +16,5 @@ export type {
 export { DomainErrorSignal, ValidationError } from "./types.js";
 export type { ContextKey } from "./key.js";
 export { createKey } from "./key.js";
+export type { WorkflowDefinition } from "./definition.js";
+export { defineWorkflow } from "./definition.js";
