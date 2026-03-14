@@ -18,3 +18,4 @@ export type { ContextKey } from "./key.js";
 export { createKey } from "./key.js";
 export type { WorkflowDefinition } from "./definition.js";
 export { defineWorkflow } from "./definition.js";
+export type { Context } from "./context.js";
