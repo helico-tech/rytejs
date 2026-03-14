@@ -21,13 +21,13 @@ router.use(async (ctx, next) => {
 Added with `state.use()` inside a `.state()` block. Only runs for handlers registered in that state.
 
 ```ts
-router.state("draft", (state) => {
+router.state("Draft", (state) => {
   state.use(async (ctx, next) => {
-    console.log("entering draft handler");
+    console.log("entering Draft handler");
     await next();
   });
 
-  state.on("updateDraft", (ctx) => {
+  state.on("UpdateDraft", (ctx) => {
     ctx.update({ title: ctx.command.payload.title });
   });
 });
@@ -40,17 +40,17 @@ State middleware does **not** run for wildcard handlers, even if the workflow is
 Passed as extra arguments to `state.on()` before the handler. Runs only for that specific command.
 
 ```ts
-router.state("draft", (state) => {
+router.state("Draft", (state) => {
   state.on(
-    "submit",
+    "Submit",
     async (ctx, next) => {
       if (!ctx.data.body) {
-        ctx.error({ code: "bodyRequired", data: {} });
+        ctx.error({ code: "BodyRequired", data: {} });
       }
       await next();
     },
     (ctx) => {
-      ctx.transition("review", {
+      ctx.transition("Review", {
         title: ctx.data.title,
         body: ctx.data.body!,
         reviewerId: ctx.command.payload.reviewerId,
@@ -85,7 +85,7 @@ router.use(async (_ctx, next) => {
   log.push("global-after");
 });
 
-router.state("draft", (state) => {
+router.state("Draft", (state) => {
   state.use(async (_ctx, next) => {
     log.push("state-before");
     await next();
@@ -93,7 +93,7 @@ router.state("draft", (state) => {
   });
 
   state.on(
-    "setTitle",
+    "SetTitle",
     async (_ctx, next) => {
       log.push("inline-before");
       await next();
@@ -106,7 +106,7 @@ router.state("draft", (state) => {
   );
 });
 
-await router.dispatch(workflow, { type: "setTitle", payload: { title: "x" } });
+await router.dispatch(workflow, { type: "SetTitle", payload: { title: "x" } });
 // log: ["global-before", "state-before", "inline-before", "handler",
 //        "inline-after", "state-after", "global-after"]
 ```
@@ -124,13 +124,13 @@ router.use(async (ctx, next) => {
   await next();
 });
 
-router.state("review", (state) => {
-  state.on("approve", (ctx) => {
+router.state("Review", (state) => {
+  state.on("Approve", (ctx) => {
     const user = ctx.get(UserKey);
     if (user.role !== "admin") {
-      ctx.error({ code: "unauthorized", data: { required: "admin" } });
+      ctx.error({ code: "Unauthorized", data: { required: "admin" } });
     }
-    ctx.transition("published", {
+    ctx.transition("Published", {
       title: ctx.data.title,
       body: ctx.data.body,
       publishedAt: new Date(),

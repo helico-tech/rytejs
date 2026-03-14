@@ -4,28 +4,28 @@ import { createKey, defineWorkflow, WorkflowRouter } from "../../src/index.js";
 
 const orderWorkflow = defineWorkflow("order", {
 	states: {
-		created: z.object({ items: z.array(z.string()), total: z.number() }),
-		paid: z.object({ items: z.array(z.string()), total: z.number(), paidAt: z.coerce.date() }),
-		shipped: z.object({
+		Created: z.object({ items: z.array(z.string()), total: z.number() }),
+		Paid: z.object({ items: z.array(z.string()), total: z.number(), paidAt: z.coerce.date() }),
+		Shipped: z.object({
 			items: z.array(z.string()),
 			total: z.number(),
 			paidAt: z.coerce.date(),
 			trackingNumber: z.string(),
 		}),
-		delivered: z.object({
+		Delivered: z.object({
 			items: z.array(z.string()),
 			total: z.number(),
 			paidAt: z.coerce.date(),
 			trackingNumber: z.string(),
 			deliveredAt: z.coerce.date(),
 		}),
-		cancelled: z.object({ reason: z.string(), cancelledAt: z.coerce.date() }),
+		Cancelled: z.object({ reason: z.string(), cancelledAt: z.coerce.date() }),
 	},
 	commands: {
-		pay: z.object({ amount: z.number() }),
-		ship: z.object({ trackingNumber: z.string() }),
-		deliver: z.object({}),
-		cancel: z.object({ reason: z.string() }),
+		Pay: z.object({ amount: z.number() }),
+		Ship: z.object({ trackingNumber: z.string() }),
+		Deliver: z.object({}),
+		Cancel: z.object({ reason: z.string() }),
 	},
 	events: {
 		OrderPaid: z.object({ orderId: z.string(), amount: z.number() }),
@@ -34,8 +34,8 @@ const orderWorkflow = defineWorkflow("order", {
 		OrderCancelled: z.object({ orderId: z.string(), reason: z.string() }),
 	},
 	errors: {
-		insufficientPayment: z.object({ required: z.number(), received: z.number() }),
-		alreadyShipped: z.object({}),
+		InsufficientPayment: z.object({ required: z.number(), received: z.number() }),
+		AlreadyShipped: z.object({}),
 	},
 });
 
@@ -53,15 +53,15 @@ describe("Order Fulfillment Integration", () => {
 			await next();
 		});
 
-		router.state("created", (state) => {
-			state.on("pay", (ctx) => {
+		router.state("Created", (state) => {
+			state.on("Pay", (ctx) => {
 				if (ctx.command.payload.amount < ctx.data.total) {
 					ctx.error({
-						code: "insufficientPayment",
+						code: "InsufficientPayment",
 						data: { required: ctx.data.total, received: ctx.command.payload.amount },
 					});
 				}
-				ctx.transition("paid", {
+				ctx.transition("Paid", {
 					items: ctx.data.items,
 					total: ctx.data.total,
 					paidAt: new Date(),
@@ -73,9 +73,9 @@ describe("Order Fulfillment Integration", () => {
 			});
 		});
 
-		router.state("paid", (state) => {
-			state.on("ship", (ctx) => {
-				ctx.transition("shipped", {
+		router.state("Paid", (state) => {
+			state.on("Ship", (ctx) => {
+				ctx.transition("Shipped", {
 					items: ctx.data.items,
 					total: ctx.data.total,
 					paidAt: ctx.data.paidAt,
@@ -88,9 +88,9 @@ describe("Order Fulfillment Integration", () => {
 			});
 		});
 
-		router.state("shipped", (state) => {
-			state.on("deliver", (ctx) => {
-				ctx.transition("delivered", {
+		router.state("Shipped", (state) => {
+			state.on("Deliver", (ctx) => {
+				ctx.transition("Delivered", {
 					items: ctx.data.items,
 					total: ctx.data.total,
 					paidAt: ctx.data.paidAt,
@@ -101,9 +101,9 @@ describe("Order Fulfillment Integration", () => {
 			});
 		});
 
-		router.state(["created", "paid"] as const, (state) => {
-			state.on("cancel", (ctx) => {
-				ctx.transition("cancelled", {
+		router.state(["Created", "Paid"] as const, (state) => {
+			state.on("Cancel", (ctx) => {
+				ctx.transition("Cancelled", {
 					reason: ctx.command.payload.reason,
 					cancelledAt: new Date(),
 				});
@@ -120,71 +120,71 @@ describe("Order Fulfillment Integration", () => {
 	test("full lifecycle: created → paid → shipped → delivered", async () => {
 		const { router } = createRouter();
 		let wf = orderWorkflow.createWorkflow("order-1", {
-			initialState: "created",
+			initialState: "Created",
 			data: { items: ["widget"], total: 50 },
 		});
 
-		let result = await router.dispatch(wf, { type: "pay", payload: { amount: 50 } });
+		let result = await router.dispatch(wf, { type: "Pay", payload: { amount: 50 } });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("paid");
+		expect(result.workflow.state).toBe("Paid");
 		expect(result.events).toHaveLength(1);
 		expect(result.events[0]?.type).toBe("OrderPaid");
 		wf = result.workflow as any;
 
 		result = await router.dispatch(wf, {
-			type: "ship",
+			type: "Ship",
 			payload: { trackingNumber: "TRACK-123" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("shipped");
+		expect(result.workflow.state).toBe("Shipped");
 		wf = result.workflow as any;
 
-		result = await router.dispatch(wf, { type: "deliver", payload: {} });
+		result = await router.dispatch(wf, { type: "Deliver", payload: {} });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("delivered");
+		expect(result.workflow.state).toBe("Delivered");
 	});
 
 	test("domain error with rollback, then successful retry", async () => {
 		const { router } = createRouter();
 		const wf = orderWorkflow.createWorkflow("order-2", {
-			initialState: "created",
+			initialState: "Created",
 			data: { items: ["widget"], total: 100 },
 		});
 
-		let result = await router.dispatch(wf, { type: "pay", payload: { amount: 50 } });
+		let result = await router.dispatch(wf, { type: "Pay", payload: { amount: 50 } });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
 		expect(result.error.category).toBe("domain");
 		if (result.error.category === "domain") {
-			expect(result.error.code).toBe("insufficientPayment");
+			expect(result.error.code).toBe("InsufficientPayment");
 		}
 
-		expect(wf.state).toBe("created");
+		expect(wf.state).toBe("Created");
 
-		result = await router.dispatch(wf, { type: "pay", payload: { amount: 100 } });
+		result = await router.dispatch(wf, { type: "Pay", payload: { amount: 100 } });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("paid");
+		expect(result.workflow.state).toBe("Paid");
 	});
 
 	test("events don't leak between dispatches", async () => {
 		const { router } = createRouter();
 		let wf = orderWorkflow.createWorkflow("order-3", {
-			initialState: "created",
+			initialState: "Created",
 			data: { items: ["a"], total: 10 },
 		});
 
-		const result1 = await router.dispatch(wf, { type: "pay", payload: { amount: 10 } });
+		const result1 = await router.dispatch(wf, { type: "Pay", payload: { amount: 10 } });
 		expect(result1.ok).toBe(true);
 		if (!result1.ok) throw new Error();
 		expect(result1.events).toHaveLength(1);
 		wf = result1.workflow as any;
 
 		const result2 = await router.dispatch(wf, {
-			type: "ship",
+			type: "Ship",
 			payload: { trackingNumber: "T1" },
 		});
 		expect(result2.ok).toBe(true);
@@ -196,27 +196,27 @@ describe("Order Fulfillment Integration", () => {
 	test("middleware injects auth and logs audit trail", async () => {
 		const { router, deps } = createRouter();
 		const wf = orderWorkflow.createWorkflow("order-4", {
-			initialState: "created",
+			initialState: "Created",
 			data: { items: ["x"], total: 5 },
 		});
 
-		await router.dispatch(wf, { type: "pay", payload: { amount: 5 } });
-		expect(deps.auditLog).toEqual(["admin:pay"]);
+		await router.dispatch(wf, { type: "Pay", payload: { amount: 5 } });
+		expect(deps.auditLog).toEqual(["admin:Pay"]);
 	});
 
 	test("cancel from created state via multi-state handler", async () => {
 		const { router } = createRouter();
 		const wf = orderWorkflow.createWorkflow("order-5", {
-			initialState: "created",
+			initialState: "Created",
 			data: { items: ["y"], total: 20 },
 		});
 
 		const result = await router.dispatch(wf, {
-			type: "cancel",
+			type: "Cancel",
 			payload: { reason: "changed mind" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("cancelled");
+		expect(result.workflow.state).toBe("Cancelled");
 	});
 });

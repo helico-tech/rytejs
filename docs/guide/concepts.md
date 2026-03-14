@@ -10,7 +10,7 @@ An immutable snapshot of a stateful entity. Every workflow has:
 | ---------------- | ---------------------------------------- |
 | `id`             | Unique identifier (you provide this)     |
 | `definitionName` | Name of the workflow definition          |
-| `state`          | Current state name (e.g. `"todo"`)       |
+| `state`          | Current state name (e.g. `"Todo"`)       |
 | `data`           | State-specific data, validated by Zod    |
 | `createdAt`      | Creation timestamp                       |
 | `updatedAt`      | Last modification timestamp              |
@@ -23,8 +23,8 @@ Each state has a Zod schema that defines its data shape. Different states can ha
 
 ```ts
 states: {
-  todo: z.object({ title: z.string() }),
-  done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
+  Todo: z.object({ title: z.string() }),
+  Done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
 }
 ```
 
@@ -36,12 +36,12 @@ Commands are intents dispatched to a workflow. Each command has a payload valida
 
 ```ts
 commands: {
-  complete: z.object({}),
-  rename: z.object({ title: z.string() }),
+  Complete: z.object({}),
+  Rename: z.object({ title: z.string() }),
 }
 ```
 
-Commands are dispatched as `{ type: "complete", payload: {} }`.
+Commands are dispatched as `{ type: "Complete", payload: {} }`.
 
 ## Events
 

@@ -4,18 +4,18 @@ import { defineWorkflow } from "../src/definition.js";
 
 const testDefinition = defineWorkflow("test", {
 	states: {
-		draft: z.object({ title: z.string().optional() }),
-		published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
+		Draft: z.object({ title: z.string().optional() }),
+		Published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
 	},
 	commands: {
-		create: z.object({ title: z.string() }),
-		publish: z.object({}),
+		Create: z.object({ title: z.string() }),
+		Publish: z.object({}),
 	},
 	events: {
 		Created: z.object({ id: z.string() }),
 	},
 	errors: {
-		invalidTitle: z.object({ reason: z.string() }),
+		InvalidTitle: z.object({ reason: z.string() }),
 	},
 });
 
@@ -32,7 +32,7 @@ describe("defineWorkflow", () => {
 	});
 
 	test("getStateSchema returns the Zod schema for a state", () => {
-		const schema = testDefinition.getStateSchema("draft");
+		const schema = testDefinition.getStateSchema("Draft");
 		const result = schema.safeParse({ title: "hello" });
 		expect(result.success).toBe(true);
 	});
@@ -44,7 +44,7 @@ describe("defineWorkflow", () => {
 	});
 
 	test("getCommandSchema returns the Zod schema for a command", () => {
-		const schema = testDefinition.getCommandSchema("create");
+		const schema = testDefinition.getCommandSchema("Create");
 		const result = schema.safeParse({ title: "hello" });
 		expect(result.success).toBe(true);
 	});
@@ -68,7 +68,7 @@ describe("defineWorkflow", () => {
 	});
 
 	test("getErrorSchema returns the Zod schema for an error code", () => {
-		const schema = testDefinition.getErrorSchema("invalidTitle");
+		const schema = testDefinition.getErrorSchema("InvalidTitle");
 		const result = schema.safeParse({ reason: "too short" });
 		expect(result.success).toBe(true);
 	});
@@ -80,7 +80,7 @@ describe("defineWorkflow", () => {
 	});
 
 	test("hasState returns true for known states", () => {
-		expect(testDefinition.hasState("draft")).toBe(true);
+		expect(testDefinition.hasState("Draft")).toBe(true);
 		expect(testDefinition.hasState("nonexistent")).toBe(false);
 	});
 });
@@ -88,13 +88,13 @@ describe("defineWorkflow", () => {
 describe("createWorkflow", () => {
 	test("creates workflow with initial state and data", () => {
 		const wf = testDefinition.createWorkflow("wf-1", {
-			initialState: "draft",
+			initialState: "Draft",
 			data: { title: "hello" },
 		});
 
 		expect(wf.id).toBe("wf-1");
 		expect(wf.definitionName).toBe("test");
-		expect(wf.state).toBe("draft");
+		expect(wf.state).toBe("Draft");
 		expect(wf.data).toEqual({ title: "hello" });
 		expect(wf.createdAt).toBeInstanceOf(Date);
 		expect(wf.updatedAt).toBeInstanceOf(Date);
@@ -102,18 +102,18 @@ describe("createWorkflow", () => {
 
 	test("creates workflow with empty data when schema allows it", () => {
 		const wf = testDefinition.createWorkflow("wf-2", {
-			initialState: "draft",
+			initialState: "Draft",
 			data: {},
 		});
 
-		expect(wf.state).toBe("draft");
+		expect(wf.state).toBe("Draft");
 		expect(wf.data).toEqual({});
 	});
 
 	test("throws validation error for invalid initial data", () => {
 		expect(() =>
 			testDefinition.createWorkflow("wf-3", {
-				initialState: "published",
+				initialState: "Published",
 				data: {} as any,
 			}),
 		).toThrow();

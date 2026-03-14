@@ -41,18 +41,18 @@ if (!result.ok && result.error.category === "validation") {
 Raised by handlers via `ctx.error()`. These represent business rule violations.
 
 ```ts
-router.state("created", (state) => {
-  state.on("pay", (ctx) => {
+router.state("Created", (state) => {
+  state.on("Pay", (ctx) => {
     if (ctx.command.payload.amount < ctx.data.total) {
       ctx.error({
-        code: "insufficientPayment",
+        code: "InsufficientPayment",
         data: {
           required: ctx.data.total,
           received: ctx.command.payload.amount,
         },
       });
     }
-    // ... transition to paid
+    // ... transition to Paid
   });
 });
 ```
@@ -61,7 +61,7 @@ Domain errors carry a typed `code` and `data`, validated against the error schem
 
 ```ts
 if (!result.ok && result.error.category === "domain") {
-  console.log(result.error.code); // "insufficientPayment"
+  console.log(result.error.code); // "InsufficientPayment"
   console.log(result.error.data); // { required: 100, received: 50 }
 }
 ```
@@ -88,14 +88,14 @@ All mutations are provisional. If dispatch fails for any reason, the original wo
 
 ```ts
 const task = taskWorkflow.createWorkflow("task-1", {
-  initialState: "todo",
+  initialState: "Todo",
   data: { title: "Original" },
 });
 
-const result = await router.dispatch(task, { type: "start", payload: { assignee: "x" } });
+const result = await router.dispatch(task, { type: "Start", payload: { assignee: "x" } });
 
 if (!result.ok) {
-  console.log(task.state);      // still "todo"
+  console.log(task.state);      // still "Todo"
   console.log(task.data.title); // still "Original"
 }
 ```

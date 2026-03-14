@@ -58,18 +58,18 @@ const AuthKey = createKey<{ userId: string; role: "viewer" | "editor" | "admin" 
 // 2. Define workflow
 const articleWorkflow = defineWorkflow("article", {
   states: {
-    draft: z.object({ title: z.string(), body: z.string().optional() }),
-    published: z.object({ title: z.string(), body: z.string(), publishedAt: z.coerce.date() }),
+    Draft: z.object({ title: z.string(), body: z.string().optional() }),
+    Published: z.object({ title: z.string(), body: z.string(), publishedAt: z.coerce.date() }),
   },
   commands: {
-    publish: z.object({}),
+    Publish: z.object({}),
   },
   events: {
     ArticlePublished: z.object({ articleId: z.string(), publishedBy: z.string() }),
   },
   errors: {
-    unauthorized: z.object({ required: z.string() }),
-    bodyRequired: z.object({}),
+    Unauthorized: z.object({ required: z.string() }),
+    BodyRequired: z.object({}),
   },
 });
 
@@ -85,19 +85,19 @@ router.use(async (ctx, next) => {
 });
 
 // 5. Handler reads the key
-router.state("draft", (state) => {
-  state.on("publish", (ctx) => {
+router.state("Draft", (state) => {
+  state.on("Publish", (ctx) => {
     const auth = ctx.get(AuthKey);
 
     if (auth.role === "viewer") {
-      ctx.error({ code: "unauthorized", data: { required: "editor" } });
+      ctx.error({ code: "Unauthorized", data: { required: "editor" } });
     }
 
     if (!ctx.data.body) {
-      ctx.error({ code: "bodyRequired", data: {} });
+      ctx.error({ code: "BodyRequired", data: {} });
     }
 
-    ctx.transition("published", {
+    ctx.transition("Published", {
       title: ctx.data.title,
       body: ctx.data.body!,
       publishedAt: new Date(),

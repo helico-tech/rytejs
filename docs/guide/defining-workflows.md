@@ -10,21 +10,21 @@ import { defineWorkflow } from "@ryte/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {
-    todo: z.object({ title: z.string(), priority: z.number().default(0) }),
-    inProgress: z.object({ title: z.string(), assignee: z.string() }),
-    done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
+    Todo: z.object({ title: z.string(), priority: z.number().default(0) }),
+    InProgress: z.object({ title: z.string(), assignee: z.string() }),
+    Done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
   },
   commands: {
-    start: z.object({ assignee: z.string() }),
-    complete: z.object({}),
-    rename: z.object({ title: z.string() }),
+    Start: z.object({ assignee: z.string() }),
+    Complete: z.object({}),
+    Rename: z.object({ title: z.string() }),
   },
   events: {
     TaskStarted: z.object({ taskId: z.string(), assignee: z.string() }),
     TaskCompleted: z.object({ taskId: z.string() }),
   },
   errors: {
-    alreadyAssigned: z.object({ currentAssignee: z.string() }),
+    AlreadyAssigned: z.object({ currentAssignee: z.string() }),
   },
 });
 ```
@@ -37,12 +37,12 @@ All four config keys -- `states`, `commands`, `events`, `errors` -- are required
 
 ```ts
 const task = taskWorkflow.createWorkflow("task-1", {
-  initialState: "todo",
+  initialState: "Todo",
   data: { title: "Write docs" },
 });
 
 console.log(task.id);    // "task-1"
-console.log(task.state); // "todo"
+console.log(task.state); // "Todo"
 console.log(task.data);  // { title: "Write docs", priority: 0 }
 ```
 
@@ -51,9 +51,9 @@ Zod defaults apply -- `priority` defaults to `0` since we used `.default(0)` in 
 If the data doesn't match the schema, `createWorkflow()` throws:
 
 ```ts
-// Throws: Invalid initial data for state 'todo': Required
+// Throws: Invalid initial data for state 'Todo': Required
 taskWorkflow.createWorkflow("bad", {
-  initialState: "todo",
+  initialState: "Todo",
   data: {}, // missing 'title'
 });
 ```
@@ -63,10 +63,10 @@ taskWorkflow.createWorkflow("bad", {
 The definition exposes methods to retrieve individual schemas at runtime:
 
 ```ts
-taskWorkflow.getStateSchema("todo");       // ZodObject for todo state
-taskWorkflow.getCommandSchema("start");    // ZodObject for start command
+taskWorkflow.getStateSchema("Todo");       // ZodObject for Todo state
+taskWorkflow.getCommandSchema("Start");    // ZodObject for Start command
 taskWorkflow.getEventSchema("TaskStarted"); // ZodObject for TaskStarted event
-taskWorkflow.getErrorSchema("alreadyAssigned"); // ZodObject for error
+taskWorkflow.getErrorSchema("AlreadyAssigned"); // ZodObject for error
 ```
 
 Each throws if the name doesn't exist.
@@ -74,7 +74,7 @@ Each throws if the name doesn't exist.
 ## Checking State Existence
 
 ```ts
-taskWorkflow.hasState("todo");      // true
+taskWorkflow.hasState("Todo");      // true
 taskWorkflow.hasState("unknown");   // false
 ```
 
@@ -86,25 +86,25 @@ import { defineWorkflow } from "@ryte/core";
 
 const articleWorkflow = defineWorkflow("article", {
   states: {
-    draft: z.object({ title: z.string(), body: z.string().optional() }),
-    review: z.object({
+    Draft: z.object({ title: z.string(), body: z.string().optional() }),
+    Review: z.object({
       title: z.string(),
       body: z.string(),
       reviewerId: z.string(),
     }),
-    published: z.object({
+    Published: z.object({
       title: z.string(),
       body: z.string(),
       publishedAt: z.coerce.date(),
     }),
   },
   commands: {
-    updateDraft: z.object({
+    UpdateDraft: z.object({
       title: z.string().optional(),
       body: z.string().optional(),
     }),
-    submitForReview: z.object({ reviewerId: z.string() }),
-    approve: z.object({}),
+    SubmitForReview: z.object({ reviewerId: z.string() }),
+    Approve: z.object({}),
   },
   events: {
     DraftUpdated: z.object({ articleId: z.string() }),
@@ -115,7 +115,7 @@ const articleWorkflow = defineWorkflow("article", {
     ArticlePublished: z.object({ articleId: z.string() }),
   },
   errors: {
-    bodyRequired: z.object({}),
+    BodyRequired: z.object({}),
   },
 });
 ```

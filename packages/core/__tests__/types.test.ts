@@ -15,20 +15,20 @@ import { DomainErrorSignal, ValidationError } from "../src/types.js";
 
 const testConfig = {
 	states: {
-		draft: z.object({ title: z.string() }),
-		published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
+		Draft: z.object({ title: z.string() }),
+		Published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
 	},
 	commands: {
-		create: z.object({ title: z.string() }),
-		publish: z.object({}),
+		Create: z.object({ title: z.string() }),
+		Publish: z.object({}),
 	},
 	events: {
 		Created: z.object({ id: z.string() }),
 		Published: z.object({ id: z.string() }),
 	},
 	errors: {
-		alreadyPublished: z.object({}),
-		invalidTitle: z.object({ reason: z.string() }),
+		AlreadyPublished: z.object({}),
+		InvalidTitle: z.object({ reason: z.string() }),
 	},
 } as const satisfies WorkflowConfig;
 
@@ -37,16 +37,16 @@ type TestConfig = typeof testConfig;
 describe("Type utilities", () => {
 	test("StateNames extracts state keys", () => {
 		type Result = StateNames<TestConfig>;
-		const value: Result = "draft";
-		expect(value).toBe("draft");
-		const value2: Result = "published";
-		expect(value2).toBe("published");
+		const value: Result = "Draft";
+		expect(value).toBe("Draft");
+		const value2: Result = "Published";
+		expect(value2).toBe("Published");
 	});
 
 	test("CommandNames extracts command keys", () => {
 		type Result = CommandNames<TestConfig>;
-		const value: Result = "create";
-		expect(value).toBe("create");
+		const value: Result = "Create";
+		expect(value).toBe("Create");
 	});
 
 	test("EventNames extracts event keys", () => {
@@ -57,18 +57,18 @@ describe("Type utilities", () => {
 
 	test("ErrorCodes extracts error keys", () => {
 		type Result = ErrorCodes<TestConfig>;
-		const value: Result = "alreadyPublished";
-		expect(value).toBe("alreadyPublished");
+		const value: Result = "AlreadyPublished";
+		expect(value).toBe("AlreadyPublished");
 	});
 
 	test("StateData resolves to Zod inferred type", () => {
-		type Result = StateData<TestConfig, "draft">;
+		type Result = StateData<TestConfig, "Draft">;
 		const value: Result = { title: "hello" };
 		expect(value.title).toBe("hello");
 	});
 
 	test("CommandPayload resolves to Zod inferred type", () => {
-		type Result = CommandPayload<TestConfig, "create">;
+		type Result = CommandPayload<TestConfig, "Create">;
 		const value: Result = { title: "hello" };
 		expect(value.title).toBe("hello");
 	});
@@ -80,7 +80,7 @@ describe("Type utilities", () => {
 	});
 
 	test("ErrorData resolves to Zod inferred type", () => {
-		type Result = ErrorData<TestConfig, "invalidTitle">;
+		type Result = ErrorData<TestConfig, "InvalidTitle">;
 		const value: Result = { reason: "too short" };
 		expect(value.reason).toBe("too short");
 	});
@@ -100,8 +100,8 @@ describe("Error classes", () => {
 	});
 
 	test("DomainErrorSignal carries code and data", () => {
-		const err = new DomainErrorSignal("alreadyPublished", {});
-		expect(err.code).toBe("alreadyPublished");
+		const err = new DomainErrorSignal("AlreadyPublished", {});
+		expect(err.code).toBe("AlreadyPublished");
 		expect(err.data).toEqual({});
 		expect(err).toBeInstanceOf(Error);
 	});

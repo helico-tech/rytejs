@@ -4,17 +4,17 @@ import { defineWorkflow, WorkflowRouter } from "../../src/index.js";
 
 const publishWorkflow = defineWorkflow("content", {
 	states: {
-		draft: z.object({ title: z.string(), body: z.string().optional() }),
-		review: z.object({ title: z.string(), body: z.string(), reviewerId: z.string() }),
-		published: z.object({ title: z.string(), body: z.string(), publishedAt: z.coerce.date() }),
-		rejected: z.object({ title: z.string(), body: z.string(), reason: z.string() }),
+		Draft: z.object({ title: z.string(), body: z.string().optional() }),
+		Review: z.object({ title: z.string(), body: z.string(), reviewerId: z.string() }),
+		Published: z.object({ title: z.string(), body: z.string(), publishedAt: z.coerce.date() }),
+		Rejected: z.object({ title: z.string(), body: z.string(), reason: z.string() }),
 	},
 	commands: {
-		updateDraft: z.object({ title: z.string().optional(), body: z.string().optional() }),
-		submitForReview: z.object({ reviewerId: z.string() }),
-		approve: z.object({}),
-		reject: z.object({ reason: z.string() }),
-		revise: z.object({}),
+		UpdateDraft: z.object({ title: z.string().optional(), body: z.string().optional() }),
+		SubmitForReview: z.object({ reviewerId: z.string() }),
+		Approve: z.object({}),
+		Reject: z.object({ reason: z.string() }),
+		Revise: z.object({}),
 	},
 	events: {
 		DraftUpdated: z.object({ contentId: z.string() }),
@@ -24,8 +24,8 @@ const publishWorkflow = defineWorkflow("content", {
 		Revised: z.object({ contentId: z.string() }),
 	},
 	errors: {
-		bodyRequired: z.object({}),
-		notReviewer: z.object({ expected: z.string() }),
+		BodyRequired: z.object({}),
+		NotReviewer: z.object({ expected: z.string() }),
 	},
 });
 
@@ -35,8 +35,8 @@ describe("Content Publishing Integration", () => {
 	function createRouter(reviewService: ReviewService) {
 		const router = new WorkflowRouter(publishWorkflow, { reviewService });
 
-		router.state("draft", (state) => {
-			state.on("updateDraft", (ctx) => {
+		router.state("Draft", (state) => {
+			state.on("UpdateDraft", (ctx) => {
 				const updates: Record<string, unknown> = {};
 				if (ctx.command.payload.title) updates.title = ctx.command.payload.title;
 				if (ctx.command.payload.body) updates.body = ctx.command.payload.body;
@@ -44,11 +44,11 @@ describe("Content Publishing Integration", () => {
 				ctx.emit({ type: "DraftUpdated", data: { contentId: ctx.workflow.id } });
 			});
 
-			state.on("submitForReview", (ctx) => {
+			state.on("SubmitForReview", (ctx) => {
 				if (!ctx.data.body) {
-					ctx.error({ code: "bodyRequired", data: {} });
+					ctx.error({ code: "BodyRequired", data: {} });
 				}
-				ctx.transition("review", {
+				ctx.transition("Review", {
 					title: ctx.data.title,
 					body: ctx.data.body!,
 					reviewerId: ctx.command.payload.reviewerId,
@@ -60,12 +60,12 @@ describe("Content Publishing Integration", () => {
 			});
 		});
 
-		router.state("review", (state) => {
-			state.on("approve", (ctx) => {
+		router.state("Review", (state) => {
+			state.on("Approve", (ctx) => {
 				if (!ctx.deps.reviewService.canApprove(ctx.data.reviewerId)) {
-					ctx.error({ code: "notReviewer", data: { expected: ctx.data.reviewerId } });
+					ctx.error({ code: "NotReviewer", data: { expected: ctx.data.reviewerId } });
 				}
-				ctx.transition("published", {
+				ctx.transition("Published", {
 					title: ctx.data.title,
 					body: ctx.data.body,
 					publishedAt: new Date(),
@@ -73,8 +73,8 @@ describe("Content Publishing Integration", () => {
 				ctx.emit({ type: "Approved", data: { contentId: ctx.workflow.id } });
 			});
 
-			state.on("reject", (ctx) => {
-				ctx.transition("rejected", {
+			state.on("Reject", (ctx) => {
+				ctx.transition("Rejected", {
 					title: ctx.data.title,
 					body: ctx.data.body,
 					reason: ctx.command.payload.reason,
@@ -86,9 +86,9 @@ describe("Content Publishing Integration", () => {
 			});
 		});
 
-		router.state("rejected", (state) => {
-			state.on("revise", (ctx) => {
-				ctx.transition("draft", {
+		router.state("Rejected", (state) => {
+			state.on("Revise", (ctx) => {
+				ctx.transition("Draft", {
 					title: ctx.data.title,
 					body: ctx.data.body,
 				});
@@ -102,12 +102,12 @@ describe("Content Publishing Integration", () => {
 	test("happy path: draft → review → published", async () => {
 		const router = createRouter({ canApprove: () => true });
 		let wf = publishWorkflow.createWorkflow("post-1", {
-			initialState: "draft",
+			initialState: "Draft",
 			data: { title: "Hello World" },
 		});
 
 		let result = await router.dispatch(wf, {
-			type: "updateDraft",
+			type: "UpdateDraft",
 			payload: { body: "Content here" },
 		});
 		expect(result.ok).toBe(true);
@@ -115,29 +115,29 @@ describe("Content Publishing Integration", () => {
 		wf = result.workflow as any;
 
 		result = await router.dispatch(wf, {
-			type: "submitForReview",
+			type: "SubmitForReview",
 			payload: { reviewerId: "reviewer-1" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("review");
+		expect(result.workflow.state).toBe("Review");
 		wf = result.workflow as any;
 
-		result = await router.dispatch(wf, { type: "approve", payload: {} });
+		result = await router.dispatch(wf, { type: "Approve", payload: {} });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("published");
+		expect(result.workflow.state).toBe("Published");
 	});
 
 	test("rejection and revision cycle", async () => {
 		const router = createRouter({ canApprove: () => true });
 		let wf = publishWorkflow.createWorkflow("post-2", {
-			initialState: "draft",
+			initialState: "Draft",
 			data: { title: "Draft", body: "Initial" },
 		});
 
 		let result = await router.dispatch(wf, {
-			type: "submitForReview",
+			type: "SubmitForReview",
 			payload: { reviewerId: "r1" },
 		});
 		expect(result.ok).toBe(true);
@@ -145,53 +145,53 @@ describe("Content Publishing Integration", () => {
 		wf = result.workflow as any;
 
 		result = await router.dispatch(wf, {
-			type: "reject",
+			type: "Reject",
 			payload: { reason: "needs work" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("rejected");
+		expect(result.workflow.state).toBe("Rejected");
 		wf = result.workflow as any;
 
-		result = await router.dispatch(wf, { type: "revise", payload: {} });
+		result = await router.dispatch(wf, { type: "Revise", payload: {} });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		expect(result.workflow.state).toBe("draft");
+		expect(result.workflow.state).toBe("Draft");
 	});
 
 	test("dependency injection: review service blocks unauthorized approval", async () => {
 		const router = createRouter({ canApprove: () => false });
 		let wf = publishWorkflow.createWorkflow("post-3", {
-			initialState: "draft",
+			initialState: "Draft",
 			data: { title: "T", body: "B" },
 		});
 
 		let result = await router.dispatch(wf, {
-			type: "submitForReview",
+			type: "SubmitForReview",
 			payload: { reviewerId: "r1" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		wf = result.workflow as any;
 
-		result = await router.dispatch(wf, { type: "approve", payload: {} });
+		result = await router.dispatch(wf, { type: "Approve", payload: {} });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
 		expect(result.error.category).toBe("domain");
 		if (result.error.category === "domain") {
-			expect(result.error.code).toBe("notReviewer");
+			expect(result.error.code).toBe("NotReviewer");
 		}
 	});
 
 	test("event accumulation is per-dispatch", async () => {
 		const router = createRouter({ canApprove: () => true });
 		const wf = publishWorkflow.createWorkflow("post-4", {
-			initialState: "draft",
+			initialState: "Draft",
 			data: { title: "T", body: "B" },
 		});
 
 		const r1 = await router.dispatch(wf, {
-			type: "submitForReview",
+			type: "SubmitForReview",
 			payload: { reviewerId: "r1" },
 		});
 		expect(r1.ok).toBe(true);
@@ -200,7 +200,7 @@ describe("Content Publishing Integration", () => {
 		expect(r1.events[0]?.type).toBe("SubmittedForReview");
 
 		const r2 = await router.dispatch(r1.workflow as any, {
-			type: "approve",
+			type: "Approve",
 			payload: {},
 		});
 		expect(r2.ok).toBe(true);

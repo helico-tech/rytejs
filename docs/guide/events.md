@@ -7,9 +7,9 @@ Events are side effects emitted during dispatch. They are schema-validated, accu
 Use `ctx.emit()` inside a handler. The event data is validated against the event's Zod schema.
 
 ```ts
-router.state("todo", (state) => {
-  state.on("complete", (ctx) => {
-    ctx.transition("done", {
+router.state("Todo", (state) => {
+  state.on("Complete", (ctx) => {
+    ctx.transition("Done", {
       title: ctx.data.title,
       completedAt: new Date(),
     });
@@ -24,8 +24,8 @@ router.state("todo", (state) => {
 You can emit multiple events in a single handler:
 
 ```ts
-state.on("start", (ctx) => {
-  ctx.transition("inProgress", {
+state.on("Start", (ctx) => {
+  ctx.transition("InProgress", {
     title: ctx.data.title,
     assignee: ctx.command.payload.assignee,
   });
@@ -39,7 +39,7 @@ state.on("start", (ctx) => {
 Events are returned in `result.events` on success:
 
 ```ts
-const result = await router.dispatch(task, { type: "complete", payload: {} });
+const result = await router.dispatch(task, { type: "Complete", payload: {} });
 
 if (result.ok) {
   for (const event of result.events) {
@@ -73,10 +73,10 @@ This produces a validation error with `source: "event"`.
 Each dispatch starts with an empty events list. Events from one dispatch never appear in another.
 
 ```ts
-const r1 = await router.dispatch(task, { type: "start", payload: { assignee: "alice" } });
+const r1 = await router.dispatch(task, { type: "Start", payload: { assignee: "alice" } });
 // r1.events: [{ type: "TaskStarted", ... }]
 
-const r2 = await router.dispatch(r1.workflow, { type: "complete", payload: {} });
+const r2 = await router.dispatch(r1.workflow, { type: "Complete", payload: {} });
 // r2.events: [{ type: "TaskCompleted", ... }]
 // TaskStarted is NOT in r2.events
 ```

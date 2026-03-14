@@ -7,8 +7,8 @@ Handlers modify workflow state through two methods: `ctx.update()` and `ctx.tran
 `ctx.data` returns a copy of the current state data:
 
 ```ts
-router.state("todo", (state) => {
-  state.on("rename", (ctx) => {
+router.state("Todo", (state) => {
+  state.on("Rename", (ctx) => {
     console.log(ctx.data.title); // current title
   });
 });
@@ -21,10 +21,10 @@ This is a getter that returns a shallow copy each time -- mutations to the retur
 `ctx.update()` merges partial data into the current state. The merged result is validated against the current state's schema.
 
 ```ts
-router.state("todo", (state) => {
-  state.on("rename", (ctx) => {
+router.state("Todo", (state) => {
+  state.on("Rename", (ctx) => {
     ctx.update({ title: ctx.command.payload.title });
-    // State is still "todo", data.title is updated
+    // State is still "Todo", data.title is updated
   });
 });
 ```
@@ -44,9 +44,9 @@ If the merged data fails validation, a validation error with `source: "state"` i
 `ctx.transition()` moves the workflow to a different state with entirely new data. The data is validated against the target state's schema.
 
 ```ts
-router.state("todo", (state) => {
-  state.on("start", (ctx) => {
-    ctx.transition("inProgress", {
+router.state("Todo", (state) => {
+  state.on("Start", (ctx) => {
+    ctx.transition("InProgress", {
       title: ctx.data.title,
       assignee: ctx.command.payload.assignee,
     });
@@ -57,14 +57,14 @@ router.state("todo", (state) => {
 **Data is explicit.** There is no implicit carry-forward from the previous state. You must provide all required fields for the target state.
 
 ```ts
-// This works -- all fields for "inProgress" are provided
-ctx.transition("inProgress", {
+// This works -- all fields for "InProgress" are provided
+ctx.transition("InProgress", {
   title: ctx.data.title,        // explicitly carried from current state
   assignee: "alice",
 });
 
 // This fails -- "assignee" is missing
-ctx.transition("inProgress", {
+ctx.transition("InProgress", {
   title: ctx.data.title,
 });
 ```
@@ -83,14 +83,14 @@ If validation fails, a validation error with `source: "transition"` is returned.
 All mutations are provisional. If a handler throws or calls `ctx.error()`, the original workflow is unchanged:
 
 ```ts
-router.state("todo", (state) => {
-  state.on("start", (ctx) => {
+router.state("Todo", (state) => {
+  state.on("Start", (ctx) => {
     ctx.update({ title: "Modified" });      // provisional
-    ctx.error({ code: "notAllowed", data: {} }); // throws -- update is discarded
+    ctx.error({ code: "NotAllowed", data: {} }); // throws -- update is discarded
   });
 });
 
-const result = await router.dispatch(task, { type: "start", payload: { assignee: "x" } });
+const result = await router.dispatch(task, { type: "Start", payload: { assignee: "x" } });
 // result.ok === false
 // task.data.title is still the original value
 ```

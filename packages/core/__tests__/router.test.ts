@@ -5,16 +5,16 @@ import { WorkflowRouter } from "../src/router.js";
 
 const definition = defineWorkflow("test", {
 	states: {
-		draft: z.object({ title: z.string().optional() }),
-		review: z.object({ title: z.string(), submittedBy: z.string() }),
-		published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
-		archived: z.object({ reason: z.string() }),
+		Draft: z.object({ title: z.string().optional() }),
+		Review: z.object({ title: z.string(), submittedBy: z.string() }),
+		Published: z.object({ title: z.string(), publishedAt: z.coerce.date() }),
+		Archived: z.object({ reason: z.string() }),
 	},
 	commands: {
-		setTitle: z.object({ title: z.string() }),
-		submit: z.object({ submittedBy: z.string() }),
-		publish: z.object({}),
-		archive: z.object({ reason: z.string() }),
+		SetTitle: z.object({ title: z.string() }),
+		Submit: z.object({ submittedBy: z.string() }),
+		Publish: z.object({}),
+		Archive: z.object({ reason: z.string() }),
 	},
 	events: {
 		TitleSet: z.object({ title: z.string() }),
@@ -23,8 +23,8 @@ const definition = defineWorkflow("test", {
 		Archived: z.object({ id: z.string(), reason: z.string() }),
 	},
 	errors: {
-		titleRequired: z.object({}),
-		unauthorized: z.object({ required: z.string() }),
+		TitleRequired: z.object({}),
+		Unauthorized: z.object({ required: z.string() }),
 	},
 });
 
@@ -35,34 +35,34 @@ function createDeps(): TestDeps {
 }
 
 const wf = {
-	draft: (data: { title?: string } = {}) =>
-		definition.createWorkflow("wf-1", { initialState: "draft", data }),
-	review: (data: { title: string; submittedBy: string }) =>
-		definition.createWorkflow("wf-1", { initialState: "review", data }),
-	published: (data: { title: string; publishedAt: Date }) =>
-		definition.createWorkflow("wf-1", { initialState: "published", data }),
-	archived: (data: { reason: string }) =>
-		definition.createWorkflow("wf-1", { initialState: "archived", data }),
+	Draft: (data: { title?: string } = {}) =>
+		definition.createWorkflow("wf-1", { initialState: "Draft", data }),
+	Review: (data: { title: string; submittedBy: string }) =>
+		definition.createWorkflow("wf-1", { initialState: "Review", data }),
+	Published: (data: { title: string; publishedAt: Date }) =>
+		definition.createWorkflow("wf-1", { initialState: "Published", data }),
+	Archived: (data: { reason: string }) =>
+		definition.createWorkflow("wf-1", { initialState: "Archived", data }),
 };
 
 describe("WorkflowRouter", () => {
 	describe("basic dispatch", () => {
 		test("dispatches command to correct state handler", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("setTitle", (ctx) => {
+			app.state("Draft", (state) => {
+				state.on("SetTitle", (ctx) => {
 					ctx.update({ title: ctx.command.payload.title });
 					ctx.emit({ type: "TitleSet", data: { title: ctx.command.payload.title } });
 				});
 			});
-			const result = await app.dispatch(wf.draft(), {
-				type: "setTitle",
+			const result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
 				payload: { title: "Hello" },
 			});
 			expect(result.ok).toBe(true);
 			if (!result.ok) throw new Error();
-			expect(result.workflow.state).toBe("draft");
-			if (result.workflow.state === "draft") {
+			expect(result.workflow.state).toBe("Draft");
+			if (result.workflow.state === "Draft") {
 				expect(result.workflow.data.title).toBe("Hello");
 			}
 			expect(result.events).toHaveLength(1);
@@ -70,22 +70,22 @@ describe("WorkflowRouter", () => {
 
 		test("handler can transition to a new state", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("submit", (ctx) => {
-					ctx.transition("review", {
+			app.state("Draft", (state) => {
+				state.on("Submit", (ctx) => {
+					ctx.transition("Review", {
 						title: ctx.data.title ?? "untitled",
 						submittedBy: ctx.command.payload.submittedBy,
 					});
 					ctx.emit({ type: "Submitted", data: { id: ctx.workflow.id } });
 				});
 			});
-			const result = await app.dispatch(wf.draft({ title: "Test" }), {
-				type: "submit",
+			const result = await app.dispatch(wf.Draft({ title: "Test" }), {
+				type: "Submit",
 				payload: { submittedBy: "user-1" },
 			});
 			expect(result.ok).toBe(true);
 			if (!result.ok) throw new Error();
-			expect(result.workflow.state).toBe("review");
+			expect(result.workflow.state).toBe("Review");
 			expect(result.workflow.data).toEqual({ title: "Test", submittedBy: "user-1" });
 		});
 	});
@@ -93,9 +93,9 @@ describe("WorkflowRouter", () => {
 	describe("command validation", () => {
 		test("invalid command payload returns validation error", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (s) => s.on("setTitle", () => {}));
-			const result = await app.dispatch(wf.draft(), {
-				type: "setTitle",
+			app.state("Draft", (s) => s.on("SetTitle", () => {}));
+			const result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
 				payload: {} as any,
 			});
 			expect(result.ok).toBe(false);
@@ -108,8 +108,8 @@ describe("WorkflowRouter", () => {
 	describe("router errors", () => {
 		test("NO_HANDLER when no handler registered for state/command", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			const result = await app.dispatch(wf.draft(), {
-				type: "setTitle",
+			const result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
 				payload: { title: "x" },
 			});
 			expect(result.ok).toBe(false);
@@ -129,7 +129,7 @@ describe("WorkflowRouter", () => {
 				updatedAt: new Date(),
 			} as any;
 			const result = await app.dispatch(badWf, {
-				type: "setTitle",
+				type: "SetTitle",
 				payload: { title: "x" },
 			});
 			expect(result.ok).toBe(false);
@@ -142,38 +142,38 @@ describe("WorkflowRouter", () => {
 	describe("domain errors", () => {
 		test("ctx.error returns domain error in result", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("submit", (ctx) => {
-					if (!ctx.data.title) ctx.error({ code: "titleRequired", data: {} });
+			app.state("Draft", (state) => {
+				state.on("Submit", (ctx) => {
+					if (!ctx.data.title) ctx.error({ code: "TitleRequired", data: {} });
 				});
 			});
-			const result = await app.dispatch(wf.draft(), {
-				type: "submit",
+			const result = await app.dispatch(wf.Draft(), {
+				type: "Submit",
 				payload: { submittedBy: "user-1" },
 			});
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("domain");
-			if (result.error.category === "domain") expect(result.error.code).toBe("titleRequired");
+			if (result.error.category === "domain") expect(result.error.code).toBe("TitleRequired");
 		});
 	});
 
 	describe("provisional mutation", () => {
 		test("error discards state changes", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("submit", (ctx) => {
+			app.state("Draft", (state) => {
+				state.on("Submit", (ctx) => {
 					ctx.update({ title: "modified" });
-					ctx.error({ code: "titleRequired", data: {} });
+					ctx.error({ code: "TitleRequired", data: {} });
 				});
 			});
-			const original = wf.draft({ title: "original" });
+			const original = wf.Draft({ title: "original" });
 			const result = await app.dispatch(original, {
-				type: "submit",
+				type: "Submit",
 				payload: { submittedBy: "user-1" },
 			});
 			expect(result.ok).toBe(false);
-			if (original.state === "draft") {
+			if (original.state === "Draft") {
 				expect(original.data.title).toBe("original");
 			}
 		});
@@ -188,14 +188,14 @@ describe("WorkflowRouter", () => {
 				await next();
 				log.push(`after:${ctx.command.type}`);
 			});
-			app.state("draft", (s) => {
-				s.on("setTitle", (ctx) => {
+			app.state("Draft", (s) => {
+				s.on("SetTitle", (ctx) => {
 					log.push("handler");
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			await app.dispatch(wf.draft(), { type: "setTitle", payload: { title: "x" } });
-			expect(log).toEqual(["before:setTitle", "handler", "after:setTitle"]);
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			expect(log).toEqual(["before:SetTitle", "handler", "after:SetTitle"]);
 		});
 	});
 
@@ -203,28 +203,28 @@ describe("WorkflowRouter", () => {
 		test("state middleware only runs for that state's handlers", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
+			app.state("Draft", (state) => {
 				state.use(async (_ctx, next) => {
 					log.push("draft-middleware");
 					await next();
 				});
-				state.on("setTitle", (ctx) => {
+				state.on("SetTitle", (ctx) => {
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			app.state("review", (state) => {
-				state.on("publish", (ctx) => {
-					ctx.transition("published", {
+			app.state("Review", (state) => {
+				state.on("Publish", (ctx) => {
+					ctx.transition("Published", {
 						title: ctx.data.title,
 						publishedAt: new Date(),
 					});
 				});
 			});
-			await app.dispatch(wf.draft(), { type: "setTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
 			expect(log).toEqual(["draft-middleware"]);
 			log.length = 0;
-			await app.dispatch(wf.review({ title: "Test", submittedBy: "u" }), {
-				type: "publish",
+			await app.dispatch(wf.Review({ title: "Test", submittedBy: "u" }), {
+				type: "Publish",
 				payload: {},
 			});
 			expect(log).toEqual([]);
@@ -233,43 +233,43 @@ describe("WorkflowRouter", () => {
 		test("state middleware does NOT run for wildcard handlers", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
+			app.state("Draft", (state) => {
 				state.use(async (_ctx, next) => {
 					log.push("draft-middleware");
 					await next();
 				});
-				state.on("setTitle", (ctx) => {
+				state.on("SetTitle", (ctx) => {
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			app.on("*", "archive", (ctx) => {
+			app.on("*", "Archive", (ctx) => {
 				log.push("wildcard-handler");
-				ctx.transition("archived", { reason: ctx.command.payload.reason });
+				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			await app.dispatch(wf.draft(), { type: "archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
 			expect(log).toEqual(["wildcard-handler"]);
 		});
 
 		test("additive middleware accumulates across app.state calls", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
+			app.state("Draft", (state) => {
 				state.use(async (_ctx, next) => {
 					log.push("mw-1");
 					await next();
 				});
 			});
-			app.state("draft", (state) => {
+			app.state("Draft", (state) => {
 				state.use(async (_ctx, next) => {
 					log.push("mw-2");
 					await next();
 				});
-				state.on("setTitle", (ctx) => {
+				state.on("SetTitle", (ctx) => {
 					log.push("handler");
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			await app.dispatch(wf.draft(), { type: "setTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
 			expect(log).toEqual(["mw-1", "mw-2", "handler"]);
 		});
 	});
@@ -278,9 +278,9 @@ describe("WorkflowRouter", () => {
 		test("inline middleware runs before handler", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
+			app.state("Draft", (state) => {
 				state.on(
-					"setTitle",
+					"SetTitle",
 					async (_ctx, next) => {
 						log.push("inline");
 						await next();
@@ -291,7 +291,7 @@ describe("WorkflowRouter", () => {
 					},
 				);
 			});
-			await app.dispatch(wf.draft(), { type: "setTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
 			expect(log).toEqual(["inline", "handler"]);
 		});
 	});
@@ -299,37 +299,37 @@ describe("WorkflowRouter", () => {
 	describe("wildcard handlers", () => {
 		test("wildcard matches any state", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.on("*", "archive", (ctx) => {
-				ctx.transition("archived", { reason: ctx.command.payload.reason });
+			app.on("*", "Archive", (ctx) => {
+				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			let result = await app.dispatch(wf.draft(), {
-				type: "archive",
+			let result = await app.dispatch(wf.Draft(), {
+				type: "Archive",
 				payload: { reason: "x" },
 			});
 			expect(result.ok).toBe(true);
-			if (result.ok) expect(result.workflow.state).toBe("archived");
-			result = await app.dispatch(wf.review({ title: "T", submittedBy: "u" }), {
-				type: "archive",
+			if (result.ok) expect(result.workflow.state).toBe("Archived");
+			result = await app.dispatch(wf.Review({ title: "T", submittedBy: "u" }), {
+				type: "Archive",
 				payload: { reason: "x" },
 			});
 			expect(result.ok).toBe(true);
-			if (result.ok) expect(result.workflow.state).toBe("archived");
+			if (result.ok) expect(result.workflow.state).toBe("Archived");
 		});
 
 		test("specific state handler takes priority over wildcard", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("archive", (ctx) => {
+			app.state("Draft", (state) => {
+				state.on("Archive", (ctx) => {
 					log.push("specific");
-					ctx.transition("archived", { reason: ctx.command.payload.reason });
+					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			app.on("*", "archive", (ctx) => {
+			app.on("*", "Archive", (ctx) => {
 				log.push("wildcard");
-				ctx.transition("archived", { reason: ctx.command.payload.reason });
+				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			await app.dispatch(wf.draft(), { type: "archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
 			expect(log).toEqual(["specific"]);
 		});
 	});
@@ -337,58 +337,58 @@ describe("WorkflowRouter", () => {
 	describe("multi-state handlers", () => {
 		test("handler registered for multiple states works", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state(["draft", "review"] as const, (state) => {
-				state.on("archive", (ctx) => {
-					ctx.transition("archived", { reason: ctx.command.payload.reason });
+			app.state(["Draft", "Review"] as const, (state) => {
+				state.on("Archive", (ctx) => {
+					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			let result = await app.dispatch(wf.draft(), {
-				type: "archive",
+			let result = await app.dispatch(wf.Draft(), {
+				type: "Archive",
 				payload: { reason: "x" },
 			});
 			expect(result.ok).toBe(true);
-			if (result.ok) expect(result.workflow.state).toBe("archived");
-			result = await app.dispatch(wf.review({ title: "T", submittedBy: "u" }), {
-				type: "archive",
+			if (result.ok) expect(result.workflow.state).toBe("Archived");
+			result = await app.dispatch(wf.Review({ title: "T", submittedBy: "u" }), {
+				type: "Archive",
 				payload: { reason: "x" },
 			});
 			expect(result.ok).toBe(true);
-			if (result.ok) expect(result.workflow.state).toBe("archived");
+			if (result.ok) expect(result.workflow.state).toBe("Archived");
 		});
 
 		test("specific state takes priority over multi-state", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("archive", (ctx) => {
+			app.state("Draft", (state) => {
+				state.on("Archive", (ctx) => {
 					log.push("specific");
-					ctx.transition("archived", { reason: ctx.command.payload.reason });
+					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			app.state(["draft", "review"] as const, (state) => {
-				state.on("archive", (ctx) => {
+			app.state(["Draft", "Review"] as const, (state) => {
+				state.on("Archive", (ctx) => {
 					log.push("multi");
-					ctx.transition("archived", { reason: ctx.command.payload.reason });
+					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			await app.dispatch(wf.draft(), { type: "archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
 			expect(log).toEqual(["specific"]);
 		});
 
 		test("multi-state takes priority over wildcard", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state(["draft", "review"] as const, (state) => {
-				state.on("archive", (ctx) => {
+			app.state(["Draft", "Review"] as const, (state) => {
+				state.on("Archive", (ctx) => {
 					log.push("multi");
-					ctx.transition("archived", { reason: ctx.command.payload.reason });
+					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			app.on("*", "archive", (ctx) => {
+			app.on("*", "Archive", (ctx) => {
 				log.push("wildcard");
-				ctx.transition("archived", { reason: ctx.command.payload.reason });
+				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			await app.dispatch(wf.draft(), { type: "archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
 			expect(log).toEqual(["multi"]);
 		});
 	});
@@ -396,46 +396,46 @@ describe("WorkflowRouter", () => {
 	describe("additive state registration", () => {
 		test("multiple app.state calls for same state accumulate handlers", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("setTitle", (ctx) => {
+			app.state("Draft", (state) => {
+				state.on("SetTitle", (ctx) => {
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			app.state("draft", (state) => {
-				state.on("submit", (ctx) => {
-					ctx.transition("review", {
+			app.state("Draft", (state) => {
+				state.on("Submit", (ctx) => {
+					ctx.transition("Review", {
 						title: ctx.data.title ?? "untitled",
 						submittedBy: ctx.command.payload.submittedBy,
 					});
 				});
 			});
-			let result = await app.dispatch(wf.draft(), {
-				type: "setTitle",
+			let result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
 				payload: { title: "Test" },
 			});
 			expect(result.ok).toBe(true);
-			result = await app.dispatch(wf.draft({ title: "Test" }), {
-				type: "submit",
+			result = await app.dispatch(wf.Draft({ title: "Test" }), {
+				type: "Submit",
 				payload: { submittedBy: "user-1" },
 			});
 			expect(result.ok).toBe(true);
-			if (result.ok) expect(result.workflow.state).toBe("review");
+			if (result.ok) expect(result.workflow.state).toBe("Review");
 		});
 
 		test("later registration for same state/command wins", async () => {
 			const log: string[] = [];
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (s) => {
-				s.on("setTitle", () => {
+			app.state("Draft", (s) => {
+				s.on("SetTitle", () => {
 					log.push("first");
 				});
 			});
-			app.state("draft", (s) => {
-				s.on("setTitle", () => {
+			app.state("Draft", (s) => {
+				s.on("SetTitle", () => {
 					log.push("second");
 				});
 			});
-			await app.dispatch(wf.draft(), { type: "setTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
 			expect(log).toEqual(["second"]);
 		});
 	});
@@ -449,14 +449,14 @@ describe("WorkflowRouter", () => {
 				await next();
 				log.push("global-after");
 			});
-			app.state("draft", (state) => {
+			app.state("Draft", (state) => {
 				state.use(async (_ctx, next) => {
 					log.push("state-before");
 					await next();
 					log.push("state-after");
 				});
 				state.on(
-					"setTitle",
+					"SetTitle",
 					async (_ctx, next) => {
 						log.push("inline-before");
 						await next();
@@ -468,7 +468,7 @@ describe("WorkflowRouter", () => {
 					},
 				);
 			});
-			await app.dispatch(wf.draft(), { type: "setTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
 			expect(log).toEqual([
 				"global-before",
 				"state-before",
@@ -484,18 +484,18 @@ describe("WorkflowRouter", () => {
 	describe("async handlers", () => {
 		test("async handler works correctly", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			app.state("draft", (state) => {
-				state.on("setTitle", async (ctx) => {
+			app.state("Draft", (state) => {
+				state.on("SetTitle", async (ctx) => {
 					await new Promise((resolve) => setTimeout(resolve, 1));
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			const result = await app.dispatch(wf.draft(), {
-				type: "setTitle",
+			const result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
 				payload: { title: "async-title" },
 			});
 			expect(result.ok).toBe(true);
-			if (result.ok && result.workflow.state === "draft") {
+			if (result.ok && result.workflow.state === "Draft") {
 				expect(result.workflow.data.title).toBe("async-title");
 			}
 		});

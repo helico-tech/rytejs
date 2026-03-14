@@ -2,7 +2,7 @@
 
 An order fulfillment workflow demonstrating middleware, multi-state handlers, domain errors, and event emission.
 
-States: `created` -> `paid` -> `shipped` -> `delivered` (with `cancelled` reachable from multiple states).
+States: `Created` -> `Paid` -> `Shipped` -> `Delivered` (with `Cancelled` reachable from multiple states).
 
 ## Workflow Definition
 
@@ -12,35 +12,35 @@ import { defineWorkflow, WorkflowRouter, createKey } from "@ryte/core";
 
 const orderWorkflow = defineWorkflow("order", {
   states: {
-    created: z.object({ items: z.array(z.string()), total: z.number() }),
-    paid: z.object({
+    Created: z.object({ items: z.array(z.string()), total: z.number() }),
+    Paid: z.object({
       items: z.array(z.string()),
       total: z.number(),
       paidAt: z.coerce.date(),
     }),
-    shipped: z.object({
+    Shipped: z.object({
       items: z.array(z.string()),
       total: z.number(),
       paidAt: z.coerce.date(),
       trackingNumber: z.string(),
     }),
-    delivered: z.object({
+    Delivered: z.object({
       items: z.array(z.string()),
       total: z.number(),
       paidAt: z.coerce.date(),
       trackingNumber: z.string(),
       deliveredAt: z.coerce.date(),
     }),
-    cancelled: z.object({
+    Cancelled: z.object({
       reason: z.string(),
       cancelledAt: z.coerce.date(),
     }),
   },
   commands: {
-    pay: z.object({ amount: z.number() }),
-    ship: z.object({ trackingNumber: z.string() }),
-    deliver: z.object({}),
-    cancel: z.object({ reason: z.string() }),
+    Pay: z.object({ amount: z.number() }),
+    Ship: z.object({ trackingNumber: z.string() }),
+    Deliver: z.object({}),
+    Cancel: z.object({ reason: z.string() }),
   },
   events: {
     OrderPaid: z.object({ orderId: z.string(), amount: z.number() }),
@@ -49,8 +49,8 @@ const orderWorkflow = defineWorkflow("order", {
     OrderCancelled: z.object({ orderId: z.string(), reason: z.string() }),
   },
   errors: {
-    insufficientPayment: z.object({ required: z.number(), received: z.number() }),
-    alreadyShipped: z.object({}),
+    InsufficientPayment: z.object({ required: z.number(), received: z.number() }),
+    AlreadyShipped: z.object({}),
   },
 });
 ```
@@ -85,15 +85,15 @@ router.use(async (ctx, next) => {
 });
 ```
 
-### State: `created`
+### State: `Created`
 
 ```ts
-router.state("created", (state) => {
-  state.on("pay", (ctx) => {
+router.state("Created", (state) => {
+  state.on("Pay", (ctx) => {
     // Domain validation: check payment amount
     if (ctx.command.payload.amount < ctx.data.total) {
       ctx.error({
-        code: "insufficientPayment",
+        code: "InsufficientPayment",
         data: {
           required: ctx.data.total,
           received: ctx.command.payload.amount,
@@ -101,7 +101,7 @@ router.state("created", (state) => {
       });
     }
 
-    ctx.transition("paid", {
+    ctx.transition("Paid", {
       items: ctx.data.items,
       total: ctx.data.total,
       paidAt: new Date(),
@@ -115,12 +115,12 @@ router.state("created", (state) => {
 });
 ```
 
-### State: `paid`
+### State: `Paid`
 
 ```ts
-router.state("paid", (state) => {
-  state.on("ship", (ctx) => {
-    ctx.transition("shipped", {
+router.state("Paid", (state) => {
+  state.on("Ship", (ctx) => {
+    ctx.transition("Shipped", {
       items: ctx.data.items,
       total: ctx.data.total,
       paidAt: ctx.data.paidAt,
@@ -138,12 +138,12 @@ router.state("paid", (state) => {
 });
 ```
 
-### State: `shipped`
+### State: `Shipped`
 
 ```ts
-router.state("shipped", (state) => {
-  state.on("deliver", (ctx) => {
-    ctx.transition("delivered", {
+router.state("Shipped", (state) => {
+  state.on("Deliver", (ctx) => {
+    ctx.transition("Delivered", {
       items: ctx.data.items,
       total: ctx.data.total,
       paidAt: ctx.data.paidAt,
@@ -159,14 +159,14 @@ router.state("shipped", (state) => {
 });
 ```
 
-### Multi-State: Cancel from `created` or `paid`
+### Multi-State: Cancel from `Created` or `Paid`
 
 A single handler registered for multiple states. Once an order is shipped, it can no longer be cancelled.
 
 ```ts
-router.state(["created", "paid"] as const, (state) => {
-  state.on("cancel", (ctx) => {
-    ctx.transition("cancelled", {
+router.state(["Created", "Paid"] as const, (state) => {
+  state.on("Cancel", (ctx) => {
+    ctx.transition("Cancelled", {
       reason: ctx.command.payload.reason,
       cancelledAt: new Date(),
     });
@@ -188,91 +188,91 @@ router.state(["created", "paid"] as const, (state) => {
 
 ```ts
 let order = orderWorkflow.createWorkflow("order-1", {
-  initialState: "created",
+  initialState: "Created",
   data: { items: ["widget"], total: 50 },
 });
 
 // Pay
 let result = await router.dispatch(order, {
-  type: "pay",
+  type: "Pay",
   payload: { amount: 50 },
 });
 // result.ok === true
-// result.workflow.state === "paid"
+// result.workflow.state === "Paid"
 // result.events[0].type === "OrderPaid"
 order = result.workflow;
 
 // Ship
 result = await router.dispatch(order, {
-  type: "ship",
+  type: "Ship",
   payload: { trackingNumber: "TRACK-123" },
 });
-// result.workflow.state === "shipped"
+// result.workflow.state === "Shipped"
 order = result.workflow;
 
 // Deliver
 result = await router.dispatch(order, {
-  type: "deliver",
+  type: "Deliver",
   payload: {},
 });
-// result.workflow.state === "delivered"
+// result.workflow.state === "Delivered"
 ```
 
 ### Error Recovery: Insufficient Payment
 
 ```ts
 const order = orderWorkflow.createWorkflow("order-2", {
-  initialState: "created",
+  initialState: "Created",
   data: { items: ["widget"], total: 100 },
 });
 
 // Attempt underpayment
 let result = await router.dispatch(order, {
-  type: "pay",
+  type: "Pay",
   payload: { amount: 50 },
 });
 
 if (!result.ok && result.error.category === "domain") {
   console.log(result.error.code);
-  // "insufficientPayment"
+  // "InsufficientPayment"
   console.log(result.error.data);
   // { required: 100, received: 50 }
 }
 
 // Original order is unchanged -- rollback happened
-console.log(order.state); // still "created"
+console.log(order.state); // still "Created"
 
 // Retry with correct amount
 result = await router.dispatch(order, {
-  type: "pay",
+  type: "Pay",
   payload: { amount: 100 },
 });
 // result.ok === true
-// result.workflow.state === "paid"
+// result.workflow.state === "Paid"
 ```
 
 ### Cancellation from Multiple States
 
 ```ts
-// Cancel from "created"
+// Cancel from "Created"
 const order1 = orderWorkflow.createWorkflow("order-3", {
-  initialState: "created",
+  initialState: "Created",
   data: { items: ["x"], total: 20 },
 });
 await router.dispatch(order1, {
-  type: "cancel",
+  type: "Cancel",
   payload: { reason: "changed mind" },
 });
-// result.workflow.state === "cancelled"
+// result.workflow.state === "Cancelled"
 
-// Cancel from "paid" also works (same handler)
+// Cancel from "Paid" also works (same handler)
 ```
 
 ### Audit Trail
 
 ```ts
 console.log(deps.auditLog);
-// ["admin:pay", "admin:ship", "admin:deliver", ...]
+// ["admin:Pay", "admin:Ship", "admin:Deliver", ...]
 ```
 
 The global middleware logs every command dispatched, building a complete audit trail in the injected `auditLog` dependency.
@@ -282,8 +282,8 @@ The global middleware logs every command dispatched, building a complete audit t
 | Pattern | Where |
 | ------- | ----- |
 | Middleware (auth + audit) | Global `.use()` with `createKey` |
-| Multi-state handler | `cancel` from `created` or `paid` |
+| Multi-state handler | `Cancel` from `Created` or `Paid` |
 | Domain error + recovery | Insufficient payment, then retry |
 | Event emission | Every state transition emits a typed event |
 | Dependency injection | `auditLog` via router constructor |
-| Rollback on error | Failed payment leaves order in `created` |
+| Rollback on error | Failed payment leaves order in `Created` |

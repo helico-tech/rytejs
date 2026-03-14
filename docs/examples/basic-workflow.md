@@ -1,6 +1,6 @@
 # Basic Workflow
 
-A complete task workflow with three states: `todo`, `inProgress`, and `done`.
+A complete task workflow with three states: `Todo`, `InProgress`, and `Done`.
 
 ## Define the Workflow
 
@@ -10,14 +10,14 @@ import { defineWorkflow, WorkflowRouter } from "@ryte/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {
-    todo: z.object({ title: z.string(), priority: z.number().default(0) }),
-    inProgress: z.object({ title: z.string(), assignee: z.string() }),
-    done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
+    Todo: z.object({ title: z.string(), priority: z.number().default(0) }),
+    InProgress: z.object({ title: z.string(), assignee: z.string() }),
+    Done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
   },
   commands: {
-    start: z.object({ assignee: z.string() }),
-    complete: z.object({}),
-    rename: z.object({ title: z.string() }),
+    Start: z.object({ assignee: z.string() }),
+    Complete: z.object({}),
+    Rename: z.object({ title: z.string() }),
   },
   events: {
     TaskStarted: z.object({ taskId: z.string(), assignee: z.string() }),
@@ -33,9 +33,9 @@ const taskWorkflow = defineWorkflow("task", {
 ```ts
 const router = new WorkflowRouter(taskWorkflow);
 
-// todo: can be renamed or started
-router.state("todo", (state) => {
-  state.on("rename", (ctx) => {
+// Todo: can be renamed or started
+router.state("Todo", (state) => {
+  state.on("Rename", (ctx) => {
     ctx.update({ title: ctx.command.payload.title });
     ctx.emit({
       type: "TaskRenamed",
@@ -43,8 +43,8 @@ router.state("todo", (state) => {
     });
   });
 
-  state.on("start", (ctx) => {
-    ctx.transition("inProgress", {
+  state.on("Start", (ctx) => {
+    ctx.transition("InProgress", {
       title: ctx.data.title,
       assignee: ctx.command.payload.assignee,
     });
@@ -55,10 +55,10 @@ router.state("todo", (state) => {
   });
 });
 
-// inProgress: can be completed
-router.state("inProgress", (state) => {
-  state.on("complete", (ctx) => {
-    ctx.transition("done", {
+// InProgress: can be completed
+router.state("InProgress", (state) => {
+  state.on("Complete", (ctx) => {
+    ctx.transition("Done", {
       title: ctx.data.title,
       completedAt: new Date(),
     });
@@ -75,11 +75,11 @@ router.state("inProgress", (state) => {
 ```ts
 // 1. Create a task
 let task = taskWorkflow.createWorkflow("task-1", {
-  initialState: "todo",
+  initialState: "Todo",
   data: { title: "Write documentation" },
 });
 
-console.log(task.state);      // "todo"
+console.log(task.state);      // "Todo"
 console.log(task.data.title); // "Write documentation"
 ```
 
@@ -87,13 +87,13 @@ console.log(task.data.title); // "Write documentation"
 
 ```ts
 let result = await router.dispatch(task, {
-  type: "rename",
+  type: "Rename",
   payload: { title: "Write complete documentation" },
 });
 
 if (result.ok) {
   task = result.workflow;
-  console.log(task.state);      // "todo"
+  console.log(task.state);      // "Todo"
   console.log(task.data.title); // "Write complete documentation"
   console.log(result.events);   // [{ type: "TaskRenamed", data: { taskId: "task-1", title: "Write complete documentation" } }]
 }
@@ -103,13 +103,13 @@ if (result.ok) {
 
 ```ts
 result = await router.dispatch(task, {
-  type: "start",
+  type: "Start",
   payload: { assignee: "alice" },
 });
 
 if (result.ok) {
   task = result.workflow;
-  console.log(task.state); // "inProgress"
+  console.log(task.state); // "InProgress"
   console.log(task.data);  // { title: "Write complete documentation", assignee: "alice" }
   console.log(result.events[0]?.type); // "TaskStarted"
 }
@@ -119,13 +119,13 @@ if (result.ok) {
 
 ```ts
 result = await router.dispatch(task, {
-  type: "complete",
+  type: "Complete",
   payload: {},
 });
 
 if (result.ok) {
   task = result.workflow;
-  console.log(task.state); // "done"
+  console.log(task.state); // "Done"
   console.log(task.data);  // { title: "Write complete documentation", completedAt: Date }
   console.log(result.events[0]?.type); // "TaskCompleted"
 }

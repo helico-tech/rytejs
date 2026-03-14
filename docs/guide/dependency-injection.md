@@ -29,14 +29,14 @@ The type is inferred from the object you pass. All handlers and middleware recei
 Use `ctx.deps` in any handler or middleware:
 
 ```ts
-router.state("review", (state) => {
-  state.on("approve", async (ctx) => {
+router.state("Review", (state) => {
+  state.on("Approve", async (ctx) => {
     const canApprove = ctx.deps.reviewService.canApprove(ctx.data.reviewerId);
     if (!canApprove) {
-      ctx.error({ code: "notReviewer", data: { expected: ctx.data.reviewerId } });
+      ctx.error({ code: "NotReviewer", data: { expected: ctx.data.reviewerId } });
     }
 
-    ctx.transition("published", {
+    ctx.transition("Published", {
       title: ctx.data.title,
       body: ctx.data.body,
       publishedAt: new Date(),
@@ -56,17 +56,17 @@ import { defineWorkflow, WorkflowRouter } from "@ryte/core";
 // Define the workflow
 const articleWorkflow = defineWorkflow("article", {
   states: {
-    draft: z.object({ title: z.string(), body: z.string().optional() }),
-    published: z.object({ title: z.string(), body: z.string(), publishedAt: z.coerce.date() }),
+    Draft: z.object({ title: z.string(), body: z.string().optional() }),
+    Published: z.object({ title: z.string(), body: z.string(), publishedAt: z.coerce.date() }),
   },
   commands: {
-    publish: z.object({}),
+    Publish: z.object({}),
   },
   events: {
     ArticlePublished: z.object({ articleId: z.string(), notifiedSubscribers: z.number() }),
   },
   errors: {
-    bodyRequired: z.object({}),
+    BodyRequired: z.object({}),
   },
 });
 
@@ -85,15 +85,15 @@ const router = new WorkflowRouter(articleWorkflow, {
 });
 
 // Use deps in handler
-router.state("draft", (state) => {
-  state.on("publish", async (ctx) => {
+router.state("Draft", (state) => {
+  state.on("Publish", async (ctx) => {
     if (!ctx.data.body) {
-      ctx.error({ code: "bodyRequired", data: {} });
+      ctx.error({ code: "BodyRequired", data: {} });
     }
 
     const count = await ctx.deps.notifier.notifySubscribers(ctx.workflow.id);
 
-    ctx.transition("published", {
+    ctx.transition("Published", {
       title: ctx.data.title,
       body: ctx.data.body!,
       publishedAt: new Date(),

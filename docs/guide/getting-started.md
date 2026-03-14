@@ -18,11 +18,11 @@ import { defineWorkflow, WorkflowRouter } from "@ryte/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {
-    todo: z.object({ title: z.string() }),
-    done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
+    Todo: z.object({ title: z.string() }),
+    Done: z.object({ title: z.string(), completedAt: z.coerce.date() }),
   },
   commands: {
-    complete: z.object({}),
+    Complete: z.object({}),
   },
   events: {
     TaskCompleted: z.object({ taskId: z.string() }),
@@ -36,9 +36,9 @@ const taskWorkflow = defineWorkflow("task", {
 ```ts
 const router = new WorkflowRouter(taskWorkflow);
 
-router.state("todo", (state) => {
-  state.on("complete", (ctx) => {
-    ctx.transition("done", {
+router.state("Todo", (state) => {
+  state.on("Complete", (ctx) => {
+    ctx.transition("Done", {
       title: ctx.data.title,
       completedAt: new Date(),
     });
@@ -51,17 +51,17 @@ router.state("todo", (state) => {
 
 ```ts
 const task = taskWorkflow.createWorkflow("task-1", {
-  initialState: "todo",
+  initialState: "Todo",
   data: { title: "Read the docs" },
 });
 
 const result = await router.dispatch(task, {
-  type: "complete",
+  type: "Complete",
   payload: {},
 });
 
 if (result.ok) {
-  console.log(result.workflow.state); // "done"
+  console.log(result.workflow.state); // "Done"
   console.log(result.events[0]?.type); // "TaskCompleted"
 }
 ```
