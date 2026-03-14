@@ -63,22 +63,37 @@ graph.transitions
 
 Extension points for events outside the dispatch pipeline.
 
-**Hook points:**
+**Hook points and signatures:**
 
 ```ts
-router.on('dispatch:start', (ctx) => { ... })
-router.on('dispatch:end', (ctx, result) => { ... })
-router.on('transition', (from, to, workflow) => { ... })
-router.on('error', (error, ctx) => { ... })
-router.on('event', (event, workflow) => { ... })
+// ctx is a read-only subset of Context (no update/transition/emit methods)
+router.on('dispatch:start', (ctx: ReadonlyContext) => void)
+
+// result is the same DispatchResult the caller receives
+router.on('dispatch:end', (ctx: ReadonlyContext, result: DispatchResult) => void)
+
+// from/to are state name strings; workflow is the post-transition snapshot
+router.on('transition', (from: StateNames, to: StateNames, workflow: Workflow) => void)
+
+// error is the PipelineError from the dispatch result
+router.on('error', (error: PipelineError, ctx: ReadonlyContext) => void)
+
+// event contains { name, data }; workflow is the post-dispatch snapshot
+router.on('event', (event: { name: EventNames; data: EventData }, workflow: Workflow) => void)
 ```
+
+**Hook execution and error policy:**
+- Hooks registered for the same event run in `.use()` / `.on()` registration order
+- Hook errors are caught and forwarded to a configurable `onHookError` callback on the router (defaults to `console.error`). They never affect the dispatch result.
+- Hooks cannot unregister themselves (simplicity over flexibility; revisit if needed)
 
 **How hooks differ from middleware:**
 
 | Aspect | Middleware | Hooks |
 |--------|-----------|-------|
 | Role | In the pipeline — can modify, short-circuit, wrap | Observer — reacts to things that happened |
-| Failure | Errors propagate and affect dispatch | Errors in hooks don't affect dispatch |
+| Failure | Errors propagate and affect dispatch | Caught, forwarded to `onHookError`, never affect dispatch |
+| Context | Full `Context` (can update, transition, emit) | `ReadonlyContext` (read-only, no mutation methods) |
 | Use case | Auth, validation, logging around dispatch | Telemetry, devtools, audit trails |
 
 **Plugin system:**
@@ -96,7 +111,11 @@ const loggingPlugin: Plugin<MyConfig, MyDeps> = (router) => {
 router.use(loggingPlugin);
 ```
 
-- `.use()` accepts both plugins (functions) and composable routers (WorkflowRouter instances) — TypeScript discriminates between them
+- `.use()` accepts composable routers (`WorkflowRouter` instances), plugins, and middleware — discriminated as follows:
+  - `WorkflowRouter` instance → composable router (merge handlers)
+  - Function with `(router) => void` signature → plugin (receives router, registers hooks/middleware)
+  - Function with `(ctx, next) => Promise<void>` signature → global middleware
+  - Discrimination uses a branded symbol on plugins (e.g., `Symbol.for('ryte:plugin')`) rather than arity checks, since arity is fragile with default params and destructuring. A `definePlugin()` helper brands the function.
 - No class hierarchy, no registration ceremony
 - The core ships hook infrastructure; actual plugins live in companion packages or userland
 
@@ -181,7 +200,9 @@ const deps = createTestDeps<MyDeps>({
 ```
 
 - Throws on failure — works with any test runner (Vitest, Jest, Node test runner)
-- Built entirely on the public API of `@rytejs/core`
+- Built entirely on the public API of `@rytejs/core` (declared as a peer dependency)
+- `createTestDeps<T>(partial)` returns the partial cast to the full type `T` — it does not proxy or throw on un-stubbed access. Developers provide only the dependencies their test needs.
+- `testPath` creates the initial workflow from the first step's `start` state and `payload`, then chains dispatch results through subsequent steps. Initial state data can be provided via an optional `data` field on the first step.
 - Focused on reducing boilerplate, not replacing your test framework
 
 ### 2.2 Serialization / Rehydration Protocol (core)
@@ -204,8 +225,10 @@ const result = definition.restore(snapshot);
 
 - **`snapshot()` produces a plain, JSON-safe object** — no classes, no symbols, no circular refs
 - **`restore()` validates through Zod schemas** — schema evolution is handled naturally; if the shape changed, you get a typed validation error
-- **`version` field** — integer on the snapshot; the core doesn't enforce migrations, but the field gives userland code a hook to transform snapshots before calling `restore()`
-- **Lives on `WorkflowDefinition`** — the definition owns the schemas, so it's the natural home
+- **`version` field** — a schema version declared on the workflow definition (e.g., `defineWorkflow({ version: 1, ... })`), stamped onto every snapshot. This is a schema version, not a per-snapshot sequence number. When the workflow's state schemas change, the developer bumps the version. Userland migration code can check the version before calling `restore()` and transform the snapshot accordingly.
+- **Date serialization** — `createdAt` and `updatedAt` are serialized as ISO 8601 strings in the snapshot. `restore()` reconstructs `Date` objects from these strings.
+- **`restore()` error type** — returns `{ ok: false, error: ValidationError }` using the existing `ValidationError` class with `source: 'restore'`.
+- **Lives on `WorkflowDefinition`** — the definition owns the schemas, so it's the natural home. Both `snapshot()` and `restore()` are methods on the definition object returned by `defineWorkflow()`.
 - **Persistence is userland** — storing and retrieving snapshots is trivial (`JSON.stringify` + any storage); no `@rytejs/persist-*` packages needed
 
 ### 2.3 Composable Routers (core)
@@ -242,7 +265,7 @@ Your app                    @rytejs/devtools
 
 - **Devtools plugin** — installed via `router.use(devtoolsPlugin())`, uses lifecycle hooks to stream events over WebSocket
 - **Dev server** — separate process (`npx @rytejs/devtools`), renders the UI
-- **Zero production footprint** — plugin is a no-op outside dev mode (gated by `NODE_ENV` or explicit opt-in)
+- **Zero production footprint** — plugin is a no-op outside dev mode, gated by explicit opt-in (e.g., `devtoolsPlugin({ enabled: true })`). May check `NODE_ENV` as a convenience fallback in the companion package, but never in core. This avoids coupling to Node.js conventions in edge runtimes.
 - **Built entirely on public APIs** — introspection for diagrams, hooks for event stream, serialization for workflow snapshots
 
 **Shipping strategy:** v0.4-alpha ships with state diagram + event timeline. Dispatch sandbox follows in a subsequent release.
@@ -280,8 +303,14 @@ const otelPlugin = (router) => {
 | `@rytejs/testing` | Companion | v0.3 | Test factories, assertions, path testing |
 | `@rytejs/devtools` | Companion | v0.4 | Web-based workflow inspector |
 
+## Prerequisites
+
+These must be resolved before Phase 1 implementation begins:
+
+- **Transition declaration mechanism** — Handlers call `ctx.transition()` dynamically, so the introspection API cannot infer possible transitions from code. A declarative approach is needed. Likely solution: a `targets` declaration on handler registration (e.g., `state.handle('PlaceOrder', { targets: ['Placed', 'Cancelled'] }, handler)`). This is a prerequisite design spike — it affects the handler registration API and must be resolved before introspection, visualization, or devtools can be implemented.
+
 ## Open Questions
 
-- **Introspection: how to declare possible transitions?** Handlers call `ctx.transition()` dynamically. The introspection API needs some way to know the possible target states. Options: static declaration on handler registration, or analysis of handler code (impractical). Likely needs a declarative hint.
-- **Devtools transport:** WebSocket is the obvious choice, but should we also support a polling/REST mode for environments where WebSockets are awkward?
-- **Visualization customization API:** How much control do users want over diagram appearance? Start minimal, expand based on feedback.
+- **Devtools transport:** WebSocket only for v0.4. Polling/SSE can be added in a future version if cloud-hosted devtools creates demand.
+- **Visualization customization API:** Start minimal (default styles, terminal state highlighting). Expand based on feedback.
+- **Hook execution ordering:** Currently specified as registration order. If composition via plugins creates ordering conflicts, consider a priority system — but defer until the need arises.
