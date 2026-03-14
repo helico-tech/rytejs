@@ -100,9 +100,10 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		}
 	}
 
-	// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
 	private mergeStateBuilders(
+		// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
 		target: Map<string, StateBuilder<TConfig, TDeps, any>>,
+		// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
 		source: Map<string, StateBuilder<TConfig, TDeps, any>>,
 	): void {
 		for (const [stateName, childBuilder] of source) {
