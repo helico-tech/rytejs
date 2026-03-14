@@ -1,6 +1,7 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
+	base: "/rytejs/",
 	title: "Ryte",
 	description: "Type-safe workflow engine for TypeScript",
 	themeConfig: {
