@@ -2,8 +2,8 @@
 
 Type-safe workflow engine with Zod validation and middleware pipelines.
 
-![CI](https://github.com/helico-tech/rytejs/actions/workflows/ci.yml/badge.svg)
-![npm](https://img.shields.io/npm/v/@rytejs/core)
+[![CI](https://github.com/helico-tech/rytejs/actions/workflows/ci.yml/badge.svg)](https://github.com/helico-tech/rytejs/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@rytejs/core)](https://www.npmjs.com/package/@rytejs/core)
 
 ## Why Ryte?
 
@@ -13,6 +13,12 @@ Type-safe workflow engine with Zod validation and middleware pipelines.
 - **Koa-style middleware** -- global, state-scoped, and inline middleware with the onion model. Add auth, logging, or validation without touching handlers.
 - **Composable routers** -- split handlers across files and compose them with `.use()`. Routers are routers.
 - **Zero platform lock-in** -- pure logic with no runtime dependencies beyond Zod. Works on Node.js, Bun, and Deno.
+
+## Install
+
+```bash
+pnpm add @rytejs/core zod
+```
 
 ## Quick Example
 
@@ -69,31 +75,25 @@ if (result.ok) {
 }
 ```
 
+## Type Safety Highlights
+
+Every part of the API is fully typed with zero manual annotations:
+
+- **State names** -- `router.state("Todo", ...)` only accepts states from your definition
+- **Command names** -- `state.on("Complete", ...)` only accepts commands from your definition
+- **Payload types** -- `ctx.command.payload` is typed based on the command's Zod schema
+- **State data** -- `ctx.data` is typed based on the current state's Zod schema
+- **Transitions** -- `ctx.transition("Done", data)` validates that `data` matches the target state's schema
+- **Events** -- `ctx.emit({ type, data })` validates both type and data against event schemas
+- **Errors** -- `ctx.error({ code, data })` only accepts error codes from your definition with matching data
+- **Discriminated unions** -- `if (workflow.state === "Todo") { workflow.data.title }` narrows automatically
+
 ## Documentation
 
 - [Getting Started](https://helico-tech.github.io/rytejs/guide/getting-started)
+- [Defining Workflows](https://helico-tech.github.io/rytejs/guide/defining-workflows)
+- [Routing Commands](https://helico-tech.github.io/rytejs/guide/routing-commands)
 - [API Reference](https://helico-tech.github.io/rytejs/api/)
-- [Examples](./examples/)
-
-## Contributing
-
-```bash
-# Clone the repo
-git clone https://github.com/helico-tech/rytejs.git
-cd rytejs
-
-# Install dependencies
-pnpm install
-
-# Run tests
-pnpm test
-
-# Lint
-pnpm lint
-
-# Build
-pnpm build
-```
 
 ## License
 
