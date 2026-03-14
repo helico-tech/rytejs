@@ -5,3 +5,4 @@ coverage
 *.tsbuildinfo
 .vitepress/cache
 .vitepress/dist
+.idea
