@@ -1,4 +1,4 @@
-import type { MigrationPipeline, WorkflowSnapshot } from "@rytejs/core";
+import type { MigrationPipeline, WorkflowConfig, WorkflowSnapshot } from "@rytejs/core";
 import { migrate } from "@rytejs/core";
 
 export interface TestMigrationOptions {
@@ -23,8 +23,8 @@ export interface TestMigrationRestoreOptions {
 	state?: string;
 }
 
-function makeTestSnapshot(
-	pipeline: MigrationPipeline,
+function makeTestSnapshot<TConfig extends WorkflowConfig>(
+	pipeline: MigrationPipeline<TConfig>,
 	version: number,
 	data: unknown,
 	state?: string,
@@ -50,7 +50,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
  * Tests a single migration step.
  * Calls the migration function for (from + 1) directly and asserts output data matches expected.
  */
-export function testMigration(pipeline: MigrationPipeline, options: TestMigrationOptions): void {
+export function testMigration<TConfig extends WorkflowConfig>(
+	pipeline: MigrationPipeline<TConfig>,
+	options: TestMigrationOptions,
+): void {
 	const targetVersion = options.from + 1;
 	const fn = pipeline.migrations.get(targetVersion);
 	if (!fn) {
@@ -70,8 +73,8 @@ export function testMigration(pipeline: MigrationPipeline, options: TestMigratio
 /**
  * Tests the full migration chain and asserts final version and data.
  */
-export function testMigrationPath(
-	pipeline: MigrationPipeline,
+export function testMigrationPath<TConfig extends WorkflowConfig>(
+	pipeline: MigrationPipeline<TConfig>,
 	options: TestMigrationPathOptions,
 ): void {
 	const snap = makeTestSnapshot(pipeline, options.from, options.input, options.state);
@@ -98,8 +101,8 @@ export function testMigrationPath(
  * Tests migrate + restore round-trip.
  * Derives the definition from the pipeline.
  */
-export function testMigrationRestore(
-	pipeline: MigrationPipeline,
+export function testMigrationRestore<TConfig extends WorkflowConfig>(
+	pipeline: MigrationPipeline<TConfig>,
 	options: TestMigrationRestoreOptions,
 ): void {
 	const snap = makeTestSnapshot(pipeline, options.from, options.input, options.state);
