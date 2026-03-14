@@ -483,6 +483,80 @@ restore(snapshot: WorkflowSnapshot<TConfig>):
   | { ok: false; error: ValidationError }
 ```
 
+### Migrations
+
+#### `MigrationFn`
+
+A function that transforms a snapshot's data from one version to the next.
+
+```ts
+type MigrationFn = (snapshot: WorkflowSnapshot) => WorkflowSnapshot;
+```
+
+#### `MigrationPipeline<TConfig>`
+
+A validated migration pipeline ready to transform snapshots.
+
+```ts
+interface MigrationPipeline<TConfig extends WorkflowConfig> {
+  readonly definition: WorkflowDefinition<TConfig>;
+  readonly targetVersion: number;
+  readonly migrations: ReadonlyMap<number, MigrationFn>;
+}
+```
+
+#### `MigrateResult`
+
+```ts
+type MigrateResult =
+  | { ok: true; snapshot: WorkflowSnapshot }
+  | { ok: false; error: MigrationError };
+```
+
+#### `MigrateOptions`
+
+```ts
+interface MigrateOptions {
+  onStep?: (fromVersion: number, toVersion: number, snapshot: WorkflowSnapshot) => void;
+  onError?: (error: MigrationError) => void;
+}
+```
+
+#### `MigrationError`
+
+Error with details about which migration step failed.
+
+```ts
+class MigrationError extends Error {
+  readonly fromVersion: number;
+  readonly toVersion: number;
+  readonly cause: unknown;
+}
+```
+
+#### `defineMigrations(definition, migrationMap)`
+
+Creates a validated migration pipeline. Each key is the target version.
+
+```ts
+function defineMigrations<TConfig extends WorkflowConfig>(
+  definition: WorkflowDefinition<TConfig>,
+  migrationMap: Record<number, MigrationFn>,
+): MigrationPipeline<TConfig>
+```
+
+#### `migrate(pipeline, snapshot, options?)`
+
+Runs the migration chain. Auto-stamps `modelVersion` after each step.
+
+```ts
+function migrate<TConfig extends WorkflowConfig>(
+  pipeline: MigrationPipeline<TConfig>,
+  snapshot: WorkflowSnapshot,
+  options?: MigrateOptions,
+): MigrateResult
+```
+
 ---
 
 ## `@rytejs/testing`
@@ -541,5 +615,38 @@ Creates a test dependencies object from a partial. Returns the partial cast to t
 
 ```ts
 function createTestDeps<T>(partial: Partial<T>): T
+```
+
+#### `testMigration(pipeline, options)`
+
+Tests a single migration step. Calls the migration function directly.
+
+```ts
+function testMigration<TConfig>(
+  pipeline: MigrationPipeline<TConfig>,
+  options: { from: number; input: unknown; expected: unknown; state?: string },
+): void
+```
+
+#### `testMigrationPath(pipeline, options)`
+
+Tests the full migration chain and asserts final version and data.
+
+```ts
+function testMigrationPath<TConfig>(
+  pipeline: MigrationPipeline<TConfig>,
+  options: { from: number; input: unknown; expectVersion: number; expected: unknown; state?: string },
+): void
+```
+
+#### `testMigrationRestore(pipeline, options)`
+
+Tests migrate + restore round-trip. Derives definition from the pipeline.
+
+```ts
+function testMigrationRestore<TConfig>(
+  pipeline: MigrationPipeline<TConfig>,
+  options: { from: number; input: unknown; expectState?: string; state?: string },
+): void
 ```
 
