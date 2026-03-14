@@ -112,8 +112,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		if (arg instanceof WorkflowRouter) {
 			this.merge(arg);
 		} else if (isPlugin(arg)) {
-			// biome-ignore lint/suspicious/noExplicitAny: type erasure — plugin's generic params are erased at call site
-			(arg as Plugin<TConfig, any>)(this);
+			(arg as (router: WorkflowRouter<TConfig, TDeps>) => void)(this);
 		} else {
 			this.globalMiddleware.push(arg as AnyMiddleware);
 		}
