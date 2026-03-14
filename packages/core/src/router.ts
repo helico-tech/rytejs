@@ -29,7 +29,7 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 
 	on<C extends CommandNames<TConfig>>(
 		command: C,
-		options: { targets: readonly StateNames<TConfig>[] },
+		options: { targets: readonly string[] },
 		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
 	): this;
 	on<C extends CommandNames<TConfig>>(
@@ -180,7 +180,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	on<C extends CommandNames<TConfig>>(
 		_state: "*",
 		command: C,
-		options: { targets: readonly StateNames<TConfig>[] },
+		options: { targets: readonly string[] },
 		...fns: [
 			...AnyMiddleware[],
 			(ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
