@@ -63,13 +63,19 @@ new WorkflowRouter(definition: WorkflowDefinition<TConfig>, deps?: TDeps)
 
 #### Methods
 
-##### `.use(middleware)`
+##### `.use(middlewareOrRouter)`
 
-Adds global middleware that wraps all dispatches.
+Adds global middleware that wraps all dispatches, or merges another router's handlers and middleware.
 
 ```ts
+// Middleware function
 use(middleware: (ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Promise<void>): this
+
+// Another router (eager merge)
+use(router: WorkflowRouter<TConfig, TDeps>): this
 ```
+
+When passed a `WorkflowRouter`, its handlers, wildcard handlers, and middleware are eagerly copied into this router. The child's definition must match (reference equality). Parent handlers take priority on conflicts.
 
 ##### `.state(name, setup)`
 
