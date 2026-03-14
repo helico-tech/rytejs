@@ -17,7 +17,11 @@ type AnyMiddleware = (ctx: any, next: () => Promise<void>) => Promise<void>;
 // biome-ignore lint/suspicious/noExplicitAny: internal type erasure for heterogeneous handler storage
 type AnyHandler = (ctx: any) => void | Promise<void>;
 
-type HandlerEntry = { inlineMiddleware: AnyMiddleware[]; handler: AnyMiddleware };
+type HandlerEntry = {
+	inlineMiddleware: AnyMiddleware[];
+	handler: AnyMiddleware;
+	targets?: string[];
+};
 
 class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNames<TConfig>> {
 	/** @internal */ readonly middleware: AnyMiddleware[] = [];
@@ -25,15 +29,32 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 
 	on<C extends CommandNames<TConfig>>(
 		command: C,
+		options: { targets: readonly StateNames<TConfig>[] },
 		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
-	): this {
-		if (fns.length === 0) throw new Error("on() requires at least a handler");
-		const handler = fns.pop() as AnyHandler;
-		const inlineMiddleware = fns as AnyMiddleware[];
+	): this;
+	on<C extends CommandNames<TConfig>>(
+		command: C,
+		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
+	): this;
+	on(command: string, ...fns: unknown[]): this {
+		// biome-ignore lint/suspicious/noExplicitAny: runtime type discrimination for options object
+		const args = [...fns] as any[];
+		let targets: string[] | undefined;
+		if (
+			args.length > 0 &&
+			typeof args[0] === "object" &&
+			args[0] !== null &&
+			"targets" in args[0]
+		) {
+			targets = (args.shift() as { targets: string[] }).targets;
+		}
+		if (args.length === 0) throw new Error("on() requires at least a handler");
+		const handler = args.pop() as AnyHandler;
+		const inlineMiddleware = args as AnyMiddleware[];
 		const wrappedHandler: AnyMiddleware = async (ctx, _next) => {
 			await handler(ctx);
 		};
-		this.handlers.set(command as string, { inlineMiddleware, handler: wrappedHandler });
+		this.handlers.set(command as string, { inlineMiddleware, handler: wrappedHandler, targets });
 		return this;
 	}
 
@@ -95,6 +116,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 				this.wildcardHandlers.set(command, {
 					inlineMiddleware: [...entry.inlineMiddleware],
 					handler: entry.handler,
+					targets: entry.targets ? [...entry.targets] : undefined,
 				});
 			}
 		}
@@ -118,6 +140,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 					parentBuilder.handlers.set(command, {
 						inlineMiddleware: [...entry.inlineMiddleware],
 						handler: entry.handler,
+						targets: entry.targets ? [...entry.targets] : undefined,
 					});
 				}
 			}
@@ -157,20 +180,42 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	on<C extends CommandNames<TConfig>>(
 		_state: "*",
 		command: C,
+		options: { targets: readonly StateNames<TConfig>[] },
 		...fns: [
 			...AnyMiddleware[],
 			(ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
 		]
-	): this {
-		if (fns.length === 0) throw new Error("on() requires at least a handler");
-		const handler = fns.pop() as AnyHandler;
-		const inlineMiddleware = fns as AnyMiddleware[];
+	): this;
+	on<C extends CommandNames<TConfig>>(
+		_state: "*",
+		command: C,
+		...fns: [
+			...AnyMiddleware[],
+			(ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
+		]
+	): this;
+	on(_state: "*", command: string, ...fns: unknown[]): this {
+		// biome-ignore lint/suspicious/noExplicitAny: runtime type discrimination for options object
+		const args = [...fns] as any[];
+		let targets: string[] | undefined;
+		if (
+			args.length > 0 &&
+			typeof args[0] === "object" &&
+			args[0] !== null &&
+			"targets" in args[0]
+		) {
+			targets = (args.shift() as { targets: string[] }).targets;
+		}
+		if (args.length === 0) throw new Error("on() requires at least a handler");
+		const handler = args.pop() as AnyHandler;
+		const inlineMiddleware = args as AnyMiddleware[];
 		const wrappedHandler: AnyMiddleware = async (ctx, _next) => {
 			await handler(ctx);
 		};
 		this.wildcardHandlers.set(command as string, {
 			inlineMiddleware,
 			handler: wrappedHandler,
+			targets,
 		});
 		return this;
 	}
