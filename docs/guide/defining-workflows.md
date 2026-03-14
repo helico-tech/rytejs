@@ -31,6 +31,45 @@ const taskWorkflow = defineWorkflow("task", {
 
 All four config keys -- `states`, `commands`, `events`, `errors` -- are required. Use `{}` for any you don't need yet.
 
+## Defining Errors
+
+Errors represent domain failures that handlers can raise. Define them upfront with Zod schemas so both the error code and its data are type-safe:
+
+```ts
+errors: {
+  AlreadyAssigned: z.object({ currentAssignee: z.string() }),
+  NotAssigned: z.object({}),
+  DeadlinePassed: z.object({ deadline: z.coerce.date() }),
+},
+```
+
+Handlers raise errors with `ctx.error()`, which halts execution and rolls back all mutations:
+
+```ts
+router.state("Todo", (state) => {
+  state.on("Start", (ctx) => {
+    if (!ctx.data.assignee) {
+      ctx.error({ code: "NotAssigned", data: {} });
+    }
+    // only runs if no error was raised
+    ctx.transition("InProgress", { ... });
+  });
+});
+```
+
+The caller gets a typed error back:
+
+```ts
+const result = await router.dispatch(task, { type: "Start", payload: {} });
+
+if (!result.ok && result.error.category === "domain") {
+  result.error.code; // "AlreadyAssigned" | "NotAssigned" | "DeadlinePassed"
+  result.error.data; // typed based on the code
+}
+```
+
+Defining errors upfront makes your workflow's failure modes explicit and discoverable -- they're part of the contract, not hidden inside handler logic.
+
 ## Creating Workflow Instances
 
 `createWorkflow()` instantiates a workflow in a specific initial state. The data is validated against the state's schema.

@@ -55,6 +55,19 @@ events: {
 
 Handlers emit events with `ctx.emit({ type: "TaskCompleted", data: { taskId: "..." } })`. Events are returned in `result.events` after a successful dispatch.
 
+## Errors
+
+Errors are typed domain failures declared upfront in the workflow definition. Each error has a code and a Zod schema for its data.
+
+```ts
+errors: {
+  NotAssigned: z.object({}),
+  AlreadyCompleted: z.object({ completedAt: z.coerce.date() }),
+}
+```
+
+Handlers raise errors with `ctx.error({ code: "NotAssigned", data: {} })`. This halts execution, rolls back all mutations, and returns a typed error in the dispatch result. Because errors are schema-defined, both the code and its data are fully type-checked -- you can't raise an error that doesn't exist or pass the wrong data shape.
+
 ## Middleware
 
 Koa-style onion model. Middleware wraps handlers and can run logic before and after. Three scopes: global, state-scoped, and inline.
@@ -117,6 +130,7 @@ If any step throws or returns a domain error, all mutations are discarded and th
 | State      | Zod schema defining data shape          |
 | Command    | Intent dispatched to trigger logic      |
 | Event      | Side effect emitted during dispatch     |
+| Error      | Typed domain failure with rollback      |
 | Middleware | Pipeline wrapping handlers (onion)      |
 | Handler    | Function that processes a command       |
 | Router     | Maps state + command to handler         |

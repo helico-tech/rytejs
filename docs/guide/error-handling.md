@@ -38,7 +38,19 @@ if (!result.ok && result.error.category === "validation") {
 
 ### Domain Errors
 
-Raised by handlers via `ctx.error()`. These represent business rule violations.
+Business rule violations defined upfront in the workflow definition. Each error code has a Zod schema, making your failure modes part of the workflow's contract:
+
+```ts
+const orderWorkflow = defineWorkflow("order", {
+  // ... states, commands, events
+  errors: {
+    InsufficientPayment: z.object({ required: z.number(), received: z.number() }),
+    AlreadyShipped: z.object({}),
+  },
+});
+```
+
+Handlers raise them via `ctx.error()`:
 
 ```ts
 router.state("Created", (state) => {
