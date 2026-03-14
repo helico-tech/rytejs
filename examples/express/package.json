@@ -1,0 +1,17 @@
+{
+	"name": "@rytejs/example-express",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "tsx index.ts"
+	},
+	"dependencies": {
+		"@rytejs/core": "workspace:*",
+		"express": "^5.0.0",
+		"zod": "^4.0.0"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.0",
+		"tsx": "^4.0.0"
+	}
+}

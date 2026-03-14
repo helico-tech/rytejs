@@ -37,6 +37,7 @@ export default defineConfig({
 						{ text: "Context Keys", link: "/guide/context-keys" },
 						{ text: "Hooks & Plugins", link: "/guide/hooks-and-plugins" },
 						{ text: "Serialization", link: "/guide/serialization" },
+						{ text: "Integrations", link: "/guide/integrations" },
 						{ text: "Testing", link: "/guide/testing" },
 					],
 				},
