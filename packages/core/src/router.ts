@@ -65,12 +65,63 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		private readonly deps: TDeps = {} as TDeps,
 	) {}
 
-	/** Adds global middleware that wraps all dispatches. */
+	/** Adds global middleware or merges another router's handlers. */
 	use(
-		middleware: (ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Promise<void>,
+		middlewareOrRouter:
+			| ((ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Promise<void>)
+			| WorkflowRouter<TConfig, TDeps>,
 	): this {
-		this.globalMiddleware.push(middleware as AnyMiddleware);
+		if (middlewareOrRouter instanceof WorkflowRouter) {
+			this.merge(middlewareOrRouter);
+		} else {
+			this.globalMiddleware.push(middlewareOrRouter as AnyMiddleware);
+		}
 		return this;
+	}
+
+	private merge(child: WorkflowRouter<TConfig, TDeps>): void {
+		if (child.definition !== this.definition) {
+			throw new Error(
+				`Cannot merge router for '${child.definition.name}' into router for '${this.definition.name}': definition mismatch`,
+			);
+		}
+
+		this.globalMiddleware.push(...child.globalMiddleware);
+		this.mergeStateBuilders(this.singleStateBuilders, child.singleStateBuilders);
+		this.mergeStateBuilders(this.multiStateBuilders, child.multiStateBuilders);
+
+		for (const [command, entry] of child.wildcardHandlers) {
+			if (!this.wildcardHandlers.has(command)) {
+				this.wildcardHandlers.set(command, {
+					inlineMiddleware: [...entry.inlineMiddleware],
+					handler: entry.handler,
+				});
+			}
+		}
+	}
+
+	// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
+	private mergeStateBuilders(
+		target: Map<string, StateBuilder<TConfig, TDeps, any>>,
+		source: Map<string, StateBuilder<TConfig, TDeps, any>>,
+	): void {
+		for (const [stateName, childBuilder] of source) {
+			let parentBuilder = target.get(stateName);
+			if (!parentBuilder) {
+				// biome-ignore lint/suspicious/noExplicitAny: type erasure — state name is dynamic at runtime
+				parentBuilder = new StateBuilder<TConfig, TDeps, any>();
+				target.set(stateName, parentBuilder);
+			}
+			for (const [command, entry] of childBuilder.handlers) {
+				if (!parentBuilder.handlers.has(command)) {
+					parentBuilder.handlers.set(command, {
+						inlineMiddleware: [...entry.inlineMiddleware],
+						handler: entry.handler,
+					});
+				}
+			}
+			parentBuilder.middleware.push(...childBuilder.middleware);
+		}
 	}
 
 	/** Registers handlers for one or more states. */

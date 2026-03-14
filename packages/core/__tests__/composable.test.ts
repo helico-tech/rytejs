@@ -65,7 +65,8 @@ describe("Composable Routers", () => {
 		});
 		const child = new WorkflowRouter(other);
 		const parent = new WorkflowRouter(definition);
-		expect(() => parent.use(child)).toThrow();
+		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing mismatched router to test runtime validation
+		expect(() => parent.use(child as any)).toThrow("definition mismatch");
 	});
 
 	test("parent wins: parent handler takes priority over child", async () => {
