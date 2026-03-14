@@ -1,15 +1,15 @@
-# @ryte/core
+# @rytejs/core
 
 Type-safe workflow engine with Zod validation and middleware pipelines.
 
-![CI](https://github.com/helico-tech/ryte/actions/workflows/ci.yml/badge.svg)
-![npm](https://img.shields.io/npm/v/@ryte/core)
+![CI](https://github.com/helico-tech/rytejs/actions/workflows/ci.yml/badge.svg)
+![npm](https://img.shields.io/npm/v/@rytejs/core)
 
 ## Quick Example
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter } from "@ryte/core";
+import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {
@@ -55,16 +55,16 @@ if (result.ok) {
 
 ## Documentation
 
-- [Getting Started](https://helico-tech.github.io/ryte/guide/getting-started)
-- [API Reference](https://helico-tech.github.io/ryte/api/)
+- [Getting Started](https://helico-tech.github.io/rytejs/guide/getting-started)
+- [API Reference](https://helico-tech.github.io/rytejs/api/)
 - [Examples](./examples/)
 
 ## Contributing
 
 ```bash
 # Clone the repo
-git clone https://github.com/helico-tech/ryte.git
-cd ryte
+git clone https://github.com/helico-tech/rytejs.git
+cd rytejs
 
 # Install dependencies
 pnpm install

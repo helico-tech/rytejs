@@ -1,4 +1,4 @@
-# Publishing @ryte/core
+# Publishing @rytejs/core
 
 Step-by-step instructions for publishing releases to npm.
 
@@ -6,7 +6,7 @@ Step-by-step instructions for publishing releases to npm.
 
 - Node.js >= 18
 - pnpm
-- NPM account with `@ryte` org access
+- NPM account with `@rytejs` org access
 
 ## First-Time Setup
 
@@ -15,7 +15,7 @@ Step-by-step instructions for publishing releases to npm.
 npm login
 
 # Create the org (if it doesn't already exist)
-npm org create ryte
+npm org create rytejs
 ```
 
 ## Publishing a Release
@@ -31,13 +31,13 @@ npm org create ryte
 3. **Build** the package:
 
    ```bash
-   pnpm --filter @ryte/core build
+   pnpm --filter @rytejs/core build
    ```
 
 4. **Publish** to npm:
 
    ```bash
-   pnpm --filter @ryte/core publish --access public
+   pnpm --filter @rytejs/core publish --access public
    ```
 
 5. **Tag the release** and push:

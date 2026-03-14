@@ -114,7 +114,7 @@ await router.dispatch(workflow, { type: "SetTitle", payload: { title: "x" } });
 ## Example: Auth Middleware
 
 ```ts
-import { createKey } from "@ryte/core";
+import { createKey } from "@rytejs/core";
 
 const UserKey = createKey<{ id: string; role: string }>("user");
 

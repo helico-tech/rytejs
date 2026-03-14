@@ -7,7 +7,7 @@ Context keys provide type-safe key-value storage on the dispatch context. Middle
 `createKey<T>(name)` creates a phantom-typed symbol. The name is for debugging only -- uniqueness comes from the underlying `Symbol`.
 
 ```ts
-import { createKey } from "@ryte/core";
+import { createKey } from "@rytejs/core";
 
 const UserKey = createKey<{ id: string; role: string }>("user");
 const RequestIdKey = createKey<string>("requestId");
@@ -50,7 +50,7 @@ const user = ctx.getOrNull(UserKey);
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter, createKey } from "@ryte/core";
+import { defineWorkflow, WorkflowRouter, createKey } from "@rytejs/core";
 
 // 1. Define a typed key
 const AuthKey = createKey<{ userId: string; role: "viewer" | "editor" | "admin" }>("auth");

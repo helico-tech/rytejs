@@ -8,7 +8,7 @@ States: `Created` -> `Paid` -> `Shipped` -> `Delivered` (with `Cancelled` reacha
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter, createKey } from "@ryte/core";
+import { defineWorkflow, WorkflowRouter, createKey } from "@rytejs/core";
 
 const orderWorkflow = defineWorkflow("order", {
   states: {

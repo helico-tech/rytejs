@@ -5,7 +5,7 @@ Install Ryte and have a working workflow in under 2 minutes.
 ## Installation
 
 ```bash
-pnpm add @ryte/core zod
+pnpm add @rytejs/core zod
 ```
 
 ## Define a Workflow
@@ -14,7 +14,7 @@ A workflow has states (Zod schemas), commands (intents that trigger logic), even
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter } from "@ryte/core";
+import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {

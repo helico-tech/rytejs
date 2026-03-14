@@ -1,5 +1,5 @@
 {
-	"name": "@ryte/docs",
+	"name": "@rytejs/docs",
 	"private": true,
 	"type": "module",
 	"scripts": {

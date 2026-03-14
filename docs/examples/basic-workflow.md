@@ -6,7 +6,7 @@ A complete task workflow with three states: `Todo`, `InProgress`, and `Done`.
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter } from "@ryte/core";
+import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {

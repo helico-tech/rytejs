@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for all exports from `@ryte/core`.
+Complete reference for all exports from `@rytejs/core`.
 
 ## Functions
 

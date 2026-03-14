@@ -29,7 +29,7 @@ importers:
 
   examples/basic:
     dependencies:
-      '@ryte/core':
+      '@rytejs/core':
         specifier: workspace:*
         version: link:../../packages/core
       zod:

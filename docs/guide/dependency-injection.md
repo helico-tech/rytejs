@@ -7,7 +7,7 @@ Pass external services to your handlers through the router's dependency system.
 Pass a deps object as the second argument to `WorkflowRouter`:
 
 ```ts
-import { WorkflowRouter } from "@ryte/core";
+import { WorkflowRouter } from "@rytejs/core";
 
 type Deps = {
   db: Database;
@@ -51,7 +51,7 @@ router.state("Review", (state) => {
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow, WorkflowRouter } from "@ryte/core";
+import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
 
 // Define the workflow
 const articleWorkflow = defineWorkflow("article", {

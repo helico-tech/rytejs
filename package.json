@@ -1,5 +1,5 @@
 {
-	"name": "ryte",
+	"name": "rytejs",
 	"private": true,
 	"type": "module",
 	"packageManager": "pnpm@10.6.2",

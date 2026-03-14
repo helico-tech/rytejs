@@ -1,12 +1,12 @@
 {
-	"name": "@ryte/example-basic",
+	"name": "@rytejs/example-basic",
 	"private": true,
 	"type": "module",
 	"scripts": {
 		"start": "tsx index.ts"
 	},
 	"dependencies": {
-		"@ryte/core": "workspace:*",
+		"@rytejs/core": "workspace:*",
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {

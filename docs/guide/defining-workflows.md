@@ -6,7 +6,7 @@
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow } from "@ryte/core";
+import { defineWorkflow } from "@rytejs/core";
 
 const taskWorkflow = defineWorkflow("task", {
   states: {
@@ -82,7 +82,7 @@ taskWorkflow.hasState("unknown");   // false
 
 ```ts
 import { z } from "zod";
-import { defineWorkflow } from "@ryte/core";
+import { defineWorkflow } from "@rytejs/core";
 
 const articleWorkflow = defineWorkflow("article", {
   states: {

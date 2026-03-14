@@ -1,4 +1,4 @@
-import { defineWorkflow, type Workflow, WorkflowRouter } from "@ryte/core";
+import { defineWorkflow, type Workflow, WorkflowRouter } from "@rytejs/core";
 import { z } from "zod";
 
 const taskWorkflow = defineWorkflow("task", {

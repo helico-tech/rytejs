@@ -1,5 +1,5 @@
 {
-	"name": "@ryte/core",
+	"name": "@rytejs/core",
 	"version": "0.1.0",
 	"description": "Type-safe workflow engine with Zod validation and middleware pipelines",
 	"license": "MIT",
@@ -20,11 +20,11 @@
 	"sideEffects": false,
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/helico-tech/ryte",
+		"url": "https://github.com/helico-tech/rytejs",
 		"directory": "packages/core"
 	},
-	"homepage": "https://helico-tech.github.io/ryte",
-	"bugs": "https://github.com/helico-tech/ryte/issues",
+	"homepage": "https://helico-tech.github.io/rytejs",
+	"bugs": "https://github.com/helico-tech/rytejs/issues",
 	"keywords": [
 		"workflow",
 		"state-machine",

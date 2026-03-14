@@ -53,6 +53,6 @@ export default defineConfig({
 				},
 			],
 		},
-		socialLinks: [{ icon: "github", link: "https://github.com/helico-tech/ryte" }],
+		socialLinks: [{ icon: "github", link: "https://github.com/helico-tech/rytejs" }],
 	},
 });

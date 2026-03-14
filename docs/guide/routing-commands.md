@@ -5,7 +5,7 @@
 ## Creating a Router
 
 ```ts
-import { WorkflowRouter } from "@ryte/core";
+import { WorkflowRouter } from "@rytejs/core";
 
 // Without dependencies
 const router = new WorkflowRouter(taskWorkflow);
