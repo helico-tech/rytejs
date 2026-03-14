@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for all exports from `@rytejs/core` and `@rytejs/viz`.
+Complete reference for all exports from `@rytejs/core`.
 
 ## Functions
 
@@ -116,16 +116,6 @@ on<C extends CommandNames<TConfig>>(
 ): this
 ```
 
-##### `.inspect()`
-
-Returns the transition graph built from registered handlers and their declared targets.
-
-```ts
-inspect(): RouterGraph<TConfig>
-```
-
-Returns a `RouterGraph` with the definition info and all transitions. See [Introspection](/guide/introspection).
-
 ##### `.on(event, callback)` (hooks)
 
 Registers a lifecycle hook callback.
@@ -213,7 +203,6 @@ interface WorkflowDefinition<TConfig extends WorkflowConfig> {
   getEventSchema(eventName: string): ZodType;
   getErrorSchema(errorCode: string): ZodType;
   hasState(stateName: string): boolean;
-  inspect(): DefinitionInfo<TConfig>;
 }
 ```
 
@@ -396,45 +385,6 @@ type ErrorData<T extends WorkflowConfig, C extends ErrorCodes<T>> =
   T["errors"][C] extends ZodType ? z.infer<T["errors"][C]> : never;
 ```
 
-### Introspection
-
-#### `DefinitionInfo<TConfig>`
-
-Static shape of a workflow definition, returned by `definition.inspect()`.
-
-```ts
-interface DefinitionInfo<TConfig extends WorkflowConfig> {
-  readonly name: string;
-  readonly states: readonly StateNames<TConfig>[];
-  readonly commands: readonly CommandNames<TConfig>[];
-  readonly events: readonly EventNames<TConfig>[];
-  readonly errors: readonly ErrorCodes<TConfig>[];
-}
-```
-
-#### `RouterGraph<TConfig>`
-
-Full transition graph of a router, returned by `router.inspect()`.
-
-```ts
-interface RouterGraph<TConfig extends WorkflowConfig> {
-  readonly definition: DefinitionInfo<TConfig>;
-  readonly transitions: readonly TransitionInfo<TConfig>[];
-}
-```
-
-#### `TransitionInfo<TConfig>`
-
-A single transition edge in the workflow graph.
-
-```ts
-interface TransitionInfo<TConfig extends WorkflowConfig> {
-  readonly from: StateNames<TConfig>;
-  readonly command: CommandNames<TConfig>;
-  readonly to: readonly StateNames<TConfig>[];
-}
-```
-
 ### Hooks & Plugins
 
 #### `ReadonlyContext<TConfig, TDeps, TState?, TCommand?>`
@@ -492,52 +442,3 @@ Type guard that checks whether a value is a branded plugin.
 function isPlugin(value: unknown): value is Plugin<WorkflowConfig, unknown>
 ```
 
----
-
-## `@rytejs/viz`
-
-### `toMermaid(graph, options?)`
-
-Generates a Mermaid stateDiagram-v2 from a workflow graph.
-
-```ts
-function toMermaid(graph: GraphInput, options?: DiagramOptions): string
-```
-
-### `toD2(graph, options?)`
-
-Generates a D2 diagram from a workflow graph.
-
-```ts
-function toD2(graph: GraphInput, options?: DiagramOptions): string
-```
-
-### `GraphInput`
-
-Input for diagram generation functions. Matches the shape returned by `router.inspect()`.
-
-```ts
-interface GraphInput {
-  readonly definition: { readonly name: string; readonly states: readonly string[] };
-  readonly transitions: readonly TransitionEdge[];
-}
-```
-
-### `TransitionEdge`
-
-```ts
-interface TransitionEdge {
-  readonly from: string;
-  readonly command: string;
-  readonly to: readonly string[];
-}
-```
-
-### `DiagramOptions`
-
-```ts
-interface DiagramOptions {
-  title?: string;
-  highlightTerminal?: boolean;
-}
-```

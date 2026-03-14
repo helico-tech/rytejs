@@ -36,7 +36,6 @@ export default defineConfig({
 						{ text: "Dependency Injection", link: "/guide/dependency-injection" },
 						{ text: "Context Keys", link: "/guide/context-keys" },
 						{ text: "Hooks & Plugins", link: "/guide/hooks-and-plugins" },
-						{ text: "Visualization", link: "/guide/visualization" },
 					],
 				},
 			],
