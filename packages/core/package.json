@@ -1,0 +1,46 @@
+{
+	"name": "@ryte/core",
+	"version": "0.1.0",
+	"description": "Type-safe workflow engine with Zod validation and middleware pipelines",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": ["dist"],
+	"sideEffects": false,
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/helico-tech/ryte",
+		"directory": "packages/core"
+	},
+	"homepage": "https://helico-tech.github.io/ryte",
+	"bugs": "https://github.com/helico-tech/ryte/issues",
+	"keywords": ["workflow", "state-machine", "typescript", "zod", "middleware"],
+	"peerDependencies": {
+		"zod": "^4.0.0"
+	},
+	"devDependencies": {
+		"tsup": "^8.0.0",
+		"typescript": "^5.7.0",
+		"vitest": "^3.0.0",
+		"zod": "^4.0.0"
+	},
+	"scripts": {
+		"build": "tsup",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"typecheck": "tsc --noEmit"
+	},
+	"engines": {
+		"node": ">=18"
+	}
+}
