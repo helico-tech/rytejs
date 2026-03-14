@@ -7,6 +7,8 @@ export type { DefinitionInfo, RouterGraph, TransitionInfo } from "./introspectio
 export type { ContextKey } from "./key.js";
 export { createKey } from "./key.js";
 export type { Middleware } from "./middleware.js";
+export type { Plugin } from "./plugin.js";
+export { definePlugin, isPlugin } from "./plugin.js";
 export type { ReadonlyContext } from "./readonly-context.js";
 export type { RouterOptions } from "./router.js";
 export { WorkflowRouter } from "./router.js";

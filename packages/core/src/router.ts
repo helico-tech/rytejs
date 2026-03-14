@@ -3,6 +3,8 @@ import { type Context, createContext } from "./context.js";
 import type { WorkflowDefinition } from "./definition.js";
 import { HOOK_EVENTS, HookRegistry } from "./hooks.js";
 import type { RouterGraph, TransitionInfo } from "./introspection.js";
+import type { Plugin } from "./plugin.js";
+import { isPlugin } from "./plugin.js";
 import type { ReadonlyContext } from "./readonly-context.js";
 import type {
 	CommandNames,
@@ -100,16 +102,20 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		this.onHookError = options.onHookError ?? console.error;
 	}
 
-	/** Adds global middleware or merges another router's handlers. */
+	/** Adds global middleware, merges another router, or applies a plugin. */
 	use(
-		middlewareOrRouter:
+		arg:
 			| ((ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Promise<void>)
-			| WorkflowRouter<TConfig, TDeps>,
+			| WorkflowRouter<TConfig, TDeps>
+			| Plugin<TConfig, TDeps>,
 	): this {
-		if (middlewareOrRouter instanceof WorkflowRouter) {
-			this.merge(middlewareOrRouter);
+		if (arg instanceof WorkflowRouter) {
+			this.merge(arg);
+		} else if (isPlugin(arg)) {
+			// biome-ignore lint/suspicious/noExplicitAny: type erasure — plugin's generic params are erased at call site
+			(arg as Plugin<TConfig, any>)(this);
 		} else {
-			this.globalMiddleware.push(middlewareOrRouter as AnyMiddleware);
+			this.globalMiddleware.push(arg as AnyMiddleware);
 		}
 		return this;
 	}
