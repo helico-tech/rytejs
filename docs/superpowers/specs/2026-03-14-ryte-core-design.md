@@ -180,7 +180,7 @@ type Handler<TConfig, TDeps, TState, TCommand> = (
 ) => Promise<void> | void
 ```
 
-`Middleware` is a Koa-style function receiving context and a `next` callback. `Handler` is the terminal function — no `next`, just business logic. Both are exported for consumers who want to type their middleware/handler variables.
+`Middleware` is a Koa-style function receiving context and a `next` callback. `Handler` is the terminal function — no `next`, just business logic. Both are defined in `context.ts` (alongside `Context`) and exported for consumers who want to type their middleware/handler variables.
 
 `StateBuilder` is **not exported** from the barrel — consumers only interact with it via the callback parameter in `router.state()`.
 
