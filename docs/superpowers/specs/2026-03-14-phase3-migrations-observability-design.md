@@ -45,7 +45,9 @@ const migrations = defineMigrations(definition, {
 });
 ```
 
-Each key is the **target version** — the function transforms from `(key - 1)` to `key`. The definition's `modelVersion` determines the final target.
+Each key is the **target version** — the function transforms from `(key - 1)` to `key`. The definition's `modelVersion` (defaults to `1` if not set, same as `snapshot()`) determines the final target.
+
+Migration functions should modify `data` and optionally `state`. The pipeline always overwrites `modelVersion` after each step, even if the migration function sets it.
 
 **Return type:**
 
@@ -61,6 +63,9 @@ interface MigrationPipeline<TConfig extends WorkflowConfig> {
 - Throws if any migration key is `<= 1` (version 1 is the baseline, no migration needed)
 - Throws if there are gaps in the version sequence (e.g., map has 2 and 4 but not 3)
 - Throws if the highest key doesn't match the definition's `modelVersion`
+- If definition has `modelVersion: 1` (or unset) and migration map is empty, returns a valid pipeline (no migrations to run)
+
+**Source file:** `packages/core/src/migration.ts`
 
 ### 1.2 `migrate(pipeline, snapshot, options?)`
 
@@ -73,8 +78,11 @@ const result = migrate(migrations, oldSnapshot);
 ```
 
 **Behavior:**
+- `migrate()` is synchronous — migration functions are pure data transforms, no async needed
 - Snapshot already at target version → returned as-is (`{ ok: true }`)
 - Snapshot version higher than target → returns error (can't downgrade)
+- Snapshot `modelVersion` must be a positive integer → returns error otherwise
+- Validates `snapshot.definitionName` matches `pipeline.definition.name` → returns error on mismatch
 - Runs each migration step sequentially: v1 → v2 → v3
 - After each step, auto-stamps `modelVersion` to the step's target version
 - If a migration function throws, catches it and returns `{ ok: false, error: MigrationError }`
@@ -155,7 +163,7 @@ testMigration(migrations, {
 });
 ```
 
-Constructs a snapshot at version `from` with `input` as data, runs `migrate()` for one step (from → from+1), asserts the output data deep-equals `expected`. Throws with a clear message on mismatch or migration failure.
+Constructs a snapshot at version `from` with `input` as data, calls the migration function for `from + 1` directly (not through `migrate()`), and asserts the output data deep-equals `expected`. Throws with a clear message on mismatch or migration failure.
 
 **Options:**
 
@@ -189,14 +197,14 @@ Runs the entire chain from `from` to the pipeline's target version. Asserts fina
 ```ts
 import { testMigrationRestore } from "@rytejs/testing";
 
-testMigrationRestore(migrations, definition, {
+testMigrationRestore(migrations, {
   from: 1,
   input: { oldField: "value" },
   expectState: "Draft",
 });
 ```
 
-Runs the full pipeline: `migrate()` then `definition.restore()`. Asserts `restore()` succeeds and optionally checks the resulting state. Catches cases where migration produces data that passes the migration but fails schema validation.
+Derives the definition from the pipeline. Runs the full pipeline: `migrate()` then `definition.restore()`. Asserts `restore()` succeeds and optionally checks the resulting state. Catches cases where migration produces data that passes the migration but fails schema validation.
 
 ---
 
@@ -207,6 +215,10 @@ A guide page at `docs/guide/observability.md` with copy-pasteable plugin example
 ### 3.1 Structured Logging
 
 ```ts
+import { createKey, definePlugin } from "@rytejs/core";
+
+const startTimeKey = createKey<number>("startTime");
+
 const loggingPlugin = definePlugin((router) => {
   router.on("dispatch:start", (ctx) => {
     const start = Date.now();
@@ -227,6 +239,11 @@ const loggingPlugin = definePlugin((router) => {
 ### 3.2 OpenTelemetry Tracing
 
 ```ts
+import { createKey, definePlugin } from "@rytejs/core";
+import { SpanStatusCode, tracer } from "./your-otel-setup";
+
+const spanKey = createKey<Span>("span");
+
 const otelPlugin = definePlugin((router) => {
   router.on("dispatch:start", (ctx) => {
     const span = tracer.startSpan(`ryte.dispatch.${ctx.command.type}`);
