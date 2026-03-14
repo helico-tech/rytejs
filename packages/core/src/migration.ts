@@ -85,8 +85,8 @@ export function defineMigrations<TConfig extends WorkflowConfig>(
  * Runs the migration chain from the snapshot's modelVersion to the pipeline's targetVersion.
  * Returns a Result. Auto-stamps modelVersion after each step.
  */
-export function migrate(
-	pipeline: MigrationPipeline,
+export function migrate<TConfig extends WorkflowConfig>(
+	pipeline: MigrationPipeline<TConfig>,
 	snapshot: WorkflowSnapshot,
 	options?: MigrateOptions,
 ): MigrateResult {
