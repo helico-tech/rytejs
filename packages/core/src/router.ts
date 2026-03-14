@@ -1,6 +1,7 @@
 import { compose } from "./compose.js";
 import { type Context, createContext } from "./context.js";
 import type { WorkflowDefinition } from "./definition.js";
+import type { RouterGraph, TransitionInfo } from "./introspection.js";
 import type {
 	CommandNames,
 	DispatchResult,
@@ -174,6 +175,57 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			setup(router as any);
 		}
 		return this;
+	}
+
+	/** Returns the transition graph built from registered handlers and their declared targets. */
+	inspect(): RouterGraph<TConfig> {
+		const transitions: TransitionInfo<TConfig>[] = [];
+		const allStates = Object.keys(this.definition.config.states) as StateNames<TConfig>[];
+
+		// Single-state handlers
+		for (const [stateName, builder] of this.singleStateBuilders) {
+			for (const [command, entry] of builder.handlers) {
+				transitions.push({
+					from: stateName as StateNames<TConfig>,
+					command: command as CommandNames<TConfig>,
+					to: (entry.targets ?? []) as StateNames<TConfig>[],
+				});
+			}
+		}
+
+		// Multi-state handlers
+		for (const [stateName, builder] of this.multiStateBuilders) {
+			for (const [command, entry] of builder.handlers) {
+				const hasSingle = this.singleStateBuilders.get(stateName)?.handlers.has(command);
+				if (!hasSingle) {
+					transitions.push({
+						from: stateName as StateNames<TConfig>,
+						command: command as CommandNames<TConfig>,
+						to: (entry.targets ?? []) as StateNames<TConfig>[],
+					});
+				}
+			}
+		}
+
+		// Wildcard handlers — produce a transition for each state not already covered
+		for (const [command, entry] of this.wildcardHandlers) {
+			for (const stateName of allStates) {
+				const hasSingle = this.singleStateBuilders.get(stateName)?.handlers.has(command);
+				const hasMulti = this.multiStateBuilders.get(stateName)?.handlers.has(command);
+				if (!hasSingle && !hasMulti) {
+					transitions.push({
+						from: stateName,
+						command: command as CommandNames<TConfig>,
+						to: (entry.targets ?? []) as StateNames<TConfig>[],
+					});
+				}
+			}
+		}
+
+		return {
+			definition: this.definition.inspect(),
+			transitions,
+		};
 	}
 
 	/** Registers a wildcard handler that matches any state. */
