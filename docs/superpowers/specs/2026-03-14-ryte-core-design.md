@@ -38,6 +38,8 @@ ryte/
 │       │   ├── types.ts             # Core type system
 │       │   ├── definition.ts        # defineWorkflow() factory
 │       │   ├── context.ts           # Context implementation
+│       │   ├── middleware.ts        # Middleware type
+│       │   ├── handler.ts           # Handler type
 │       │   ├── router.ts            # WorkflowRouter + StateBuilder
 │       │   ├── compose.ts           # Middleware composition
 │       │   └── key.ts               # Typed context keys
@@ -167,20 +169,31 @@ interface Context<TConfig, TDeps, TState, TCommand> {
 }
 ```
 
-### Middleware and Handler Types
+### Middleware Type
+
+Defined in `middleware.ts`. Fully typed context parameter.
 
 ```typescript
-type Middleware<TConfig, TDeps> = (
-  ctx: Context<TConfig, TDeps, any, any>,
+type Middleware<TConfig extends WorkflowConfig, TDeps> = (
+  ctx: Context<TConfig, TDeps>,
   next: () => Promise<void>
 ) => Promise<void>
-
-type Handler<TConfig, TDeps, TState, TCommand> = (
-  ctx: Context<TConfig, TDeps, TState, TCommand>
-) => Promise<void> | void
 ```
 
-`Middleware` is a Koa-style function receiving context and a `next` callback. `Handler` is the terminal function — no `next`, just business logic. Both are defined in `context.ts` (alongside `Context`) and exported for consumers who want to type their middleware/handler variables.
+### Handler Type
+
+Defined in `handler.ts`. Fully typed context parameter with state and command narrowing.
+
+```typescript
+type Handler<
+  TConfig extends WorkflowConfig,
+  TDeps,
+  TState extends StateNames<TConfig>,
+  TCommand extends CommandNames<TConfig>
+> = (ctx: Context<TConfig, TDeps, TState, TCommand>) => Promise<void> | void
+```
+
+Both are exported for consumers who want to type their middleware/handler variables.
 
 `StateBuilder` is **not exported** from the barrel — consumers only interact with it via the callback parameter in `router.state()`.
 
@@ -238,6 +251,22 @@ type DispatchResult<TConfig extends WorkflowConfig = WorkflowConfig> =
   | { ok: true; workflow: Workflow<TConfig>; events: Event[] }
   | { ok: false; error: PipelineError<TConfig> }
 ```
+
+## Dependency Graph
+
+```
+types.ts        ← no internal imports
+key.ts          ← no internal imports
+compose.ts      ← no internal imports
+definition.ts   ← imports types.ts
+context.ts      ← imports types.ts, key.ts, definition.ts
+middleware.ts   ← imports types.ts, context.ts
+handler.ts      ← imports types.ts, context.ts
+router.ts       ← imports types.ts, context.ts, definition.ts, compose.ts, middleware.ts, handler.ts
+index.ts        ← re-exports from all of the above
+```
+
+No circular dependencies. Each file imports only from files above it in this list.
 
 ## Build & Package Configuration
 
@@ -322,9 +351,7 @@ export default defineConfig({
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "test": {
-      "dependsOn": ["build"]
-    },
+    "test": {},
     "typecheck": {},
     "lint": {}
   }
