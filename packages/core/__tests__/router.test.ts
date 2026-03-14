@@ -96,6 +96,7 @@ describe("WorkflowRouter", () => {
 			app.state("Draft", (s) => s.on("SetTitle", () => {}));
 			const result = await app.dispatch(wf.Draft(), {
 				type: "SetTitle",
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid payload to test validation
 				payload: {} as any,
 			});
 			expect(result.ok).toBe(false);
@@ -127,6 +128,7 @@ describe("WorkflowRouter", () => {
 				data: {},
 				createdAt: new Date(),
 				updatedAt: new Date(),
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally creating invalid workflow to test UNKNOWN_STATE
 			} as any;
 			const result = await app.dispatch(badWf, {
 				type: "SetTitle",

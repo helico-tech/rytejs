@@ -12,7 +12,9 @@ import type {
 } from "./types.js";
 import { DomainErrorSignal, ValidationError } from "./types.js";
 
+// biome-ignore lint/suspicious/noExplicitAny: internal type erasure for heterogeneous middleware storage
 type AnyMiddleware = (ctx: any, next: () => Promise<void>) => Promise<void>;
+// biome-ignore lint/suspicious/noExplicitAny: internal type erasure for heterogeneous handler storage
 type AnyHandler = (ctx: any) => void | Promise<void>;
 
 type HandlerEntry = { inlineMiddleware: AnyMiddleware[]; handler: AnyMiddleware };
@@ -49,9 +51,12 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
  * Supports global middleware, state-scoped middleware, inline middleware,
  * wildcard handlers, and multi-state handlers.
  */
+// biome-ignore lint/complexity/noBannedTypes: {} is correct here — TDeps defaults to "no deps", inferred away when deps are provided
 export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	private globalMiddleware: AnyMiddleware[] = [];
+	// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
 	private singleStateBuilders = new Map<string, StateBuilder<TConfig, TDeps, any>>();
+	// biome-ignore lint/suspicious/noExplicitAny: type erasure — builders store handlers for different state types
 	private multiStateBuilders = new Map<string, StateBuilder<TConfig, TDeps, any>>();
 	private wildcardHandlers = new Map<string, HandlerEntry>();
 
@@ -86,9 +91,11 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		for (const n of names as string[]) {
 			let router = routerMap.get(n);
 			if (!router) {
+				// biome-ignore lint/suspicious/noExplicitAny: type erasure — state name is dynamic at runtime
 				router = new StateBuilder<TConfig, TDeps, any>();
 				routerMap.set(n, router);
 			}
+			// biome-ignore lint/suspicious/noExplicitAny: type erasure — setup callback expects a specific state type
 			setup(router as any);
 		}
 		return this;
@@ -155,6 +162,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		const wildcardHandler = this.wildcardHandlers.get(command.type);
 
 		let routeEntry: HandlerEntry | undefined;
+		// biome-ignore lint/suspicious/noExplicitAny: type erasure — matched router's state type is dynamic
 		let matchedRouter: StateBuilder<TConfig, TDeps, any> | undefined;
 
 		if (singleHandler) {

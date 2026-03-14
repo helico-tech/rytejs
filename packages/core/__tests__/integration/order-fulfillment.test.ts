@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { createKey, defineWorkflow, WorkflowRouter } from "../../src/index.js";
+import { createKey, defineWorkflow, type Workflow, WorkflowRouter } from "../../src/index.js";
 
 const orderWorkflow = defineWorkflow("order", {
 	states: {
@@ -119,7 +119,7 @@ describe("Order Fulfillment Integration", () => {
 
 	test("full lifecycle: created → paid → shipped → delivered", async () => {
 		const { router } = createRouter();
-		let wf = orderWorkflow.createWorkflow("order-1", {
+		let wf: Workflow<typeof orderWorkflow.config> = orderWorkflow.createWorkflow("order-1", {
 			initialState: "Created",
 			data: { items: ["widget"], total: 50 },
 		});
@@ -130,7 +130,7 @@ describe("Order Fulfillment Integration", () => {
 		expect(result.workflow.state).toBe("Paid");
 		expect(result.events).toHaveLength(1);
 		expect(result.events[0]?.type).toBe("OrderPaid");
-		wf = result.workflow as any;
+		wf = result.workflow;
 
 		result = await router.dispatch(wf, {
 			type: "Ship",
@@ -139,7 +139,7 @@ describe("Order Fulfillment Integration", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Shipped");
-		wf = result.workflow as any;
+		wf = result.workflow;
 
 		result = await router.dispatch(wf, { type: "Deliver", payload: {} });
 		expect(result.ok).toBe(true);
@@ -172,7 +172,7 @@ describe("Order Fulfillment Integration", () => {
 
 	test("events don't leak between dispatches", async () => {
 		const { router } = createRouter();
-		let wf = orderWorkflow.createWorkflow("order-3", {
+		let wf: Workflow<typeof orderWorkflow.config> = orderWorkflow.createWorkflow("order-3", {
 			initialState: "Created",
 			data: { items: ["a"], total: 10 },
 		});
@@ -181,7 +181,7 @@ describe("Order Fulfillment Integration", () => {
 		expect(result1.ok).toBe(true);
 		if (!result1.ok) throw new Error();
 		expect(result1.events).toHaveLength(1);
-		wf = result1.workflow as any;
+		wf = result1.workflow;
 
 		const result2 = await router.dispatch(wf, {
 			type: "Ship",

@@ -114,6 +114,7 @@ describe("createWorkflow", () => {
 		expect(() =>
 			testDefinition.createWorkflow("wf-3", {
 				initialState: "Published",
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
 				data: {} as any,
 			}),
 		).toThrow();
@@ -122,6 +123,7 @@ describe("createWorkflow", () => {
 	test("throws for unknown initial state", () => {
 		expect(() =>
 			testDefinition.createWorkflow("wf-4", {
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid state to test error
 				initialState: "nonexistent" as any,
 				data: {},
 			}),

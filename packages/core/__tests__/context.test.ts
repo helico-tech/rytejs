@@ -67,6 +67,7 @@ describe("createContext", () => {
 		test("ctx.update validates against state schema", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid type to test validation
 			expect(() => ctx.update({ title: 123 as any })).toThrow(ValidationError);
 		});
 	});
@@ -84,12 +85,14 @@ describe("createContext", () => {
 		test("ctx.transition validates data against target state schema", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Submit", payload: {} }, deps);
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
 			expect(() => ctx.transition("Review", {} as any)).toThrow(ValidationError);
 		});
 
 		test("ctx.transition throws for unknown target state", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Submit", payload: {} }, deps);
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid state to test error
 			expect(() => ctx.transition("nonexistent" as any, {})).toThrow("Unknown state: nonexistent");
 		});
 
@@ -117,6 +120,7 @@ describe("createContext", () => {
 		test("ctx.emit validates event data against schema", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
 			expect(() => ctx.emit({ type: "Saved", data: {} as any })).toThrow();
 		});
 
@@ -145,6 +149,7 @@ describe("createContext", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
 			expect(() =>
+				// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
 				ctx.error({ code: "Incomplete", data: { missing: "not-an-array" } as any }),
 			).toThrow();
 		});
