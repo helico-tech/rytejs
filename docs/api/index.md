@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for all exports from `@rytejs/core`.
+Complete reference for all exports from `@rytejs/core` and `@rytejs/viz`.
 
 ## Functions
 
@@ -53,19 +53,20 @@ class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}>
 #### Constructor
 
 ```ts
-new WorkflowRouter(definition: WorkflowDefinition<TConfig>, deps?: TDeps)
+new WorkflowRouter(definition: WorkflowDefinition<TConfig>, deps?: TDeps, options?: RouterOptions)
 ```
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
 | `definition` | `WorkflowDefinition<TConfig>` | Workflow definition created by `defineWorkflow()` |
 | `deps` | `TDeps` | Optional dependencies object, accessible via `ctx.deps` |
+| `options` | `RouterOptions` | Optional configuration (e.g., `onHookError` callback) |
 
 #### Methods
 
 ##### `.use(middlewareOrRouter)`
 
-Adds global middleware that wraps all dispatches, or merges another router's handlers and middleware.
+Adds global middleware, merges another router, or applies a plugin.
 
 ```ts
 // Middleware function
@@ -73,9 +74,12 @@ use(middleware: (ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Pro
 
 // Another router (eager merge)
 use(router: WorkflowRouter<TConfig, TDeps>): this
+
+// Plugin
+use(plugin: Plugin<TConfig, TDeps>): this
 ```
 
-When passed a `WorkflowRouter`, its handlers, wildcard handlers, and middleware are eagerly copied into this router. The child's definition must match (reference equality). Parent handlers take priority on conflicts.
+When passed a `WorkflowRouter`, its handlers, wildcard handlers, middleware, and hooks are eagerly copied. When passed a plugin (created via `definePlugin()`), the plugin function is called with the router. Otherwise, the argument is added as global middleware.
 
 ##### `.state(name, setup)`
 
@@ -97,6 +101,7 @@ state<S extends readonly StateNames<TConfig>[]>(
 
 The `setup` callback receives a `StateBuilder` with:
 - `.on(command, ...middleware?, handler)` -- register a handler with optional inline middleware
+- `.on(command, { targets: [...] }, ...middleware?, handler)` -- register with transition targets for introspection
 - `.use(middleware)` -- add state-scoped middleware
 
 ##### `.on("*", command, ...middleware?, handler)`
@@ -110,6 +115,30 @@ on<C extends CommandNames<TConfig>>(
   ...fns: [...Middleware[], Handler],
 ): this
 ```
+
+##### `.inspect()`
+
+Returns the transition graph built from registered handlers and their declared targets.
+
+```ts
+inspect(): RouterGraph<TConfig>
+```
+
+Returns a `RouterGraph` with the definition info and all transitions. See [Introspection](/guide/introspection).
+
+##### `.on(event, callback)` (hooks)
+
+Registers a lifecycle hook callback.
+
+```ts
+on(event: "dispatch:start", callback: (ctx: ReadonlyContext<TConfig, TDeps>) => void | Promise<void>): this
+on(event: "dispatch:end", callback: (ctx: ReadonlyContext<TConfig, TDeps>, result: DispatchResult<TConfig>) => void | Promise<void>): this
+on(event: "transition", callback: (from: StateNames<TConfig>, to: StateNames<TConfig>, workflow: Workflow<TConfig>) => void | Promise<void>): this
+on(event: "error", callback: (error: PipelineError<TConfig>, ctx: ReadonlyContext<TConfig, TDeps>) => void | Promise<void>): this
+on(event: "event", callback: (event: { type: EventNames<TConfig>; data: unknown }, workflow: Workflow<TConfig>) => void | Promise<void>): this
+```
+
+See [Hooks & Plugins](/guide/hooks-and-plugins).
 
 ##### `.dispatch(workflow, command)`
 
@@ -184,6 +213,7 @@ interface WorkflowDefinition<TConfig extends WorkflowConfig> {
   getEventSchema(eventName: string): ZodType;
   getErrorSchema(errorCode: string): ZodType;
   hasState(stateName: string): boolean;
+  inspect(): DefinitionInfo<TConfig>;
 }
 ```
 
@@ -364,4 +394,150 @@ Infers the data type for a given error code.
 ```ts
 type ErrorData<T extends WorkflowConfig, C extends ErrorCodes<T>> =
   T["errors"][C] extends ZodType ? z.infer<T["errors"][C]> : never;
+```
+
+### Introspection
+
+#### `DefinitionInfo<TConfig>`
+
+Static shape of a workflow definition, returned by `definition.inspect()`.
+
+```ts
+interface DefinitionInfo<TConfig extends WorkflowConfig> {
+  readonly name: string;
+  readonly states: readonly StateNames<TConfig>[];
+  readonly commands: readonly CommandNames<TConfig>[];
+  readonly events: readonly EventNames<TConfig>[];
+  readonly errors: readonly ErrorCodes<TConfig>[];
+}
+```
+
+#### `RouterGraph<TConfig>`
+
+Full transition graph of a router, returned by `router.inspect()`.
+
+```ts
+interface RouterGraph<TConfig extends WorkflowConfig> {
+  readonly definition: DefinitionInfo<TConfig>;
+  readonly transitions: readonly TransitionInfo<TConfig>[];
+}
+```
+
+#### `TransitionInfo<TConfig>`
+
+A single transition edge in the workflow graph.
+
+```ts
+interface TransitionInfo<TConfig extends WorkflowConfig> {
+  readonly from: StateNames<TConfig>;
+  readonly command: CommandNames<TConfig>;
+  readonly to: readonly StateNames<TConfig>[];
+}
+```
+
+### Hooks & Plugins
+
+#### `ReadonlyContext<TConfig, TDeps, TState?, TCommand?>`
+
+Read-only subset of `Context` for hook callbacks. Excludes `update`, `transition`, `emit`, `error`, and `getWorkflowSnapshot`.
+
+```ts
+type ReadonlyContext<TConfig, TDeps, TState, TCommand> =
+  Omit<Context<TConfig, TDeps, TState, TCommand>,
+    "update" | "transition" | "emit" | "error" | "getWorkflowSnapshot">;
+```
+
+#### `HookEvent`
+
+Union of lifecycle hook event names.
+
+```ts
+type HookEvent = "dispatch:start" | "dispatch:end" | "transition" | "error" | "event";
+```
+
+#### `RouterOptions`
+
+Options for the `WorkflowRouter` constructor.
+
+```ts
+interface RouterOptions {
+  onHookError?: (error: unknown) => void;
+}
+```
+
+#### `Plugin<TConfig, TDeps>`
+
+A branded plugin function for use with `router.use()`.
+
+```ts
+type Plugin<TConfig, TDeps> =
+  ((router: WorkflowRouter<TConfig, TDeps>) => void) & { readonly [symbol]: true };
+```
+
+#### `definePlugin(fn)`
+
+Brands a function as a Ryte plugin.
+
+```ts
+function definePlugin<TConfig extends WorkflowConfig, TDeps>(
+  fn: (router: WorkflowRouter<TConfig, TDeps>) => void,
+): Plugin<TConfig, TDeps>
+```
+
+#### `isPlugin(value)`
+
+Type guard that checks whether a value is a branded plugin.
+
+```ts
+function isPlugin(value: unknown): value is Plugin<WorkflowConfig, unknown>
+```
+
+---
+
+## `@rytejs/viz`
+
+### `toMermaid(graph, options?)`
+
+Generates a Mermaid stateDiagram-v2 from a workflow graph.
+
+```ts
+function toMermaid(graph: GraphInput, options?: DiagramOptions): string
+```
+
+### `toD2(graph, options?)`
+
+Generates a D2 diagram from a workflow graph.
+
+```ts
+function toD2(graph: GraphInput, options?: DiagramOptions): string
+```
+
+### `GraphInput`
+
+Input for diagram generation functions. Matches the shape returned by `router.inspect()`.
+
+```ts
+interface GraphInput {
+  readonly definition: { readonly name: string; readonly states: readonly string[] };
+  readonly transitions: readonly TransitionEdge[];
+}
+```
+
+### `TransitionEdge`
+
+```ts
+interface TransitionEdge {
+  readonly from: string;
+  readonly command: string;
+  readonly to: readonly string[];
+}
+```
+
+### `DiagramOptions`
+
+```ts
+interface DiagramOptions {
+  title?: string;
+  highlightTerminal?: boolean;
+}
 ```
