@@ -171,18 +171,27 @@ interface Context<TConfig, TDeps, TState, TCommand> {
 
 ### Middleware Type
 
-Defined in `middleware.ts`. Fully typed context parameter.
+Defined in `middleware.ts`. Fully typed context with narrowing via defaults — same pattern as `Context`.
 
 ```typescript
-type Middleware<TConfig extends WorkflowConfig, TDeps> = (
-  ctx: Context<TConfig, TDeps>,
+type Middleware<
+  TConfig extends WorkflowConfig,
+  TDeps,
+  TState extends StateNames<TConfig> = StateNames<TConfig>,
+  TCommand extends CommandNames<TConfig> = CommandNames<TConfig>,
+> = (
+  ctx: Context<TConfig, TDeps, TState, TCommand>,
   next: () => Promise<void>
 ) => Promise<void>
 ```
 
+- Global middleware: `Middleware<TConfig, TDeps>` — context has union of all states/commands
+- State-scoped: `Middleware<TConfig, TDeps, "draft">` — narrowed to specific state
+- Inline: `Middleware<TConfig, TDeps, "draft", "publish">` — fully narrowed
+
 ### Handler Type
 
-Defined in `handler.ts`. Fully typed context parameter with state and command narrowing.
+Defined in `handler.ts`. A handler is terminal middleware — same typed context, no `next`.
 
 ```typescript
 type Handler<
