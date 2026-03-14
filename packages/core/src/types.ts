@@ -1,6 +1,7 @@
 import type { ZodType, z } from "zod";
 
 export interface WorkflowConfig {
+	modelVersion?: number;
 	states: Record<string, ZodType>;
 	commands: Record<string, ZodType>;
 	events: Record<string, ZodType>;
@@ -50,7 +51,7 @@ export type Workflow<TConfig extends WorkflowConfig = WorkflowConfig> = {
 export type PipelineError<TConfig extends WorkflowConfig = WorkflowConfig> =
 	| {
 			category: "validation";
-			source: "command" | "state" | "event" | "transition";
+			source: "command" | "state" | "event" | "transition" | "restore";
 			issues: z.core.$ZodIssue[];
 			message: string;
 	  }
@@ -79,7 +80,7 @@ export type DispatchResult<TConfig extends WorkflowConfig = WorkflowConfig> =
 /** Thrown internally when Zod validation fails during dispatch. */
 export class ValidationError extends Error {
 	constructor(
-		public readonly source: "command" | "state" | "event" | "transition",
+		public readonly source: "command" | "state" | "event" | "transition" | "restore",
 		public readonly issues: z.core.$ZodIssue[],
 	) {
 		super(`Validation failed (${source}): ${issues.map((i) => i.message).join(", ")}`);

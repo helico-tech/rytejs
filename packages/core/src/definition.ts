@@ -1,5 +1,7 @@
 import type { ZodType, z } from "zod";
-import type { StateNames, WorkflowConfig, WorkflowOf } from "./types.js";
+import type { WorkflowSnapshot } from "./snapshot.js";
+import type { StateNames, Workflow, WorkflowConfig, WorkflowOf } from "./types.js";
+import { ValidationError } from "./types.js";
 
 /** The result of defineWorkflow() — holds schemas and creates workflow instances. */
 export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowConfig> {
@@ -14,6 +16,10 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	getEventSchema(eventName: string): ZodType;
 	getErrorSchema(errorCode: string): ZodType;
 	hasState(stateName: string): boolean;
+	snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>;
+	restore(
+		snapshot: WorkflowSnapshot<TConfig>,
+	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
 }
 
 /**
@@ -73,6 +79,57 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 
 		hasState(stateName: string): boolean {
 			return stateName in config.states;
+		},
+
+		snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig> {
+			return {
+				id: workflow.id,
+				definitionName: name,
+				state: workflow.state,
+				data: workflow.data,
+				createdAt: workflow.createdAt.toISOString(),
+				updatedAt: workflow.updatedAt.toISOString(),
+				modelVersion: config.modelVersion ?? 1,
+			} as WorkflowSnapshot<TConfig>;
+		},
+
+		restore(
+			snap: WorkflowSnapshot<TConfig>,
+		): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError } {
+			const stateSchema = config.states[snap.state as string];
+			if (!stateSchema) {
+				return {
+					ok: false,
+					error: new ValidationError("restore", [
+						{
+							code: "custom",
+							message: `Unknown state: ${snap.state}`,
+							input: snap.state,
+							path: ["state"],
+						},
+					]),
+				};
+			}
+
+			const result = stateSchema.safeParse(snap.data);
+			if (!result.success) {
+				return {
+					ok: false,
+					error: new ValidationError("restore", result.error.issues),
+				};
+			}
+
+			return {
+				ok: true,
+				workflow: {
+					id: snap.id,
+					definitionName: snap.definitionName,
+					state: snap.state,
+					data: result.data,
+					createdAt: new Date(snap.createdAt),
+					updatedAt: new Date(snap.updatedAt),
+				} as Workflow<TConfig>,
+			};
 		},
 	};
 }

@@ -11,6 +11,7 @@ export { definePlugin, isPlugin } from "./plugin.js";
 export type { ReadonlyContext } from "./readonly-context.js";
 export type { RouterOptions } from "./router.js";
 export { WorkflowRouter } from "./router.js";
+export type { WorkflowSnapshot } from "./snapshot.js";
 export type {
 	CommandNames,
 	CommandPayload,
