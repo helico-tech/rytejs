@@ -39,7 +39,7 @@ router.on("event", (event, workflow) => {
 | `dispatch:start` | After context created, before handler | `(ctx)` |
 | `dispatch:end` | After dispatch completes (always) | `(ctx, result)` |
 | `transition` | After a state change | `(from, to, workflow)` |
-| `error` | On domain or validation error | `(error, ctx)` |
+| `error` | On domain, validation, dependency, or unexpected error | `(error, ctx)` |
 | `event` | For each emitted event | `(event, workflow)` |
 
 ### Hooks vs Middleware

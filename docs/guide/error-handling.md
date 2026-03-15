@@ -15,7 +15,7 @@ if (result.ok) {
 
 ## Error Categories
 
-`PipelineError` is a discriminated union with four categories.
+`PipelineError` is a discriminated union with five categories.
 
 ### Validation Errors
 
@@ -94,6 +94,28 @@ if (!result.ok && result.error.category === "unexpected") {
 
 `dispatch:end` always fires even when an unexpected error occurs, so hooks and plugins that observe `dispatch:end` will always run.
 
+### Dependency Errors
+
+When a dependency injected via the router constructor throws during dispatch, the error is automatically caught and returned as a `"dependency"` error. This lets you distinguish infrastructure failures (database down, API timeout) from handler bugs (`"unexpected"`).
+
+Dependencies are wrapped in a Proxy by default — no handler code changes required.
+
+```ts
+if (!result.ok && result.error.category === "dependency") {
+	console.log(result.error.name);    // top-level dep key, e.g. "db"
+	console.log(result.error.message); // 'Dependency "db" failed: Connection refused'
+	console.log(result.error.error);   // the original thrown error
+}
+```
+
+To disable dependency wrapping:
+
+```ts
+const router = new WorkflowRouter(definition, deps, { wrapDeps: false });
+```
+
+With wrapping disabled, dependency errors fall through to `"unexpected"`.
+
 ### Router Errors
 
 The router itself couldn't find a handler.
@@ -153,6 +175,10 @@ if (!result.ok) {
     case "router":
       // result.error.code, result.error.message
       console.log("Router:", result.error.message);
+      break;
+    case "dependency":
+      // result.error.name, result.error.error, result.error.message
+      console.log("Dependency failed:", result.error.name);
       break;
     case "unexpected":
       // result.error.error, result.error.message
