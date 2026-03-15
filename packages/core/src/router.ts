@@ -16,7 +16,7 @@ import type {
 	Workflow,
 	WorkflowConfig,
 } from "./types.js";
-import { DomainErrorSignal, ValidationError } from "./types.js";
+import { DependencyErrorSignal, DomainErrorSignal, ValidationError } from "./types.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: internal type erasure for heterogeneous middleware storage
 type AnyMiddleware = (ctx: any, next: () => Promise<void>) => Promise<void>;
@@ -32,6 +32,8 @@ type HandlerEntry = {
 export interface RouterOptions {
 	/** Callback invoked when a lifecycle hook throws. Defaults to `console.error`. */
 	onHookError?: (error: unknown) => void;
+	/** Wrap deps in a Proxy to catch dependency errors. Defaults to `true`. */
+	wrapDeps?: boolean;
 }
 
 class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNames<TConfig>> {
@@ -76,6 +78,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	private wildcardHandlers = new Map<string, HandlerEntry>();
 	private hookRegistry = new HookRegistry();
 	private readonly onHookError: (error: unknown) => void;
+	private readonly wrapDeps: boolean;
 
 	/**
 	 * @param definition - The workflow definition describing states, commands, events, and errors
@@ -88,6 +91,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		options: RouterOptions = {},
 	) {
 		this.onHookError = options.onHookError ?? console.error;
+		this.wrapDeps = options.wrapDeps !== false;
 	}
 
 	/**
@@ -359,6 +363,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			workflow,
 			validatedCommand,
 			this.deps,
+			{ wrapDeps: this.wrapDeps },
 		);
 
 		// Hook: dispatch:start
@@ -413,6 +418,16 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 						category: "validation" as const,
 						source: err.source,
 						issues: err.issues,
+						message: err.message,
+					},
+				};
+			} else if (err instanceof DependencyErrorSignal) {
+				result = {
+					ok: false as const,
+					error: {
+						category: "dependency" as const,
+						name: err.depName,
+						error: err.error,
 						message: err.message,
 					},
 				};

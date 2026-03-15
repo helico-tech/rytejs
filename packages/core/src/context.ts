@@ -14,6 +14,7 @@ import type {
 	WorkflowOf,
 } from "./types.js";
 import { DomainErrorSignal, ValidationError } from "./types.js";
+import { wrapDeps as wrapDepsProxy } from "./wrap-deps.js";
 
 /** Mutable context flowing through the middleware pipeline during dispatch. */
 export interface Context<
@@ -96,6 +97,7 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 	originalWorkflow: Workflow<TConfig>,
 	command: { type: string; payload: unknown },
 	deps: TDeps,
+	options?: { wrapDeps?: boolean },
 ): Context<TConfig, TDeps> {
 	let mutableState = originalWorkflow.state;
 	let mutableData: Record<string, unknown> = {
@@ -108,7 +110,10 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 	const ctx = {
 		command,
 		workflow: originalWorkflow,
-		deps,
+		deps:
+			options?.wrapDeps !== false && deps != null && typeof deps === "object"
+				? (wrapDepsProxy(deps as object) as TDeps)
+				: deps,
 
 		get data() {
 			return { ...mutableData } as StateData<TConfig, StateNames<TConfig>>;
