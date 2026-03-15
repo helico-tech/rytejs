@@ -48,27 +48,57 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 
 **New file: `docs/typedoc.json`**
 
-- `entryPointStrategy: "packages"` — points at `../packages/core` and `../packages/testing`
-- `outputFileStrategy: "modules"` — produces one Markdown file per package (`core.md` and `testing.md`)
-- `out: "./api"` — writes generated files into `docs/api/`
-- `plugin: ["typedoc-plugin-markdown"]`
-- `hidePageHeader: true`, `hideBreadcrumbs: true` — cleaner output for VitePress integration
-- `treatWarningsAsErrors: true` — fails build on malformed or drifted JSDoc (e.g. `@param` referencing non-existent parameter)
+The exact output file strategy and options need to be validated during implementation by running a prototype against the actual packages. The goal is to produce one Markdown page per package (`@rytejs/core` and `@rytejs/testing`).
+
+```json
+{
+  "$schema": "https://typedoc-plugin-markdown.org/schema.json",
+  "entryPointStrategy": "packages",
+  "entryPoints": ["../packages/core", "../packages/testing"],
+  "out": "./api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "hidePageHeader": true,
+  "hideBreadcrumbs": true,
+  "treatWarningsAsErrors": true
+}
+```
+
+**Note**: The `entryPointStrategy: "packages"` mode may produce a directory tree per package rather than a single flat file. During implementation, validate the actual output structure and adjust `outputFileStrategy` (e.g., `"modules"` or `"members"`) and any merging options as needed. The VitePress sidebar config (Section 4) must match the actual generated file paths.
+
+**Note**: TypeDoc may read from `dist/index.d.ts` (via package `types` field) or from source. Verify that JSDoc comments survive the `tsup` build into `.d.ts` files. If they don't, configure TypeDoc to read from source entry points directly.
 
 ### 3. Build Integration
 
-**Dependencies** added to `docs/package.json`:
-- `typedoc`
-- `typedoc-plugin-markdown`
+**Dependencies** added to `docs/package.json` (pin major versions):
+- `typedoc` ^0.27
+- `typedoc-plugin-markdown` ^4
 
 **Scripts** in `docs/package.json`:
 ```json
 "docs:api": "typedoc",
-"build": "pnpm docs:api && vitepress build",
-"dev": "pnpm docs:api && vitepress dev"
+"build": "vitepress build",
+"dev": "vitepress dev"
 ```
 
-**Turbo pipeline**: Add `docs:api` task that depends on package builds (TypeDoc needs resolved source). This ensures JSDoc validation runs in CI.
+Note: `docs:api` is not inlined into `build` or `dev` — turbo handles the dependency ordering (see below). This avoids double-running the generation step.
+
+**Turbo pipeline** in `turbo.json`:
+```json
+"docs#docs:api": {
+  "dependsOn": ["^build"],
+  "outputs": ["api/**"]
+},
+"docs#build": {
+  "dependsOn": ["docs#docs:api"],
+  "outputs": [".vitepress/dist/**"]
+}
+```
+
+This ensures:
+1. Packages are built first (TypeDoc needs resolved types)
+2. API docs are generated before VitePress build
+3. JSDoc validation (via `treatWarningsAsErrors`) runs in CI
+4. Turbo caches the generated output
 
 ### 4. VitePress Configuration
 
@@ -88,10 +118,20 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 
 **Nav** link updated to point to `/api/core` as the default API landing page.
 
+**Note**: The exact link paths depend on the actual TypeDoc output structure validated in Section 2. If TypeDoc produces directories instead of flat files, the links must be adjusted to match (e.g., `/api/core/index` instead of `/api/core`).
+
+**`/api/` URL**: If TypeDoc generates an `index.md` at the root of `docs/api/`, it will serve as a landing page. If not, a small hand-written `docs/api/index.md` should redirect to `/api/core`. This file would be excluded from `.gitignore` if hand-maintained.
+
 ### 5. Cleanup
 
 - Delete `docs/api/index.md` (replaced by generated output)
-- Add `docs/api/` to `.gitignore` (generated files should not be committed)
+- Add `docs/api/` to `.gitignore` (generated files should not be committed; adjust pattern if a hand-maintained `index.md` redirect is needed)
+
+## Risks
+
+- **Cross-package resolution**: `@rytejs/testing` has a peer dependency on `@rytejs/core`. TypeDoc needs to resolve types across packages. Validate this works during implementation.
+- **JSDoc survival in `.d.ts`**: If `tsup` strips JSDoc during compilation, TypeDoc must be configured to read source directly instead of declarations.
+- **Output structure**: The exact file layout from `typedoc-plugin-markdown` with `entryPointStrategy: "packages"` must be validated empirically. The VitePress sidebar config depends on this.
 
 ## Files Changed
 
@@ -100,7 +140,7 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 - `docs/typedoc.json` — new TypeDoc configuration
 - `docs/package.json` — new dependencies and scripts
 - `docs/.vitepress/config.ts` — sidebar and nav updates
-- `turbo.json` — new `docs:api` task
+- `turbo.json` — new `docs#docs:api` and updated `docs#build` tasks
 - `.gitignore` — add `docs/api/`
 - `docs/api/index.md` — deleted
 
