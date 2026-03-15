@@ -88,6 +88,12 @@ export type PipelineError<TConfig extends WorkflowConfig = WorkflowConfig> =
 			category: "unexpected";
 			error: unknown;
 			message: string;
+	  }
+	| {
+			category: "dependency";
+			name: string;
+			error: unknown;
+			message: string;
 	  };
 
 /** Return type of {@link WorkflowRouter.dispatch}. Discriminated union on `ok`. */
@@ -133,5 +139,23 @@ export class DomainErrorSignal extends Error {
 	) {
 		super(`Domain error: ${code}`);
 		this.name = "DomainErrorSignal";
+	}
+}
+
+/**
+ * Thrown internally when a proxied dependency call fails.
+ * Caught by the router and returned as a dependency error in {@link DispatchResult}.
+ *
+ * @param depName - The top-level dependency key (e.g. "db", "stripe")
+ * @param error - The original error thrown by the dependency
+ */
+export class DependencyErrorSignal extends Error {
+	constructor(
+		public readonly depName: string,
+		public readonly error: unknown,
+	) {
+		const original = error instanceof Error ? error.message : String(error);
+		super(`Dependency "${depName}" failed: ${original}`);
+		this.name = "DependencyErrorSignal";
 	}
 }
