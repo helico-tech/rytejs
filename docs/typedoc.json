@@ -7,5 +7,6 @@
 	"hidePageHeader": true,
 	"hideBreadcrumbs": true,
 	"outputFileStrategy": "modules",
-	"readme": "none"
+	"readme": "none",
+	"entryFileName": "index"
 }
