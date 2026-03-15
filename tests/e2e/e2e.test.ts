@@ -738,6 +738,7 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("IdentityFailed");
 		expect(result.events[0]?.type).toBe("IdentityFailed");
+		expect(result.events[0]?.data).toEqual(expect.objectContaining({ reason: "document_expired" }));
 		if (result.workflow.state === "IdentityFailed") {
 			expect(result.workflow.data.failureReason).toBe("document_expired");
 		}
@@ -780,6 +781,7 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("BankFailed");
 		expect(result.events[0]?.type).toBe("BankFailed");
+		expect(result.events[0]?.data).toEqual(expect.objectContaining({ reason: "account_closed" }));
 		if (result.workflow.state === "BankFailed") {
 			expect(result.workflow.data.failureReason).toBe("account_closed");
 		}
@@ -839,6 +841,12 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Rejected");
 		expect(result.events[0]?.type).toBe("OnboardingRejected");
+		expect(result.events[0]?.data).toEqual(
+			expect.objectContaining({
+				rejectedBy: "compliance@company.com",
+				reason: "suspicious activity",
+			}),
+		);
 		if (result.workflow.state === "Rejected") {
 			expect(result.workflow.data.rejectedBy).toBe("compliance@company.com");
 			expect(result.workflow.data.rejectionReason).toBe("suspicious activity");
