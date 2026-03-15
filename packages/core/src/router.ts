@@ -230,7 +230,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	): this;
 	/**
 	 * Registers a wildcard handler that matches any state.
-	 * @param _state - Must be `"*"` to match all states
+	 * @param state - Must be `"*"` to match all states
 	 * @param command - The command name to handle
 	 * @param fns - Optional inline middleware followed by the terminal handler
 	 */
