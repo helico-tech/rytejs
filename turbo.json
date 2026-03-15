@@ -9,6 +9,14 @@
 		"typecheck": {
 			"dependsOn": ["^build"]
 		},
-		"lint": {}
+		"lint": {},
+		"@rytejs/docs#docs:api": {
+			"dependsOn": ["^build"],
+			"outputs": ["api/**"]
+		},
+		"@rytejs/docs#build": {
+			"dependsOn": ["@rytejs/docs#docs:api"],
+			"outputs": [".vitepress/dist/**"]
+		}
 	}
 }
