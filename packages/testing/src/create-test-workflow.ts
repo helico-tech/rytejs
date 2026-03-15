@@ -15,6 +15,12 @@ export interface CreateTestWorkflowOptions {
 /**
  * Creates a workflow in any state without dispatching through the handler chain.
  * Validates data against the state's Zod schema.
+ *
+ * @param definition - The workflow definition to create from
+ * @param state - The state to place the workflow in
+ * @param data - State data (validated against the state's Zod schema)
+ * @param options - Optional configuration (e.g., custom ID)
+ * @returns A workflow instance in the specified state
  */
 export function createTestWorkflow<TConfig extends WorkflowConfig, S extends StateNames<TConfig>>(
 	definition: WorkflowDefinition<TConfig>,

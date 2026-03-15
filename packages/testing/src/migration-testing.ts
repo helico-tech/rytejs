@@ -48,7 +48,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
 
 /**
  * Tests a single migration step.
- * Calls the migration function for (from + 1) directly and asserts output data matches expected.
+ * Calls the migration function for (`from` + 1) directly and asserts output data matches expected.
+ *
+ * @param pipeline - The migration pipeline containing the migration to test
+ * @param options - Test configuration: source version, input data, expected output data
  */
 export function testMigration<TConfig extends WorkflowConfig>(
 	pipeline: MigrationPipeline<TConfig>,
@@ -72,6 +75,9 @@ export function testMigration<TConfig extends WorkflowConfig>(
 
 /**
  * Tests the full migration chain and asserts final version and data.
+ *
+ * @param pipeline - The migration pipeline to run
+ * @param options - Test configuration: source version, input data, expected final version and data
  */
 export function testMigrationPath<TConfig extends WorkflowConfig>(
 	pipeline: MigrationPipeline<TConfig>,
@@ -98,8 +104,10 @@ export function testMigrationPath<TConfig extends WorkflowConfig>(
 }
 
 /**
- * Tests migrate + restore round-trip.
- * Derives the definition from the pipeline.
+ * Tests migrate + restore round-trip. Derives the definition from the pipeline.
+ *
+ * @param pipeline - The migration pipeline to run
+ * @param options - Test configuration: source version, input data, optional expected final state
  */
 export function testMigrationRestore<TConfig extends WorkflowConfig>(
 	pipeline: MigrationPipeline<TConfig>,

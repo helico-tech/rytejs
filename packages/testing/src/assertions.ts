@@ -3,6 +3,9 @@ import type { DispatchResult, WorkflowConfig } from "@rytejs/core";
 /**
  * Asserts that a dispatch result is ok. Optionally checks the resulting state.
  * Throws on failure — works with any test runner.
+ *
+ * @param result - The dispatch result to assert on
+ * @param expectedState - If provided, also asserts the workflow is in this state
  */
 export function expectOk<TConfig extends WorkflowConfig>(
 	result: DispatchResult<TConfig>,
@@ -20,6 +23,10 @@ export function expectOk<TConfig extends WorkflowConfig>(
  * Asserts that a dispatch result is an error with the given category.
  * Optionally checks the error code (for domain/router errors).
  * Throws on failure — works with any test runner.
+ *
+ * @param result - The dispatch result to assert on
+ * @param category - Expected error category
+ * @param code - If provided, also asserts the error code matches (for `"domain"` and `"router"` categories)
  */
 export function expectError<TConfig extends WorkflowConfig>(
 	result: DispatchResult<TConfig>,

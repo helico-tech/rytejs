@@ -27,6 +27,10 @@ export interface PathStep<TConfig extends WorkflowConfig> {
  * Tests a sequence of commands and verifies the expected state after each dispatch.
  * Creates the initial workflow from the first step's start/data, then chains dispatch results.
  * Throws on failure — works with any test runner.
+ *
+ * @param router - The workflow router to dispatch commands through
+ * @param definition - The workflow definition (used to create the initial workflow)
+ * @param steps - Array of {@link PathStep} objects defining the command sequence
  */
 export async function testPath<TConfig extends WorkflowConfig, TDeps>(
 	router: WorkflowRouter<TConfig, TDeps>,
