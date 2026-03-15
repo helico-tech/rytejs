@@ -30,7 +30,7 @@ export function expectOk<TConfig extends WorkflowConfig>(
  */
 export function expectError<TConfig extends WorkflowConfig>(
 	result: DispatchResult<TConfig>,
-	category: "validation" | "domain" | "router",
+	category: "validation" | "domain" | "router" | "dependency" | "unexpected",
 	code?: string,
 ): asserts result is Extract<DispatchResult<TConfig>, { ok: false }> {
 	if (result.ok) {

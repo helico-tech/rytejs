@@ -98,4 +98,29 @@ describe("expectError", () => {
 		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
 		expect(() => expectError(result, "validation")).toThrow("Expected error category 'validation'");
 	});
+
+	test("narrows dependency error", () => {
+		const result = {
+			ok: false as const,
+			error: {
+				category: "dependency" as const,
+				name: "db",
+				error: new Error("down"),
+				message: 'Dependency "db" failed: down',
+			},
+		};
+		expectError(result, "dependency");
+	});
+
+	test("narrows unexpected error", () => {
+		const result = {
+			ok: false as const,
+			error: {
+				category: "unexpected" as const,
+				error: new TypeError("oops"),
+				message: "oops",
+			},
+		};
+		expectError(result, "unexpected");
+	});
 });
