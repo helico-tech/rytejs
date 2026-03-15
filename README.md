@@ -1,9 +1,15 @@
-# @rytejs/core
+<p align="center">
+  <img src="docs/public/logo.svg" width="120" alt="Ryte" />
+</p>
 
-Type-safe workflow engine with Zod validation and middleware pipelines.
+<h1 align="center">@rytejs/core</h1>
 
-![CI](https://github.com/helico-tech/rytejs/actions/workflows/ci.yml/badge.svg)
-![npm](https://img.shields.io/npm/v/@rytejs/core)
+<p align="center">Type-safe workflow engine with Zod validation and middleware pipelines.</p>
+
+<p align="center">
+  <img src="https://github.com/helico-tech/rytejs/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <img src="https://img.shields.io/npm/v/@rytejs/core" alt="npm" />
+</p>
 
 ## Why Ryte?
 

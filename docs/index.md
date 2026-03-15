@@ -3,6 +3,9 @@ layout: home
 hero:
   name: Ryte
   text: Type-safe workflow engine for TypeScript
+  image:
+    src: /logo.svg
+    alt: Ryte
   tagline: Define states with Zod. Route commands through middleware. Ship with confidence.
   actions:
     - theme: brand

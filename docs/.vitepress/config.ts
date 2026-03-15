@@ -5,6 +5,7 @@ export default defineConfig({
 	title: "Ryte",
 	description: "Type-safe workflow engine for TypeScript",
 	themeConfig: {
+		logo: "/logo.svg",
 		nav: [
 			{ text: "Guide", link: "/guide/getting-started" },
 			{ text: "API", link: "/api/core/src" },
