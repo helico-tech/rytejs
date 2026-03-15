@@ -1,85 +1,7 @@
-import { createKey, defineWorkflow, WorkflowRouter } from "@rytejs/core";
+import { createKey, WorkflowRouter } from "@rytejs/core";
 import { describe, expect, test } from "vitest";
-import { z } from "zod";
-
-// ─── Define a workflow ───────────────────────────────────────────────
-
-const taskWorkflow = defineWorkflow("task", {
-	states: {
-		Todo: z.object({ title: z.string(), assignee: z.string().optional() }),
-		InProgress: z.object({
-			title: z.string(),
-			assignee: z.string(),
-			startedAt: z.coerce.date(),
-		}),
-		Done: z.object({
-			title: z.string(),
-			assignee: z.string(),
-			completedAt: z.coerce.date(),
-		}),
-	},
-	commands: {
-		Assign: z.object({ assignee: z.string() }),
-		Start: z.object({}),
-		Complete: z.object({}),
-	},
-	events: {
-		TaskAssigned: z.object({ taskId: z.string(), assignee: z.string() }),
-		TaskStarted: z.object({ taskId: z.string() }),
-		TaskCompleted: z.object({ taskId: z.string() }),
-	},
-	errors: {
-		NotAssigned: z.object({}),
-	},
-});
-
-// ─── Fluent router setup with composable routers ─────────────────────
-
-const todoRouter = new WorkflowRouter(taskWorkflow).state("Todo", (state) => {
-	state
-		.on("Assign", (ctx) => {
-			ctx.update({ assignee: ctx.command.payload.assignee });
-			ctx.emit({
-				type: "TaskAssigned",
-				data: {
-					taskId: ctx.workflow.id,
-					assignee: ctx.command.payload.assignee,
-				},
-			});
-		})
-		.on("Start", (ctx) => {
-			const { assignee } = ctx.data;
-			if (!assignee) {
-				ctx.error({ code: "NotAssigned", data: {} });
-				return;
-			}
-			ctx.transition("InProgress", {
-				title: ctx.data.title,
-				assignee,
-				startedAt: new Date(),
-			});
-			ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
-		});
-});
-
-const inProgressRouter = new WorkflowRouter(taskWorkflow).state("InProgress", (state) => {
-	state.on("Complete", (ctx) => {
-		ctx.transition("Done", {
-			title: ctx.data.title,
-			assignee: ctx.data.assignee,
-			completedAt: new Date(),
-		});
-		ctx.emit({
-			type: "TaskCompleted",
-			data: { taskId: ctx.workflow.id },
-		});
-	});
-});
-
-// Compose routers
-const router = new WorkflowRouter(taskWorkflow).use(todoRouter).use(inProgressRouter);
-
-// ─── Tests ──────────────────────────────────────────────────────────
+import { taskWorkflow } from "./definition.ts";
+import { router } from "./router.ts";
 
 describe("@rytejs/core E2E", () => {
 	test("state transition: Todo → Todo (update)", async () => {
@@ -196,7 +118,7 @@ describe("@rytejs/core E2E", () => {
 				ctx.set(UserKey, "admin");
 				await next();
 			})
-			.use(todoRouter);
+			.use(router);
 
 		const task = taskWorkflow.createWorkflow("task-7", {
 			initialState: "Todo",
