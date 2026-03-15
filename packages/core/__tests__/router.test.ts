@@ -557,4 +557,193 @@ describe("WorkflowRouter", () => {
 			}
 		});
 	});
+
+	describe("dependency errors", () => {
+		test("sync dep throw returns dependency error", async () => {
+			const deps = {
+				db: {
+					save: () => {
+						throw new Error("connection refused");
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps);
+			router.state("Draft", ({ on }) => {
+				on("Publish", ({ deps }) => {
+					deps.db.save();
+				});
+			});
+
+			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.category).toBe("dependency");
+				if (result.error.category === "dependency") {
+					expect(result.error.name).toBe("db");
+					expect(result.error.message).toBe('Dependency "db" failed: connection refused');
+					expect(result.error.error).toBeInstanceOf(Error);
+				}
+			}
+		});
+
+		test("async dep rejection returns dependency error", async () => {
+			const deps = {
+				api: {
+					fetch: async () => {
+						throw new Error("timeout");
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps);
+			router.state("Draft", ({ on }) => {
+				on("Publish", async ({ deps }) => {
+					await deps.api.fetch();
+				});
+			});
+
+			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.category).toBe("dependency");
+				if (result.error.category === "dependency") {
+					expect(result.error.name).toBe("api");
+				}
+			}
+		});
+
+		test("nested dep access tracks top-level name", async () => {
+			const deps = {
+				db: {
+					users: {
+						find: () => {
+							throw new Error("not found");
+						},
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps);
+			router.state("Draft", ({ on }) => {
+				on("Publish", ({ deps }) => {
+					deps.db.users.find();
+				});
+			});
+
+			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(result.ok).toBe(false);
+			if (!result.ok && result.error.category === "dependency") {
+				expect(result.error.name).toBe("db");
+			}
+		});
+
+		test("handler bug still returns unexpected", async () => {
+			const router = new WorkflowRouter(definition, {});
+			router.state("Draft", ({ on }) => {
+				on("Publish", () => {
+					// @ts-expect-error intentional handler bug
+					null.foo();
+				});
+			});
+
+			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.category).toBe("unexpected");
+			}
+		});
+
+		test("wrapDeps: false makes dep errors unexpected", async () => {
+			const deps = {
+				db: {
+					save: () => {
+						throw new Error("connection refused");
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps, { wrapDeps: false });
+			router.state("Draft", ({ on }) => {
+				on("Publish", ({ deps }) => {
+					deps.db.save();
+				});
+			});
+
+			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.category).toBe("unexpected");
+			}
+		});
+
+		test("dispatch:end hook fires on dependency error", async () => {
+			const deps = {
+				db: {
+					save: () => {
+						throw new Error("down");
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps);
+			router.state("Draft", ({ on }) => {
+				on("Publish", ({ deps }) => {
+					deps.db.save();
+				});
+			});
+			let hookFired = false;
+			router.on("dispatch:end", () => {
+				hookFired = true;
+			});
+
+			await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(hookFired).toBe(true);
+		});
+
+		test("error hook receives dependency error", async () => {
+			const deps = {
+				db: {
+					save: () => {
+						throw new Error("down");
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps);
+			router.state("Draft", ({ on }) => {
+				on("Publish", ({ deps }) => {
+					deps.db.save();
+				});
+			});
+			let receivedError: unknown = null;
+			router.on("error", (error) => {
+				receivedError = error;
+			});
+
+			await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(receivedError).not.toBeNull();
+			expect((receivedError as { category: string }).category).toBe("dependency");
+		});
+
+		test("domain error after catching dep error takes precedence", async () => {
+			const deps = {
+				db: {
+					check: () => {
+						throw new Error("unavailable");
+					},
+				},
+			};
+			const router = new WorkflowRouter(definition, deps);
+			router.state("Draft", ({ on }) => {
+				on("Publish", (ctx) => {
+					try {
+						ctx.deps.db.check();
+					} catch {
+						ctx.error({ code: "TitleRequired", data: {} });
+					}
+				});
+			});
+
+			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.error.category).toBe("domain");
+			}
+		});
+	});
 });

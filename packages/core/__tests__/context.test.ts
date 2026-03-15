@@ -217,7 +217,9 @@ describe("createContext", () => {
 	describe("deps", () => {
 		test("ctx.deps exposes provided dependencies", () => {
 			const wf = create.Draft();
-			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
+			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps, {
+				wrapDeps: false,
+			});
 			expect(ctx.deps).toBe(deps);
 		});
 	});
