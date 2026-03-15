@@ -5,11 +5,20 @@ import type { WorkflowConfig } from "./types.js";
 /** A function that transforms a snapshot's data from one version to the next. */
 export type MigrationFn = (snapshot: WorkflowSnapshot) => WorkflowSnapshot;
 
+/** A migration entry — either a bare function or an object with a description. */
+export type MigrationEntry = MigrationFn | { description: string; up: MigrationFn };
+
+/** Internal normalized migration step with optional description. */
+interface NormalizedMigration {
+	fn: MigrationFn;
+	description?: string;
+}
+
 /** A validated migration pipeline ready to transform snapshots. */
 export interface MigrationPipeline<TConfig extends WorkflowConfig = WorkflowConfig> {
 	readonly definition: WorkflowDefinition<TConfig>;
 	readonly targetVersion: number;
-	readonly migrations: ReadonlyMap<number, MigrationFn>;
+	readonly migrations: ReadonlyMap<number, NormalizedMigration>;
 }
 
 /** Result of migrate(). */
@@ -19,7 +28,12 @@ export type MigrateResult =
 
 /** Options for migrate(). */
 export interface MigrateOptions {
-	onStep?: (fromVersion: number, toVersion: number, snapshot: WorkflowSnapshot) => void;
+	onStep?: (
+		fromVersion: number,
+		toVersion: number,
+		snapshot: WorkflowSnapshot,
+		description?: string,
+	) => void;
 	onError?: (error: MigrationError) => void;
 }
 
@@ -43,10 +57,14 @@ export class MigrationError extends Error {
  */
 export function defineMigrations<TConfig extends WorkflowConfig>(
 	definition: WorkflowDefinition<TConfig>,
-	migrationMap: Record<number, MigrationFn>,
+	migrationMap: Record<number, MigrationEntry>,
 ): MigrationPipeline<TConfig> {
 	const targetVersion = definition.config.modelVersion ?? 1;
-	const entries = Object.entries(migrationMap).map(([k, v]) => [Number(k), v] as const);
+	const entries = Object.entries(migrationMap).map(([k, v]) => {
+		const normalized: NormalizedMigration =
+			typeof v === "function" ? { fn: v } : { fn: v.up, description: v.description };
+		return [Number(k), normalized] as const;
+	});
 
 	for (const [version] of entries) {
 		if (version <= 1) {
@@ -132,8 +150,8 @@ export function migrate<TConfig extends WorkflowConfig>(
 
 	let current = { ...snapshot };
 	for (let version = current.modelVersion + 1; version <= pipeline.targetVersion; version++) {
-		const fn = pipeline.migrations.get(version);
-		if (!fn) {
+		const migration = pipeline.migrations.get(version);
+		if (!migration) {
 			const error = new MigrationError(
 				version - 1,
 				version,
@@ -145,14 +163,14 @@ export function migrate<TConfig extends WorkflowConfig>(
 
 		const fromVersion = version - 1;
 		try {
-			current = { ...fn(current), modelVersion: version };
+			current = { ...migration.fn(current), modelVersion: version };
 		} catch (cause) {
 			const error = new MigrationError(fromVersion, version, cause);
 			options?.onError?.(error);
 			return { ok: false, error };
 		}
 
-		options?.onStep?.(fromVersion, version, current);
+		options?.onStep?.(fromVersion, version, current, migration.description);
 	}
 
 	return { ok: true, snapshot: current };
