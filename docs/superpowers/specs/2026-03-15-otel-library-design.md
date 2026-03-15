@@ -268,6 +268,10 @@ Each test file creates an in-memory OTEL SDK using the official `@opentelemetry/
 
 Use `@rytejs/testing`'s `createTestWorkflow`, `expectOk`, `expectError` for workflow setup and assertions.
 
+## Known Limitations
+
+**Early-return dispatches are invisible.** Router-level errors (`UNKNOWN_STATE`, command validation failure, `NO_HANDLER`) return before `dispatch:start` fires, so no hooks run and the plugin never sees them. This means `ryte.dispatch.count` reflects dispatches that entered the pipeline, not all `router.dispatch()` calls. This is an inherent limitation of the hook system — the plugin cannot work around it without changes to core.
+
 ## Decision Log
 
 | Decision | Choice | Rationale |
