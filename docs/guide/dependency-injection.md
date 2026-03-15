@@ -22,30 +22,30 @@ const deps: Deps = {
 const router = new WorkflowRouter(taskWorkflow, deps);
 ```
 
-The type is inferred from the object you pass. All handlers and middleware receive the same typed `ctx.deps`.
+The type is inferred from the object you pass. All handlers and middleware receive the same typed `deps`.
 
 ## Accessing Dependencies
 
-Use `ctx.deps` in any handler or middleware:
+Use `deps` in any handler or middleware:
 
 ```ts
-router.state("Review", (state) => {
-  state.on("Approve", async (ctx) => {
-    const canApprove = ctx.deps.reviewService.canApprove(ctx.data.reviewerId);
+router.state("Review", ({ on }) => {
+  on("Approve", async ({ deps, data, error, transition }) => {
+    const canApprove = deps.reviewService.canApprove(data.reviewerId);
     if (!canApprove) {
-      ctx.error({ code: "NotReviewer", data: { expected: ctx.data.reviewerId } });
+      error({ code: "NotReviewer", data: { expected: data.reviewerId } });
     }
 
-    ctx.transition("Published", {
-      title: ctx.data.title,
-      body: ctx.data.body,
+    transition("Published", {
+      title: data.title,
+      body: data.body,
       publishedAt: new Date(),
     });
   });
 });
 ```
 
-`ctx.deps` is fully typed -- TypeScript knows exactly what services are available.
+`deps` is fully typed -- TypeScript knows exactly what services are available.
 
 ## Complete Example
 
@@ -85,23 +85,23 @@ const router = new WorkflowRouter(articleWorkflow, {
 });
 
 // Use deps in handler
-router.state("Draft", (state) => {
-  state.on("Publish", async (ctx) => {
-    if (!ctx.data.body) {
-      ctx.error({ code: "BodyRequired", data: {} });
+router.state("Draft", ({ on }) => {
+  on("Publish", async ({ data, deps, error, transition, emit, workflow }) => {
+    if (!data.body) {
+      error({ code: "BodyRequired", data: {} });
     }
 
-    const count = await ctx.deps.notifier.notifySubscribers(ctx.workflow.id);
+    const count = await deps.notifier.notifySubscribers(workflow.id);
 
-    ctx.transition("Published", {
-      title: ctx.data.title,
-      body: ctx.data.body!,
+    transition("Published", {
+      title: data.title,
+      body: data.body!,
       publishedAt: new Date(),
     });
 
-    ctx.emit({
+    emit({
       type: "ArticlePublished",
-      data: { articleId: ctx.workflow.id, notifiedSubscribers: count },
+      data: { articleId: workflow.id, notifiedSubscribers: count },
     });
   });
 });

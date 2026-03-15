@@ -43,8 +43,8 @@ import { z } from "zod";
 const taskWorkflow = defineWorkflow("task", { /* ... */ });
 
 const router = new WorkflowRouter(taskWorkflow)
-  .state("Todo", (state) => { /* ... */ })
-  .state("InProgress", (state) => { /* ... */ });
+  .state("Todo", ({ on }) => { /* ... */ })
+  .state("InProgress", ({ on }) => { /* ... */ });
 
 const store = new Map<string, WorkflowSnapshot>();
 const app = express();
@@ -105,7 +105,7 @@ import { z } from "zod";
 
 const taskWorkflow = defineWorkflow("task", { /* ... */ });
 const router = new WorkflowRouter(taskWorkflow)
-  .state("Todo", (state) => { /* ... */ });
+  .state("Todo", ({ on }) => { /* ... */ });
 
 const store = new Map<string, WorkflowSnapshot>();
 const app = new Hono();
@@ -160,7 +160,7 @@ import { z } from "zod";
 
 const taskWorkflow = defineWorkflow("task", { /* ... */ });
 const router = new WorkflowRouter(taskWorkflow)
-  .state("Todo", (state) => { /* ... */ });
+  .state("Todo", ({ on }) => { /* ... */ });
 
 const store = new Map<string, WorkflowSnapshot>();
 
@@ -217,7 +217,7 @@ const router = new WorkflowRouter(taskWorkflow)
   .on("error", (error) => {
     console.error(`Error: ${error.category}`, error);
   })
-  .state("Todo", (state) => { /* ... */ });
+  .state("Todo", ({ on }) => { /* ... */ });
 ```
 
 ## Choosing a Storage Backend

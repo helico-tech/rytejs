@@ -74,12 +74,12 @@ const router = new WorkflowRouter(orderWorkflow, deps);
 Every command is authenticated and logged.
 
 ```ts
-router.use(async (ctx, next) => {
+router.use(async ({ set, get, deps, command }, next) => {
   // Set authenticated user (in production: validate JWT, check session)
-  ctx.set(AuthKey, "admin");
+  set(AuthKey, "admin");
 
   // Audit trail
-  ctx.deps.auditLog.push(`${ctx.get(AuthKey)}:${ctx.command.type}`);
+  deps.auditLog.push(`${get(AuthKey)}:${command.type}`);
 
   await next();
 });
@@ -88,28 +88,28 @@ router.use(async (ctx, next) => {
 ### State: `Created`
 
 ```ts
-router.state("Created", (state) => {
-  state.on("Pay", (ctx) => {
+router.state("Created", ({ on }) => {
+  on("Pay", ({ command, data, error, transition, emit, workflow }) => {
     // Domain validation: check payment amount
-    if (ctx.command.payload.amount < ctx.data.total) {
-      ctx.error({
+    if (command.payload.amount < data.total) {
+      error({
         code: "InsufficientPayment",
         data: {
-          required: ctx.data.total,
-          received: ctx.command.payload.amount,
+          required: data.total,
+          received: command.payload.amount,
         },
       });
     }
 
-    ctx.transition("Paid", {
-      items: ctx.data.items,
-      total: ctx.data.total,
+    transition("Paid", {
+      items: data.items,
+      total: data.total,
       paidAt: new Date(),
     });
 
-    ctx.emit({
+    emit({
       type: "OrderPaid",
-      data: { orderId: ctx.workflow.id, amount: ctx.command.payload.amount },
+      data: { orderId: workflow.id, amount: command.payload.amount },
     });
   });
 });
@@ -118,20 +118,20 @@ router.state("Created", (state) => {
 ### State: `Paid`
 
 ```ts
-router.state("Paid", (state) => {
-  state.on("Ship", (ctx) => {
-    ctx.transition("Shipped", {
-      items: ctx.data.items,
-      total: ctx.data.total,
-      paidAt: ctx.data.paidAt,
-      trackingNumber: ctx.command.payload.trackingNumber,
+router.state("Paid", ({ on }) => {
+  on("Ship", ({ data, command, transition, emit, workflow }) => {
+    transition("Shipped", {
+      items: data.items,
+      total: data.total,
+      paidAt: data.paidAt,
+      trackingNumber: command.payload.trackingNumber,
     });
 
-    ctx.emit({
+    emit({
       type: "OrderShipped",
       data: {
-        orderId: ctx.workflow.id,
-        trackingNumber: ctx.command.payload.trackingNumber,
+        orderId: workflow.id,
+        trackingNumber: command.payload.trackingNumber,
       },
     });
   });
@@ -141,19 +141,19 @@ router.state("Paid", (state) => {
 ### State: `Shipped`
 
 ```ts
-router.state("Shipped", (state) => {
-  state.on("Deliver", (ctx) => {
-    ctx.transition("Delivered", {
-      items: ctx.data.items,
-      total: ctx.data.total,
-      paidAt: ctx.data.paidAt,
-      trackingNumber: ctx.data.trackingNumber,
+router.state("Shipped", ({ on }) => {
+  on("Deliver", ({ data, transition, emit, workflow }) => {
+    transition("Delivered", {
+      items: data.items,
+      total: data.total,
+      paidAt: data.paidAt,
+      trackingNumber: data.trackingNumber,
       deliveredAt: new Date(),
     });
 
-    ctx.emit({
+    emit({
       type: "OrderDelivered",
-      data: { orderId: ctx.workflow.id },
+      data: { orderId: workflow.id },
     });
   });
 });
@@ -164,18 +164,18 @@ router.state("Shipped", (state) => {
 A single handler registered for multiple states. Once an order is shipped, it can no longer be cancelled.
 
 ```ts
-router.state(["Created", "Paid"] as const, (state) => {
-  state.on("Cancel", (ctx) => {
-    ctx.transition("Cancelled", {
-      reason: ctx.command.payload.reason,
+router.state(["Created", "Paid"] as const, ({ on }) => {
+  on("Cancel", ({ command, transition, emit, workflow }) => {
+    transition("Cancelled", {
+      reason: command.payload.reason,
       cancelledAt: new Date(),
     });
 
-    ctx.emit({
+    emit({
       type: "OrderCancelled",
       data: {
-        orderId: ctx.workflow.id,
-        reason: ctx.command.payload.reason,
+        orderId: workflow.id,
+        reason: command.payload.reason,
       },
     });
   });

@@ -17,32 +17,32 @@ Two calls to `createKey` with the same name produce different keys.
 
 ## Setting Values
 
-Use `ctx.set(key, value)` in middleware:
+Use `set(key, value)` in middleware:
 
 ```ts
-router.use(async (ctx, next) => {
-  ctx.set(UserKey, { id: "user-1", role: "admin" });
-  ctx.set(RequestIdKey, crypto.randomUUID());
+router.use(async ({ set }, next) => {
+  set(UserKey, { id: "user-1", role: "admin" });
+  set(RequestIdKey, crypto.randomUUID());
   await next();
 });
 ```
 
-The value must match the key's type parameter -- `ctx.set(UserKey, "string")` is a type error.
+The value must match the key's type parameter -- `set(UserKey, "string")` is a type error.
 
 ## Reading Values
 
-### `ctx.get(key)` -- throws if missing
+### `get(key)` -- throws if missing
 
 ```ts
-const user = ctx.get(UserKey);
+const user = get(UserKey);
 // user is typed as { id: string; role: string }
 // throws if UserKey was never set
 ```
 
-### `ctx.getOrNull(key)` -- returns undefined if missing
+### `getOrNull(key)` -- returns undefined if missing
 
 ```ts
-const user = ctx.getOrNull(UserKey);
+const user = getOrNull(UserKey);
 // user is typed as { id: string; role: string } | undefined
 ```
 
@@ -77,35 +77,35 @@ const articleWorkflow = defineWorkflow("article", {
 const router = new WorkflowRouter(articleWorkflow);
 
 // 4. Auth middleware sets the key
-router.use(async (ctx, next) => {
+router.use(async ({ set }, next) => {
   // In a real app: validate JWT, look up session, etc.
   const auth = { userId: "user-1", role: "editor" as const };
-  ctx.set(AuthKey, auth);
+  set(AuthKey, auth);
   await next();
 });
 
 // 5. Handler reads the key
-router.state("Draft", (state) => {
-  state.on("Publish", (ctx) => {
-    const auth = ctx.get(AuthKey);
+router.state("Draft", ({ on }) => {
+  on("Publish", ({ get, error, data, transition, emit, workflow }) => {
+    const auth = get(AuthKey);
 
     if (auth.role === "viewer") {
-      ctx.error({ code: "Unauthorized", data: { required: "editor" } });
+      error({ code: "Unauthorized", data: { required: "editor" } });
     }
 
-    if (!ctx.data.body) {
-      ctx.error({ code: "BodyRequired", data: {} });
+    if (!data.body) {
+      error({ code: "BodyRequired", data: {} });
     }
 
-    ctx.transition("Published", {
-      title: ctx.data.title,
-      body: ctx.data.body!,
+    transition("Published", {
+      title: data.title,
+      body: data.body!,
       publishedAt: new Date(),
     });
 
-    ctx.emit({
+    emit({
       type: "ArticlePublished",
-      data: { articleId: ctx.workflow.id, publishedBy: auth.userId },
+      data: { articleId: workflow.id, publishedBy: auth.userId },
     });
   });
 });

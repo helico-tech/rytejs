@@ -12,14 +12,14 @@ import { createKey, definePlugin } from "@rytejs/core";
 const startTimeKey = createKey<number>("startTime");
 
 const loggingPlugin = definePlugin((router) => {
-	router.on("dispatch:start", (ctx) => {
-		ctx.set(startTimeKey, Date.now());
+	router.on("dispatch:start", ({ set }) => {
+		set(startTimeKey, Date.now());
 	});
-	router.on("dispatch:end", (ctx, result) => {
-		const duration = Date.now() - ctx.get(startTimeKey);
+	router.on("dispatch:end", ({ get, command, workflow }, result) => {
+		const duration = Date.now() - get(startTimeKey);
 		console.log(JSON.stringify({
-			command: ctx.command.type,
-			state: ctx.workflow.state,
+			command: command.type,
+			state: workflow.state,
 			ok: result.ok,
 			duration,
 		}));
@@ -40,12 +40,12 @@ import { createKey, definePlugin } from "@rytejs/core";
 const spanKey = createKey<any>("span");
 
 const otelPlugin = definePlugin((router) => {
-	router.on("dispatch:start", (ctx) => {
-		const span = tracer.startSpan(`ryte.dispatch.${ctx.command.type}`);
-		ctx.set(spanKey, span);
+	router.on("dispatch:start", ({ command, set }) => {
+		const span = tracer.startSpan(`ryte.dispatch.${command.type}`);
+		set(spanKey, span);
 	});
-	router.on("dispatch:end", (ctx, result) => {
-		const span = ctx.get(spanKey);
+	router.on("dispatch:end", ({ get }, result) => {
+		const span = get(spanKey);
 		span.setStatus({ code: result.ok ? SpanStatusCode.OK : SpanStatusCode.ERROR });
 		span.end();
 	});
@@ -70,11 +70,11 @@ const auditPlugin = definePlugin((router) => {
 			timestamp: new Date(),
 		});
 	});
-	router.on("error", (error, ctx) => {
+	router.on("error", (error, { workflow, command }) => {
 		auditLog.record({
-			workflowId: ctx.workflow.id,
+			workflowId: workflow.id,
 			error: error.category,
-			command: ctx.command.type,
+			command: command.type,
 			timestamp: new Date(),
 		});
 	});
@@ -91,10 +91,10 @@ Increments counters for every dispatch and every state transition, tagged with r
 import { definePlugin } from "@rytejs/core";
 
 const metricsPlugin = definePlugin((router) => {
-	router.on("dispatch:end", (ctx, result) => {
+	router.on("dispatch:end", ({ command, workflow }, result) => {
 		metrics.increment("ryte.dispatch.total", {
-			command: ctx.command.type,
-			state: ctx.workflow.state,
+			command: command.type,
+			state: workflow.state,
 			ok: String(result.ok),
 		});
 	});

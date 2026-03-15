@@ -43,16 +43,16 @@ errors: {
 },
 ```
 
-Handlers raise errors with `ctx.error()`, which halts execution and rolls back all mutations:
+Handlers raise errors with `error()`, which halts execution and rolls back all mutations:
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Start", (ctx) => {
-    if (!ctx.data.assignee) {
-      ctx.error({ code: "NotAssigned", data: {} });
+router.state("Todo", ({ on }) => {
+  on("Start", ({ data, error, transition }) => {
+    if (!data.assignee) {
+      error({ code: "NotAssigned", data: {} });
     }
     // only runs if no error was raised
-    ctx.transition("InProgress", { ... });
+    transition("InProgress", { ... });
   });
 });
 ```

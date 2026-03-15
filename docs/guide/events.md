@@ -4,18 +4,18 @@ Events are side effects emitted during dispatch. They are schema-validated, accu
 
 ## Emitting Events
 
-Use `ctx.emit()` inside a handler. The event data is validated against the event's Zod schema.
+Use `emit()` inside a handler. The event data is validated against the event's Zod schema.
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Complete", (ctx) => {
-    ctx.transition("Done", {
-      title: ctx.data.title,
+router.state("Todo", ({ on }) => {
+  on("Complete", ({ data, transition, emit, workflow }) => {
+    transition("Done", {
+      title: data.title,
       completedAt: new Date(),
     });
-    ctx.emit({
+    emit({
       type: "TaskCompleted",
-      data: { taskId: ctx.workflow.id },
+      data: { taskId: workflow.id },
     });
   });
 });
@@ -24,13 +24,13 @@ router.state("Todo", (state) => {
 You can emit multiple events in a single handler:
 
 ```ts
-state.on("Start", (ctx) => {
-  ctx.transition("InProgress", {
-    title: ctx.data.title,
-    assignee: ctx.command.payload.assignee,
+on("Start", ({ data, command, transition, emit, workflow }) => {
+  transition("InProgress", {
+    title: data.title,
+    assignee: command.payload.assignee,
   });
-  ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee } });
-  ctx.emit({ type: "AssigneeNotified", data: { assignee: ctx.command.payload.assignee } });
+  emit({ type: "TaskStarted", data: { taskId: workflow.id, assignee: command.payload.assignee } });
+  emit({ type: "AssigneeNotified", data: { assignee: command.payload.assignee } });
 });
 ```
 
@@ -63,7 +63,7 @@ const workflow = defineWorkflow("task", {
 });
 
 // In a handler:
-ctx.emit({ type: "TaskCompleted", data: { taskId: 123 } }); // fails -- taskId must be string
+emit({ type: "TaskCompleted", data: { taskId: 123 } }); // fails -- taskId must be string
 ```
 
 This produces a validation error with `source: "event"`.

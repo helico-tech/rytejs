@@ -11,11 +11,11 @@ import { WorkflowRouter } from "@rytejs/core";
 
 const router = new WorkflowRouter(definition);
 
-router.on("dispatch:start", (ctx) => {
-	console.log(`→ ${ctx.command.type}`);
+router.on("dispatch:start", ({ command }) => {
+	console.log(`→ ${command.type}`);
 });
 
-router.on("dispatch:end", (ctx, result) => {
+router.on("dispatch:end", (_ctx, result) => {
 	console.log(`← ${result.ok ? "ok" : "error"}`);
 });
 
@@ -23,7 +23,7 @@ router.on("transition", (from, to, workflow) => {
 	console.log(`${from} → ${to}`);
 });
 
-router.on("error", (error, ctx) => {
+router.on("error", (error, _ctx) => {
 	console.log(`error: ${error.category}`);
 });
 
@@ -79,8 +79,8 @@ A plugin is a function that receives the router and configures it — registerin
 import { definePlugin } from "@rytejs/core";
 
 const loggingPlugin = definePlugin((router) => {
-	router.on("dispatch:start", (ctx) => {
-		console.log(`[${new Date().toISOString()}] → ${ctx.command.type}`);
+	router.on("dispatch:start", ({ command }) => {
+		console.log(`[${new Date().toISOString()}] → ${command.type}`);
 	});
 	router.on("dispatch:end", (_ctx, result) => {
 		console.log(`[${new Date().toISOString()}] ← ${result.ok ? "ok" : "error"}`);
@@ -116,14 +116,14 @@ Plugins can register both hooks and middleware:
 ```ts
 const authPlugin = definePlugin((router) => {
 	// Middleware: runs in the dispatch pipeline
-	router.use(async (ctx, next) => {
-		if (!ctx.deps.currentUser) throw new Error("Unauthorized");
+	router.use(async ({ deps }, next) => {
+		if (!deps.currentUser) throw new Error("Unauthorized");
 		await next();
 	});
 
 	// Hook: observes after the fact
-	router.on("dispatch:end", (ctx, result) => {
-		auditLog.record(ctx.command, result);
+	router.on("dispatch:end", ({ command }, result) => {
+		auditLog.record(command, result);
 	});
 });
 ```

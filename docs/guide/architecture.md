@@ -44,16 +44,16 @@ Handlers that perform IO are hard to test, hard to reason about, and fragile. Wh
 
 ```ts
 // Bad: IO inside the handler
-state.on("PlaceOrder", async (ctx) => {
-	const charge = await paymentService.charge(ctx.data.total); // IO in handler
-	if (!charge.ok) return ctx.error({ code: "PaymentFailed", data: {} });
-	ctx.transition("Placed", { ... });
+on("PlaceOrder", async ({ data, error, transition }) => {
+	const charge = await paymentService.charge(data.total); // IO in handler
+	if (!charge.ok) return error({ code: "PaymentFailed", data: {} });
+	transition("Placed", { ... });
 });
 
 // Good: handler emits intent, IO layer acts on it
-state.on("PlaceOrder", (ctx) => {
-	ctx.transition("Placed", { ... });
-	ctx.emit({ type: "OrderPlaced", data: { orderId: ctx.workflow.id, total: ctx.data.total } });
+on("PlaceOrder", ({ data, transition, emit, workflow }) => {
+	transition("Placed", { ... });
+	emit({ type: "OrderPlaced", data: { orderId: workflow.id, total: data.total } });
 });
 
 // After dispatch, the IO layer processes events
@@ -90,13 +90,13 @@ type Deps = {
 
 const router = new WorkflowRouter(definition, deps);
 
-state.on("PlaceOrder", async (ctx) => {
-	const inStock = await ctx.deps.inventory.check(ctx.data.sku);
+on("PlaceOrder", async ({ deps, data, error, transition, emit }) => {
+	const inStock = await deps.inventory.check(data.sku);
 	if (!inStock) {
-		return ctx.error({ code: "OutOfStock", data: { sku: ctx.data.sku } });
+		return error({ code: "OutOfStock", data: { sku: data.sku } });
 	}
-	ctx.transition("Placed", { ... });
-	ctx.emit({ type: "OrderPlaced", data: { ... } });
+	transition("Placed", { ... });
+	emit({ type: "OrderPlaced", data: { ... } });
 });
 ```
 
@@ -107,8 +107,8 @@ This is acceptable — reads are side-effect-free and easy to stub in tests. The
 | Concern | Where | How |
 |---------|-------|-----|
 | Load workflow | Before dispatch | `restore()` from storage |
-| Business rules | Inside handler | `ctx.transition()`, `ctx.error()`, `ctx.emit()` |
-| Read external data | Inside handler | Via `ctx.deps` (injected, stubbable) |
+| Business rules | Inside handler | `transition()`, `error()`, `emit()` |
+| Read external data | Inside handler | Via `deps` (injected, stubbable) |
 | Persist state | After dispatch | `snapshot()` to storage |
 | Side effects | After dispatch | Process `result.events` |
 | Notifications | After dispatch | React to events |

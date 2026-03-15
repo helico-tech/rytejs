@@ -24,9 +24,9 @@ Zod validation failed. The `source` field tells you where:
 | Source         | When                                           |
 | -------------- | ---------------------------------------------- |
 | `"command"`    | Command payload doesn't match its schema       |
-| `"state"`      | `ctx.update()` produced invalid state data     |
-| `"transition"` | `ctx.transition()` data doesn't match target   |
-| `"event"`      | `ctx.emit()` data doesn't match event schema   |
+| `"state"`      | `update()` produced invalid state data         |
+| `"transition"` | `transition()` data doesn't match target       |
+| `"event"`      | `emit()` data doesn't match event schema       |
 
 ```ts
 if (!result.ok && result.error.category === "validation") {
@@ -50,17 +50,17 @@ const orderWorkflow = defineWorkflow("order", {
 });
 ```
 
-Handlers raise them via `ctx.error()`:
+Handlers raise them via `error()`:
 
 ```ts
-router.state("Created", (state) => {
-  state.on("Pay", (ctx) => {
-    if (ctx.command.payload.amount < ctx.data.total) {
-      ctx.error({
+router.state("Created", ({ on }) => {
+  on("Pay", ({ command, data, error }) => {
+    if (command.payload.amount < data.total) {
+      error({
         code: "InsufficientPayment",
         data: {
-          required: ctx.data.total,
-          received: ctx.command.payload.amount,
+          required: data.total,
+          received: command.payload.amount,
         },
       });
     }

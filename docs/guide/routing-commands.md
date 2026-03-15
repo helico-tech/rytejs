@@ -14,27 +14,27 @@ const router = new WorkflowRouter(taskWorkflow);
 const router = new WorkflowRouter(taskWorkflow, { db, logger });
 ```
 
-The second argument is an optional dependencies object, accessible in handlers via `ctx.deps`.
+The second argument is an optional dependencies object, accessible in handlers via `deps`.
 
 ## Single-State Handlers
 
 Register handlers for a specific state with `.state()`:
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Start", (ctx) => {
-    ctx.transition("InProgress", {
-      title: ctx.data.title,
-      assignee: ctx.command.payload.assignee,
+router.state("Todo", ({ on }) => {
+  on("Start", ({ data, command, transition, emit, workflow }) => {
+    transition("InProgress", {
+      title: data.title,
+      assignee: command.payload.assignee,
     });
-    ctx.emit({
+    emit({
       type: "TaskStarted",
-      data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+      data: { taskId: workflow.id, assignee: command.payload.assignee },
     });
   });
 
-  state.on("Rename", (ctx) => {
-    ctx.update({ title: ctx.command.payload.title });
+  on("Rename", ({ command, update }) => {
+    update({ title: command.payload.title });
   });
 });
 ```
@@ -46,9 +46,9 @@ Multiple `.state()` calls for the same state are additive -- handlers and middle
 Register a handler that applies to multiple states by passing an array:
 
 ```ts
-router.state(["Todo", "InProgress"] as const, (state) => {
-  state.on("Rename", (ctx) => {
-    ctx.update({ title: ctx.command.payload.title });
+router.state(["Todo", "InProgress"] as const, ({ on }) => {
+  on("Rename", ({ command, update }) => {
+    update({ title: command.payload.title });
   });
 });
 ```
@@ -60,8 +60,8 @@ The `as const` assertion is required so TypeScript narrows the state union corre
 Handle a command regardless of current state with `.on("*", ...)`:
 
 ```ts
-router.on("*", "Archive", (ctx) => {
-  ctx.transition("Archived", { reason: ctx.command.payload.reason });
+router.on("*", "Archive", ({ command, transition }) => {
+  transition("Archived", { reason: command.payload.reason });
 });
 ```
 
@@ -75,17 +75,17 @@ When multiple registrations could match, the most specific wins:
 
 ```ts
 // "Draft" + "Archive" -> uses specific handler
-router.state("Draft", (s) => {
-  s.on("Archive", (ctx) => { /* runs for Draft */ });
+router.state("Draft", ({ on }) => {
+  on("Archive", () => { /* runs for Draft */ });
 });
 
 // ["Draft", "Review"] + "Archive" -> used for Review, not Draft
-router.state(["Draft", "Review"] as const, (s) => {
-  s.on("Archive", (ctx) => { /* runs for Review */ });
+router.state(["Draft", "Review"] as const, ({ on }) => {
+  on("Archive", () => { /* runs for Review */ });
 });
 
 // "*" + "Archive" -> fallback for all other states
-router.on("*", "Archive", (ctx) => { /* runs for Published, etc. */ });
+router.on("*", "Archive", () => { /* runs for Published, etc. */ });
 ```
 
 ## Composable Routers
@@ -94,23 +94,23 @@ Split handler registration across routers and compose them with `.use()`:
 
 ```ts
 const draftRouter = new WorkflowRouter(taskWorkflow);
-draftRouter.state("Draft", (state) => {
-  state.on("SetTitle", (ctx) => {
-    ctx.update({ title: ctx.command.payload.title });
+draftRouter.state("Draft", ({ on }) => {
+  on("SetTitle", ({ command, update }) => {
+    update({ title: command.payload.title });
   });
-  state.on("Submit", (ctx) => {
-    ctx.transition("Review", {
-      title: ctx.data.title,
-      assignee: ctx.command.payload.assignee,
+  on("Submit", ({ data, command, transition }) => {
+    transition("Review", {
+      title: data.title,
+      assignee: command.payload.assignee,
     });
   });
 });
 
 const reviewRouter = new WorkflowRouter(taskWorkflow);
-reviewRouter.state("Review", (state) => {
-  state.on("Approve", (ctx) => {
-    ctx.transition("Published", {
-      title: ctx.data.title,
+reviewRouter.state("Review", ({ on }) => {
+  on("Approve", ({ data, transition }) => {
+    transition("Published", {
+      title: data.title,
       publishedAt: new Date(),
     });
   });
@@ -137,8 +137,8 @@ Routers can be nested arbitrarily:
 
 ```ts
 const inner = new WorkflowRouter(taskWorkflow);
-inner.state("Draft", (s) => {
-  s.on("SetTitle", (ctx) => { ctx.update({ title: ctx.command.payload.title }); });
+inner.state("Draft", ({ on }) => {
+  on("SetTitle", ({ command, update }) => { update({ title: command.payload.title }); });
 });
 
 const middle = new WorkflowRouter(taskWorkflow);

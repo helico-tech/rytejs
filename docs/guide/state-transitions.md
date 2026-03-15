@@ -1,15 +1,15 @@
 # State Transitions
 
-Handlers modify workflow state through two methods: `ctx.update()` and `ctx.transition()`.
+Handlers modify workflow state through two methods: `update()` and `transition()`.
 
 ## Reading Current Data
 
-`ctx.data` returns a copy of the current state data:
+`data` holds the current state data:
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Rename", (ctx) => {
-    console.log(ctx.data.title); // current title
+router.state("Todo", ({ on }) => {
+  on("Rename", ({ data }) => {
+    console.log(data.title); // current title
   });
 });
 ```
@@ -18,12 +18,12 @@ This is a getter that returns a shallow copy each time -- mutations to the retur
 
 ## Updating Within the Same State
 
-`ctx.update()` merges partial data into the current state. The merged result is validated against the current state's schema.
+`update()` merges partial data into the current state. The merged result is validated against the current state's schema.
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Rename", (ctx) => {
-    ctx.update({ title: ctx.command.payload.title });
+router.state("Todo", ({ on }) => {
+  on("Rename", ({ command, update }) => {
+    update({ title: command.payload.title });
     // State is still "Todo", data.title is updated
   });
 });
@@ -33,7 +33,7 @@ Only the fields you pass are merged. Existing fields are preserved:
 
 ```ts
 // Before: { title: "Old", priority: 3 }
-ctx.update({ title: "New" });
+update({ title: "New" });
 // After:  { title: "New", priority: 3 }
 ```
 
@@ -41,14 +41,14 @@ If the merged data fails validation, a validation error with `source: "state"` i
 
 ## Transitioning to a New State
 
-`ctx.transition()` moves the workflow to a different state with entirely new data. The data is validated against the target state's schema.
+`transition()` moves the workflow to a different state with entirely new data. The data is validated against the target state's schema.
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Start", (ctx) => {
-    ctx.transition("InProgress", {
-      title: ctx.data.title,
-      assignee: ctx.command.payload.assignee,
+router.state("Todo", ({ on }) => {
+  on("Start", ({ data, command, transition }) => {
+    transition("InProgress", {
+      title: data.title,
+      assignee: command.payload.assignee,
     });
   });
 });
@@ -58,14 +58,14 @@ router.state("Todo", (state) => {
 
 ```ts
 // This works -- all fields for "InProgress" are provided
-ctx.transition("InProgress", {
-  title: ctx.data.title,        // explicitly carried from current state
+transition("InProgress", {
+  title: data.title,        // explicitly carried from current state
   assignee: "alice",
 });
 
 // This fails -- "assignee" is missing
-ctx.transition("InProgress", {
-  title: ctx.data.title,
+transition("InProgress", {
+  title: data.title,
 });
 ```
 
@@ -73,20 +73,20 @@ If validation fails, a validation error with `source: "transition"` is returned.
 
 ## Update vs Transition
 
-| Method         | Stays in state? | Data behavior                    | Validation against |
-| -------------- | --------------- | -------------------------------- | ------------------ |
-| `ctx.update()` | Yes             | Merges partial into current data | Current state      |
-| `ctx.transition()` | No         | Replaces data entirely           | Target state       |
+| Method        | Stays in state? | Data behavior                    | Validation against |
+| ------------- | --------------- | -------------------------------- | ------------------ |
+| `update()`    | Yes             | Merges partial into current data | Current state      |
+| `transition()` | No             | Replaces data entirely           | Target state       |
 
 ## Rollback on Error
 
-All mutations are provisional. If a handler throws or calls `ctx.error()`, the original workflow is unchanged:
+All mutations are provisional. If a handler throws or calls `error()`, the original workflow is unchanged:
 
 ```ts
-router.state("Todo", (state) => {
-  state.on("Start", (ctx) => {
-    ctx.update({ title: "Modified" });      // provisional
-    ctx.error({ code: "NotAllowed", data: {} }); // throws -- update is discarded
+router.state("Todo", ({ on }) => {
+  on("Start", ({ update, error }) => {
+    update({ title: "Modified" });      // provisional
+    error({ code: "NotAllowed", data: {} }); // throws -- update is discarded
   });
 });
 

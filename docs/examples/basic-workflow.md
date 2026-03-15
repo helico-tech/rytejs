@@ -34,35 +34,34 @@ All methods return `this`, so you can chain `.state()` calls fluently:
 
 ```ts
 const router = new WorkflowRouter(taskWorkflow)
-  .state("Todo", (state) => {
-    state
-      .on("Rename", (ctx) => {
-        ctx.update({ title: ctx.command.payload.title });
-        ctx.emit({
+  .state("Todo", ({ on }) => {
+    on("Rename", ({ command, update, emit, workflow }) => {
+        update({ title: command.payload.title });
+        emit({
           type: "TaskRenamed",
-          data: { taskId: ctx.workflow.id, title: ctx.command.payload.title },
+          data: { taskId: workflow.id, title: command.payload.title },
         });
-      })
-      .on("Start", (ctx) => {
-        ctx.transition("InProgress", {
-          title: ctx.data.title,
-          assignee: ctx.command.payload.assignee,
+      });
+    on("Start", ({ data, command, transition, emit, workflow }) => {
+        transition("InProgress", {
+          title: data.title,
+          assignee: command.payload.assignee,
         });
-        ctx.emit({
+        emit({
           type: "TaskStarted",
-          data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+          data: { taskId: workflow.id, assignee: command.payload.assignee },
         });
       });
   })
-  .state("InProgress", (state) => {
-    state.on("Complete", (ctx) => {
-      ctx.transition("Done", {
-        title: ctx.data.title,
+  .state("InProgress", ({ on }) => {
+    on("Complete", ({ data, transition, emit, workflow }) => {
+      transition("Done", {
+        title: data.title,
         completedAt: new Date(),
       });
-      ctx.emit({
+      emit({
         type: "TaskCompleted",
-        data: { taskId: ctx.workflow.id },
+        data: { taskId: workflow.id },
       });
     });
   });
@@ -134,9 +133,9 @@ if (result.ok) {
 1. `defineWorkflow()` creates a definition with Zod schemas for states, commands, events, and errors.
 2. `createWorkflow()` instantiates a workflow in an initial state, validating the data.
 3. `WorkflowRouter` maps state + command pairs to handlers.
-4. `ctx.update()` modifies data within the current state (validated).
-5. `ctx.transition()` moves to a new state with new data (validated).
-6. `ctx.emit()` records events (validated, accumulated per dispatch).
+4. `update()` modifies data within the current state (validated).
+5. `transition()` moves to a new state with new data (validated).
+6. `emit()` records events (validated, accumulated per dispatch).
 7. `router.dispatch()` returns the updated workflow and events, or an error.
 
 Each dispatch is isolated -- the original workflow is never mutated, events don't carry over between dispatches, and errors trigger a full rollback.

@@ -53,7 +53,7 @@ events: {
 }
 ```
 
-Handlers emit events with `ctx.emit({ type: "TaskCompleted", data: { taskId: "..." } })`. Events are returned in `result.events` after a successful dispatch.
+Handlers emit events with `emit({ type: "TaskCompleted", data: { taskId: "..." } })`. Events are returned in `result.events` after a successful dispatch.
 
 ## Errors
 
@@ -66,17 +66,17 @@ errors: {
 }
 ```
 
-Handlers raise errors with `ctx.error({ code: "NotAssigned", data: {} })`. This halts execution, rolls back all mutations, and returns a typed error in the dispatch result. Because errors are schema-defined, both the code and its data are fully type-checked -- you can't raise an error that doesn't exist or pass the wrong data shape.
+Handlers raise errors with `error({ code: "NotAssigned", data: {} })`. This halts execution, rolls back all mutations, and returns a typed error in the dispatch result. Because errors are schema-defined, both the code and its data are fully type-checked -- you can't raise an error that doesn't exist or pass the wrong data shape.
 
 ## Middleware
 
 Koa-style onion model. Middleware wraps handlers and can run logic before and after. Three scopes: global, state-scoped, and inline.
 
 ```ts
-router.use(async (ctx, next) => {
-  console.log("before");
-  await next();
-  console.log("after");
+router.use(async (_ctx, next) => {
+	console.log("before");
+	await next();
+	console.log("after");
 });
 ```
 

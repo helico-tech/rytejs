@@ -41,21 +41,21 @@ All methods return `this`, so you can chain `.state()` and `.on()` calls fluentl
 
 ```ts
 const router = new WorkflowRouter(taskWorkflow)
-  .state("Todo", (state) => {
-    state.on("Complete", (ctx) => {
-      if (!ctx.data.assignee) {
-        ctx.error({ code: "NotAssigned", data: {} });
+  .state("Todo", ({ on }) => {
+    on("Complete", ({ data, error, transition, emit, workflow }) => {
+      if (!data.assignee) {
+        error({ code: "NotAssigned", data: {} });
       }
-      ctx.transition("Done", {
-        title: ctx.data.title,
+      transition("Done", {
+        title: data.title,
         completedAt: new Date(),
       });
-      ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
+      emit({ type: "TaskCompleted", data: { taskId: workflow.id } });
     });
   });
 ```
 
-`ctx.error()` halts execution and rolls back all mutations. The error code and data are validated against the schema you defined.
+`error()` halts execution and rolls back all mutations. The error code and data are validated against the schema you defined.
 
 ## Dispatch and Check the Result
 
