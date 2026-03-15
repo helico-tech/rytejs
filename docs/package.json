@@ -5,9 +5,12 @@
 	"scripts": {
 		"dev": "vitepress dev",
 		"build": "vitepress build",
-		"preview": "vitepress preview"
+		"preview": "vitepress preview",
+		"docs:api": "typedoc"
 	},
 	"devDependencies": {
+		"typedoc": "^0.27.9",
+		"typedoc-plugin-markdown": "^4.4.2",
 		"vitepress": "^1.5.0"
 	}
 }
