@@ -15,7 +15,7 @@ features:
   - title: Fully Typed, Zero Annotations
     details: Zod schemas define your states, commands, events, and errors. TypeScript infers everything — state names, payload types, error codes — with full autocompletion. No manual type annotations needed.
   - title: Discriminated Unions
-    details: Checking workflow.state narrows workflow.data automatically. ctx.error() only accepts error codes from your definition. Every handler argument is precisely typed.
+    details: Checking workflow.state narrows workflow.data automatically. error() only accepts error codes from your definition. Every handler argument is precisely typed.
   - title: Middleware Pipelines
     details: Koa-style onion model with global, state-scoped, and inline middleware. Add auth, logging, or validation without touching handlers.
   - title: Composable Routers

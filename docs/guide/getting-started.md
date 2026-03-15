@@ -8,6 +8,8 @@ Install Ryte and have a working workflow in under 2 minutes.
 pnpm add @rytejs/core zod
 ```
 
+> **Note:** Ryte requires Zod v4 or later as a peer dependency.
+
 ## Define a Workflow
 
 A workflow has states (Zod schemas), commands (intents that trigger logic), events (side effects), and errors (typed domain failures).

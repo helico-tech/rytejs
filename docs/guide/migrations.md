@@ -26,6 +26,22 @@ const migrations = defineMigrations(definition, {
 });
 ```
 
+Each key is either a plain transform function or an object with a `description` and an `up` function:
+
+```ts
+const migrations = defineMigrations(definition, {
+	2: {
+		description: "Add status field",
+		up: (snap) => ({
+			...snap,
+			data: { ...(snap.data as Record<string, unknown>), status: "active" },
+		}),
+	},
+});
+```
+
+The `description` is optional but shows up in `onStep` callbacks (see [Observability Callbacks](#observability-callbacks)).
+
 Each key is the **target version** — the function transforms from `(key - 1)` to `key`. Migration functions operate on `unknown` data, so `as any` casts are expected here. Type safety is restored at the `restore()` boundary, not inside the migration functions themselves.
 
 The pipeline auto-stamps `modelVersion` after each step, even if your function sets it. You only transform data and, optionally, state.
@@ -90,12 +106,12 @@ const workflow = restored.workflow;
 
 ## Observability Callbacks
 
-`migrate()` accepts an optional second argument with lifecycle callbacks:
+`migrate()` accepts an optional third argument with lifecycle callbacks:
 
 ```ts
 const result = migrate(migrations, oldSnapshot, {
-	onStep: (fromVersion, toVersion, snapshot) => {
-		console.log(`Migrated ${fromVersion} → ${toVersion}`);
+	onStep: (fromVersion, toVersion, snapshot, description) => {
+		console.log(`Migrated ${fromVersion} → ${toVersion}: ${description ?? "no description"}`);
 	},
 	onError: (error) => {
 		logger.error("Migration step failed", {

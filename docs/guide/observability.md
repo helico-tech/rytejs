@@ -81,7 +81,7 @@ const auditPlugin = definePlugin((router) => {
 });
 ```
 
-The `error` hook fires for domain and validation errors — the same errors returned in the result rather than thrown. Unexpected errors (handler throws) are not captured here; use `dispatch:end` with `result.ok === false` and `result.category === "unexpected"` if you need those.
+The `error` hook fires for domain and validation errors — the same errors returned in the result rather than thrown. Unexpected errors (handler throws a non-domain, non-validation error) are not captured here; use `dispatch:end` with `result.ok === false` and `result.error.category === "unexpected"` if you need those. Unexpected errors are captured as `{ category: "unexpected", error, message }` in the result, and `dispatch:end` always fires.
 
 ## Metrics
 

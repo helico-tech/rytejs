@@ -15,7 +15,7 @@ if (result.ok) {
 
 ## Error Categories
 
-`PipelineError` is a discriminated union with three categories.
+`PipelineError` is a discriminated union with four categories.
 
 ### Validation Errors
 
@@ -27,6 +27,9 @@ Zod validation failed. The `source` field tells you where:
 | `"state"`      | `update()` produced invalid state data         |
 | `"transition"` | `transition()` data doesn't match target       |
 | `"event"`      | `emit()` data doesn't match event schema       |
+| `"restore"`    | `restore()` data doesn't match state schema    |
+
+> **Note:** The `"restore"` source only appears from `definition.restore()`, not from `dispatch()`.
 
 ```ts
 if (!result.ok && result.error.category === "validation") {
@@ -77,6 +80,19 @@ if (!result.ok && result.error.category === "domain") {
   console.log(result.error.data); // { required: 100, received: 50 }
 }
 ```
+
+### Unexpected Errors
+
+When a handler throws a value that is neither a domain error nor a validation error, the dispatch catches it and returns an `"unexpected"` error instead of letting the exception propagate:
+
+```ts
+if (!result.ok && result.error.category === "unexpected") {
+  console.log(result.error.message); // human-readable summary
+  console.log(result.error.error);   // the original thrown value
+}
+```
+
+`dispatch:end` always fires even when an unexpected error occurs, so hooks and plugins that observe `dispatch:end` will always run.
 
 ### Router Errors
 
@@ -137,6 +153,10 @@ if (!result.ok) {
     case "router":
       // result.error.code, result.error.message
       console.log("Router:", result.error.message);
+      break;
+    case "unexpected":
+      // result.error.error, result.error.message
+      console.log("Unexpected:", result.error.message);
       break;
   }
 }

@@ -163,7 +163,7 @@ const result = await router.dispatch(workflow, {
 
 ```ts
 type DispatchResult<TConfig> =
-  | { ok: true; workflow: Workflow<TConfig>; events: Array<{ type: string; data: unknown }> }
+  | { ok: true; workflow: Workflow<TConfig>; events: Array<{ type: EventNames<TConfig>; data: unknown }> }
   | { ok: false; error: PipelineError<TConfig> };
 ```
 

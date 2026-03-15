@@ -92,4 +92,4 @@ if (snap.modelVersion === 1) {
 const result = definition.restore(snap);
 ```
 
-The core doesn't enforce migrations — it gives you the version field and the validation. Migration logic is yours.
+For migrating old snapshots to the current schema version, see the [Migrations](/guide/migrations) guide. The core provides `defineMigrations()` and `migrate()` for building migration pipelines.
