@@ -28,7 +28,9 @@ type HandlerEntry = {
 	handler: AnyMiddleware;
 };
 
+/** Options for the {@link WorkflowRouter} constructor. */
 export interface RouterOptions {
+	/** Callback invoked when a lifecycle hook throws. Defaults to `console.error`. */
 	onHookError?: (error: unknown) => void;
 }
 
@@ -75,6 +77,11 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	private hookRegistry = new HookRegistry();
 	private readonly onHookError: (error: unknown) => void;
 
+	/**
+	 * @param definition - The workflow definition describing states, commands, events, and errors
+	 * @param deps - Dependencies injected into every handler context
+	 * @param options - Router configuration options
+	 */
 	constructor(
 		private readonly definition: WorkflowDefinition<TConfig>,
 		private readonly deps: TDeps = {} as TDeps,
@@ -83,7 +90,10 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		this.onHookError = options.onHookError ?? console.error;
 	}
 
-	/** Adds global middleware, merges another router, or applies a plugin. */
+	/**
+	 * Adds global middleware, merges another router, or applies a plugin.
+	 * @param arg - A middleware function, another {@link WorkflowRouter} to merge, or a {@link Plugin}
+	 */
 	use(
 		arg:
 			| ((ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Promise<void>)
@@ -148,7 +158,11 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		}
 	}
 
-	/** Registers handlers for one or more states. */
+	/**
+	 * Registers handlers for one or more states.
+	 * @param name - A state name or array of state names to register handlers for
+	 * @param setup - Callback that receives a state builder to register commands and middleware
+	 */
 	state<P extends StateNames<TConfig> | readonly StateNames<TConfig>[]>(
 		name: P,
 		setup: (
@@ -176,7 +190,11 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		return this;
 	}
 
-	/** Registers a lifecycle hook callback. */
+	/**
+	 * Registers a lifecycle hook callback.
+	 * @param event - The lifecycle event name
+	 * @param callback - The callback to invoke when the event fires
+	 */
 	on(
 		event: "dispatch:start",
 		callback: (ctx: ReadonlyContext<TConfig, TDeps>) => void | Promise<void>,
@@ -210,7 +228,12 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			workflow: Workflow<TConfig>,
 		) => void | Promise<void>,
 	): this;
-	/** Registers a wildcard handler that matches any state. */
+	/**
+	 * Registers a wildcard handler that matches any state.
+	 * @param _state - Must be `"*"` to match all states
+	 * @param command - The command name to handle
+	 * @param fns - Optional inline middleware followed by the terminal handler
+	 */
 	on<C extends CommandNames<TConfig>>(
 		state: "*",
 		command: C,
@@ -248,7 +271,12 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		throw new Error(`Unknown event or state: ${first}`);
 	}
 
-	/** Dispatches a command to the appropriate handler and returns the result. */
+	/**
+	 * Dispatches a command to the appropriate handler and returns the result.
+	 * @param workflow - The current workflow instance to dispatch against
+	 * @param command - The command with its type and payload
+	 * @returns A {@link DispatchResult} indicating success or failure with the updated workflow and events
+	 */
 	async dispatch(
 		workflow: Workflow<TConfig>,
 		command: { type: CommandNames<TConfig>; payload: unknown },

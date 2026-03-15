@@ -5,7 +5,7 @@ import type { WorkflowConfig } from "./types.js";
 /** A function that transforms a snapshot's data from one version to the next. */
 export type MigrationFn = (snapshot: WorkflowSnapshot) => WorkflowSnapshot;
 
-/** A migration entry — either a bare function or an object with a description. */
+/** A migration entry — either a bare {@link MigrationFn} or an object with a description. */
 export type MigrationEntry = MigrationFn | { description: string; up: MigrationFn };
 
 /** Internal normalized migration step with optional description. */
@@ -16,29 +16,48 @@ interface NormalizedMigration {
 
 /** A validated migration pipeline ready to transform snapshots. */
 export interface MigrationPipeline<TConfig extends WorkflowConfig = WorkflowConfig> {
+	/** The workflow definition this pipeline belongs to. */
 	readonly definition: WorkflowDefinition<TConfig>;
+	/** The target schema version to migrate snapshots to. */
 	readonly targetVersion: number;
+	/** Map of version number to normalized migration step. */
 	readonly migrations: ReadonlyMap<number, NormalizedMigration>;
 }
 
-/** Result of migrate(). */
+/** Result of {@link migrate}. */
 export type MigrateResult =
 	| { ok: true; snapshot: WorkflowSnapshot }
 	| { ok: false; error: MigrationError };
 
-/** Options for migrate(). */
+/** Options for {@link migrate}. */
 export interface MigrateOptions {
+	/**
+	 * Called after each successful migration step.
+	 * @param fromVersion - The version before this step
+	 * @param toVersion - The version after this step
+	 * @param snapshot - The snapshot after this step
+	 * @param description - Optional description from the migration entry
+	 */
 	onStep?: (
 		fromVersion: number,
 		toVersion: number,
 		snapshot: WorkflowSnapshot,
 		description?: string,
 	) => void;
+	/**
+	 * Called when a migration step fails.
+	 * @param error - The {@link MigrationError} describing the failure
+	 */
 	onError?: (error: MigrationError) => void;
 }
 
 /** Error thrown when a migration step fails. */
 export class MigrationError extends Error {
+	/**
+	 * @param fromVersion - The schema version the migration started from
+	 * @param toVersion - The schema version the migration was attempting to reach
+	 * @param cause - The underlying error that caused the failure
+	 */
 	constructor(
 		public readonly fromVersion: number,
 		public readonly toVersion: number,
@@ -54,6 +73,11 @@ export class MigrationError extends Error {
 /**
  * Creates a validated migration pipeline from a definition and version-keyed transform functions.
  * Each key is the target version — the function transforms from (key - 1) to key.
+ *
+ * @param definition - The workflow definition the migrations belong to
+ * @param migrationMap - A record mapping target version numbers to {@link MigrationEntry} values
+ * @returns A validated {@link MigrationPipeline} ready for use with {@link migrate}
+ * @throws If migration keys are not sequential from 2 to the definition's `modelVersion`, or if the highest key does not match `modelVersion`
  */
 export function defineMigrations<TConfig extends WorkflowConfig>(
 	definition: WorkflowDefinition<TConfig>,
@@ -102,6 +126,11 @@ export function defineMigrations<TConfig extends WorkflowConfig>(
 /**
  * Runs the migration chain from the snapshot's modelVersion to the pipeline's targetVersion.
  * Returns a Result. Auto-stamps modelVersion after each step.
+ *
+ * @param pipeline - The {@link MigrationPipeline} created by {@link defineMigrations}
+ * @param snapshot - The workflow snapshot to migrate
+ * @param options - Optional callbacks for step progress and error reporting
+ * @returns A {@link MigrateResult} with the migrated snapshot on success, or a {@link MigrationError} on failure
  */
 export function migrate<TConfig extends WorkflowConfig>(
 	pipeline: MigrationPipeline<TConfig>,

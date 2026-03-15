@@ -22,28 +22,63 @@ export interface Context<
 	TState extends StateNames<TConfig> = StateNames<TConfig>,
 	TCommand extends CommandNames<TConfig> = CommandNames<TConfig>,
 > {
+	/** The command being dispatched, with type and validated payload. */
 	readonly command: {
 		readonly type: TCommand;
 		readonly payload: CommandPayload<TConfig, TCommand>;
 	};
+	/** The original workflow before any mutations. */
 	readonly workflow: WorkflowOf<TConfig, TState>;
+	/** Dependencies injected via the router constructor. */
 	readonly deps: TDeps;
 
+	/** Current state data (reflects mutations from {@link update}). */
 	readonly data: StateData<TConfig, TState>;
+	/**
+	 * Merges partial data into the current state. Validates against the state's Zod schema.
+	 * @param data - Partial state data to merge
+	 */
 	update(data: Partial<StateData<TConfig, TState>>): void;
 
+	/**
+	 * Transitions the workflow to a new state with new data. Validates against the target state's Zod schema.
+	 * @param target - Target state name
+	 * @param data - Data for the target state
+	 */
 	transition<Target extends StateNames<TConfig>>(
 		target: Target,
 		data: StateData<TConfig, Target>,
 	): void;
 
+	/**
+	 * Emits a domain event. Validates event data against the event's Zod schema.
+	 * @param event - Event with type and data
+	 */
 	emit<E extends EventNames<TConfig>>(event: { type: E; data: EventData<TConfig, E> }): void;
+	/** Accumulated events emitted during this dispatch. */
 	readonly events: ReadonlyArray<{ type: EventNames<TConfig>; data: unknown }>;
 
+	/**
+	 * Signals a domain error. Validates error data and throws internally (caught by the router).
+	 * @param err - Error with code and data
+	 */
 	error<C extends ErrorCodes<TConfig>>(err: { code: C; data: ErrorData<TConfig, C> }): never;
 
+	/**
+	 * Stores a value in context-scoped middleware state.
+	 * @param key - A {@link ContextKey} created via {@link createKey}
+	 * @param value - The value to store
+	 */
 	set<T>(key: ContextKey<T>, value: T): void;
+	/**
+	 * Retrieves a value from context-scoped middleware state. Throws if not set.
+	 * @param key - A {@link ContextKey} created via {@link createKey}
+	 */
 	get<T>(key: ContextKey<T>): T;
+	/**
+	 * Retrieves a value from context-scoped middleware state, or `undefined` if not set.
+	 * @param key - A {@link ContextKey} created via {@link createKey}
+	 */
 	getOrNull<T>(key: ContextKey<T>): T | undefined;
 
 	/** @internal — not part of the handler API */
