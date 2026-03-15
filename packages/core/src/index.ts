@@ -6,7 +6,13 @@ export type { HookEvent } from "./hooks.js";
 export type { ContextKey } from "./key.js";
 export { createKey } from "./key.js";
 export type { Middleware } from "./middleware.js";
-export type { MigrateOptions, MigrateResult, MigrationFn, MigrationPipeline } from "./migration.js";
+export type {
+	MigrateOptions,
+	MigrateResult,
+	MigrationEntry,
+	MigrationFn,
+	MigrationPipeline,
+} from "./migration.js";
 export { defineMigrations, MigrationError, migrate } from "./migration.js";
 export type { Plugin } from "./plugin.js";
 export { definePlugin, isPlugin } from "./plugin.js";

@@ -230,6 +230,42 @@ describe("migrate()", () => {
 		expect(onStep.mock.calls[1]?.[1]).toBe(3);
 	});
 
+	test("migration entries with descriptions pass description to onStep", () => {
+		const describedPipeline = defineMigrations(definitionV3, {
+			2: {
+				description: "Add status field",
+				up: (snap) => ({
+					...snap,
+					data: { ...(snap.data as Record<string, unknown>), status: "active" },
+				}),
+			},
+			3: {
+				description: "Add fullName field",
+				up: (snap) => ({
+					...snap,
+					data: { ...(snap.data as Record<string, unknown>), fullName: "unknown" },
+				}),
+			},
+		});
+		const descriptions: (string | undefined)[] = [];
+		migrate(describedPipeline, makeSnapshot(1), {
+			onStep: (_from, _to, _snap, description) => {
+				descriptions.push(description);
+			},
+		});
+		expect(descriptions).toEqual(["Add status field", "Add fullName field"]);
+	});
+
+	test("bare function migrations have undefined description in onStep", () => {
+		const descriptions: (string | undefined)[] = [];
+		migrate(pipeline, makeSnapshot(1), {
+			onStep: (_from, _to, _snap, description) => {
+				descriptions.push(description);
+			},
+		});
+		expect(descriptions).toEqual([undefined, undefined]);
+	});
+
 	test("no-op pipeline for modelVersion 1 returns snapshot as-is", () => {
 		const noopPipeline = defineMigrations(definitionV1, {});
 		const snap = makeSnapshot(1);

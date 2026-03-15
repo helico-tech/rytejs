@@ -55,13 +55,13 @@ export function testMigration<TConfig extends WorkflowConfig>(
 	options: TestMigrationOptions,
 ): void {
 	const targetVersion = options.from + 1;
-	const fn = pipeline.migrations.get(targetVersion);
-	if (!fn) {
+	const migration = pipeline.migrations.get(targetVersion);
+	if (!migration) {
 		throw new Error(`No migration function found for version ${targetVersion}`);
 	}
 
 	const snap = makeTestSnapshot(pipeline, options.from, options.input, options.state);
-	const result = fn(snap);
+	const result = migration.fn(snap);
 
 	if (!deepEqual(result.data, options.expected)) {
 		throw new Error(
