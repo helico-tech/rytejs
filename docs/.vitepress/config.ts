@@ -7,7 +7,7 @@ export default defineConfig({
 	themeConfig: {
 		nav: [
 			{ text: "Guide", link: "/guide/getting-started" },
-			{ text: "API", link: "/api/" },
+			{ text: "API", link: "/api/core/src" },
 			{ text: "Examples", link: "/examples/basic-workflow" },
 		],
 		sidebar: {
@@ -48,7 +48,10 @@ export default defineConfig({
 			"/api/": [
 				{
 					text: "API Reference",
-					items: [{ text: "Full Reference", link: "/api/" }],
+					items: [
+						{ text: "@rytejs/core", link: "/api/core/src" },
+						{ text: "@rytejs/testing", link: "/api/testing/src" },
+					],
 				},
 			],
 			"/examples/": [

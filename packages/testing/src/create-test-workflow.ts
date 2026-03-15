@@ -8,7 +8,7 @@ import type {
 
 /** Options for createTestWorkflow. */
 export interface CreateTestWorkflowOptions {
-	/** Custom workflow ID. Defaults to "test-<random>". */
+	/** Custom workflow ID. Defaults to `"test-{random}"`. */
 	id?: string;
 }
 
