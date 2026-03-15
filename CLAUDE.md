@@ -56,7 +56,7 @@ npx biome check --fix .                   # autofix
 - Code blocks in docs use **tab indentation**
 - Every code example must be **verifiable against the actual API** — check imports exist in `packages/core/src/index.ts`
 - **Never reference removed features**: `inspect()`, `targets`, `@rytejs/viz`, `DefinitionInfo`, `RouterGraph`, `TransitionInfo`
-- When documenting `PipelineError` categories, include ALL FOUR: `"validation"`, `"domain"`, `"router"`, `"unexpected"`
+- When documenting `PipelineError` categories, include ALL FIVE: `"validation"`, `"domain"`, `"router"`, `"unexpected"`, `"dependency"`
 - `ValidationError.source` includes `"restore"` (from `definition.restore()`, not from `dispatch()`)
 
 ## Testing
