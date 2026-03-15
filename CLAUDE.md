@@ -6,11 +6,13 @@
 
 ## Commands
 
-```bash
-# Full check (typecheck + test + lint)
-npx turbo run typecheck test && npx biome check .
+Use `pnpm` for workspace-level commands, `npx` for per-package tools.
 
-# Per-package
+```bash
+# Full check (workspace-level, uses turbo)
+pnpm run check                            # typecheck + test + lint
+
+# Per-package (use npx, NOT pnpm — these are not workspace scripts)
 cd packages/core && npx vitest run        # 149 tests
 cd packages/testing && npx vitest run     # 29 tests
 cd packages/core && npx tsc --noEmit      # typecheck
@@ -80,3 +82,22 @@ tests/e2e/              # E2E tests (NOT in workspace, installs from npm)
 - After adding features: update relevant guide in `docs/guide/`, add to sidebar in `docs/.vitepress/config.ts`
 - After changing public types: verify `@rytejs/testing` still compiles (rebuild core first)
 - TypeScript overloads with `StateNames<TConfig>[]` in signatures need `string[]` instead — TS can't infer literal arrays without `as const`
+
+## Common Mistakes to Avoid
+
+These are errors that have actually happened in this codebase. Read before writing code.
+
+### TypeScript generics
+- **Always add `<TConfig extends WorkflowConfig>` to functions that accept `MigrationPipeline`, `WorkflowDefinition`, or `WorkflowSnapshot`.** Without it, specific config types (e.g., `{ modelVersion: 3, states: {...} }`) won't be assignable to the base `WorkflowConfig`. This mistake was made 3 times.
+
+### Stale dist
+- **Rebuild core (`cd packages/core && npx tsup`) after ANY change to core source.** The `@rytejs/testing` package and integration tests import from `dist/`, not source. Forgetting this causes "X is not a function" errors that look like bugs but are just stale builds. This happened repeatedly.
+
+### Documentation ahead of code
+- **Never document behavior that isn't implemented yet.** Write the code and tests first, then the docs. Writing docs first led to: StateBuilder destructuring that broke at runtime, a `dispatch:end` guarantee that wasn't enforced, and an error category that didn't exist.
+
+### Subagent oversight
+- **Review subagent output for: internal types leaked as exports, `any` in public APIs, missing `biome-ignore` comments.** Subagents don't know project conventions unless explicitly told.
+
+### Internal exports
+- **Only export what consumers need.** `HookRegistry`, `HOOK_EVENTS`, `NormalizedMigration` are internal. Check `index.ts` after subagents modify it.
