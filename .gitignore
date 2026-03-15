@@ -6,3 +6,4 @@ coverage
 .vitepress/cache
 .vitepress/dist
 .idea
+docs/api/
