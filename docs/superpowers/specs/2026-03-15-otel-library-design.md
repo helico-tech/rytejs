@@ -75,11 +75,11 @@ When no OTEL SDK is registered, all tracer/meter/logger calls are no-ops. No war
 
 | Hook | Action |
 |---|---|
-| `dispatch:start` | Create span, store via context key, set initial attributes |
-| `transition` | Add span event `ryte.transition` |
-| `event` | Add span event `ryte.event` |
-| `error` | Add error attributes to span |
-| `dispatch:end` | Set span status, end span |
+| `dispatch:start` | Create span, store in context key + span map, set initial attributes |
+| `transition` | Add span event `ryte.transition` (span retrieved from span map) |
+| `event` | Add span event `ryte.event` (span retrieved from span map) |
+| `error` | Add error attributes to span (span retrieved from context key) |
+| `dispatch:end` | Set span status, end span, remove from span map |
 
 ### Span naming
 
@@ -115,17 +115,26 @@ When no OTEL SDK is registered, all tracer/meter/logger calls are no-ops. No war
 | `ryte.error.code` | `error.code` | domain, router |
 | `ryte.error.source` | `error.source` | validation |
 | `ryte.error.dependency` | `error.name` | dependency |
-| `ryte.error.message` | `error.message` | Always |
+| `ryte.error.message` | `error.message` | validation, router, unexpected, dependency (not domain) |
+
+Note: `domain` errors have no `message` field — they carry `code` and `data` only. The `ryte.error.message` attribute is omitted for domain errors. For domain errors, `ryte.error.code` serves as the primary identifier.
 
 ### Span completion (dispatch:end)
 
 - Status: `SpanStatusCode.OK` if `result.ok`, `SpanStatusCode.ERROR` otherwise
-- If error: `otel.status_description` set to `error.message`
+- If error: `otel.status_description` set to `error.message` when available, or `error.code` for domain errors
 - `span.end()` called
+- Span removed from the span map (cleanup)
 
 ### Context propagation
 
-Span stored via `createKey<Span>("ryte.otel.span")`. Start time stored via `createKey<number>("ryte.otel.startTime")`.
+**Dual storage strategy** — needed because not all hooks receive `ReadonlyContext`:
+
+- **Context key:** `createKey<Span>("ryte.otel.span")` — used by `dispatch:start`, `error`, and `dispatch:end` hooks, which receive `ReadonlyContext` and can call `ctx.get(spanKey)` / `ctx.set(spanKey, span)`.
+- **Span map:** `Map<string, Span>` keyed on `workflow.id` — used by `transition` and `event` hooks, which receive `(from, to, workflow)` and `(event, workflow)` respectively (no `ReadonlyContext`). The map is scoped to the plugin closure.
+- **Start time:** `createKey<number>("ryte.otel.startTime")` — stored via context key, only read in `dispatch:end`.
+
+The span map is set in `dispatch:start` and cleaned up in `dispatch:end` (which is guaranteed to fire). For concurrent dispatches on the same workflow ID, the map entry is overwritten — this is acceptable because concurrent dispatches on the same workflow instance are not a supported pattern in @rytejs (the workflow is passed by value, and concurrent mutation would produce undefined results regardless).
 
 ## Metrics
 
@@ -185,7 +194,7 @@ Body: `"dispatch {CommandType} → {ok|error}"`
 
 Severity: `WARN` for domain/validation/router, `ERROR` for unexpected/dependency.
 
-Body: `"error {category}: {message}"`
+Body: `"error {category}: {message}"` (for domain errors: `"error domain: {code}"`)
 
 | Attribute | Value |
 |---|---|
@@ -207,16 +216,17 @@ Transitions and domain events are captured as span events in tracing. They are n
 `createOtelPlugin()` returns a `definePlugin(...)` that:
 
 1. Creates context keys for span and start time
-2. Acquires tracer/meter/logger (from options or global OTEL API)
-3. Creates metric instruments (counters, histogram)
-4. Registers all 5 hooks:
-   - `dispatch:start` — create span, store start time, set initial attributes
-   - `transition` — add span event, increment transition counter
-   - `event` — add span event
-   - `error` — add error attributes to span, emit error log
-   - `dispatch:end` — set span status, record duration, increment dispatch counter, emit dispatch log, end span
+2. Creates a `Map<string, Span>` for span lookup from hooks without `ReadonlyContext`
+3. Acquires tracer/meter/logger (from options or global OTEL API)
+4. Creates metric instruments (counters, histogram)
+5. Registers all 5 hooks:
+   - `dispatch:start` (receives `ReadonlyContext`) — create span, store in context key + span map, store start time, set initial attributes
+   - `transition` (receives `from, to, workflow`) — look up span from span map via `workflow.id`, add span event, increment transition counter
+   - `event` (receives `event, workflow`) — look up span from span map via `workflow.id`, add span event
+   - `error` (receives `error, ReadonlyContext`) — retrieve span from context key, add error attributes, emit error log
+   - `dispatch:end` (receives `ReadonlyContext, result`) — retrieve span from context key, set span status, record duration, increment dispatch counter, emit dispatch log, end span, remove from span map
 
-The plugin is generic over `WorkflowConfig` and `TDeps`, matching the `definePlugin` signature. Since hooks only access `ReadonlyContext`, it works with any workflow definition.
+The plugin is generic over `WorkflowConfig` and `TDeps`, matching the `definePlugin` signature. The `transition` and `event` hooks do not receive `ReadonlyContext` — they access the span via the plugin-scoped `Map<string, Span>` keyed on `workflow.id`.
 
 ## Testing Strategy
 
