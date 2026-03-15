@@ -1,4 +1,4 @@
-import { createKey, defineWorkflow, type Workflow, WorkflowRouter } from "@rytejs/core";
+import { createKey, defineWorkflow, WorkflowRouter } from "@rytejs/core";
 import { describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 
@@ -594,13 +594,10 @@ describe("onboarding workflow", () => {
 	test("happy path: full onboarding to active", async () => {
 		const { router, deps, auditLog } = createOnboardingRouter();
 
-		let wf: Workflow<typeof onboardingWorkflow.config> = onboardingWorkflow.createWorkflow(
-			"onb-1",
-			{
-				initialState: "Started",
-				data: { email: "alice@example.com", fullName: "Alice Smith" },
-			},
-		);
+		const wf = onboardingWorkflow.createWorkflow("onb-1", {
+			initialState: "Started",
+			data: { email: "alice@example.com", fullName: "Alice Smith" },
+		});
 
 		// 1. Submit identity documents
 		let result = await router.dispatch(wf, {
@@ -614,10 +611,9 @@ describe("onboarding workflow", () => {
 			expect(result.workflow.data.identityRequestId).toBe("id-req-001");
 		}
 		expect(result.events[0]?.type).toBe("IdentityCheckRequested");
-		wf = result.workflow;
 
 		// 2. Identity provider calls back with success
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveIdentityResult",
 			payload: { success: true },
 		});
@@ -625,10 +621,9 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("IdentityVerified");
 		expect(result.events[0]?.type).toBe("IdentityVerified");
-		wf = result.workflow;
 
 		// 3. Initiate bank verification
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "InitiateBankVerification",
 			payload: { bankAccountId: "ACC-123" },
 		});
@@ -640,10 +635,9 @@ describe("onboarding workflow", () => {
 			expect(result.workflow.data.microDepositId).toBe("dep-001");
 		}
 		expect(result.events[0]?.type).toBe("MicroDepositInitiated");
-		wf = result.workflow;
 
 		// 4. Bank calls back with success
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveBankResult",
 			payload: { success: true },
 		});
@@ -651,10 +645,9 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("BankVerified");
 		expect(result.events[0]?.type).toBe("BankVerified");
-		wf = result.workflow;
 
 		// 5. Submit for backoffice review
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "SubmitForReview",
 			payload: {},
 		});
@@ -662,10 +655,9 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("BackofficeReview");
 		expect(result.events[0]?.type).toBe("BackofficeReviewRequested");
-		wf = result.workflow;
 
 		// 6. Backoffice approves
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ApproveOnboarding",
 			payload: { approvedBy: "admin@company.com" },
 		});
@@ -673,10 +665,9 @@ describe("onboarding workflow", () => {
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Approved");
 		expect(result.events.map((e) => e.type)).toEqual(["OnboardingApproved", "WelcomeEmailSent"]);
-		wf = result.workflow;
 
 		// 7. Activate account
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ActivateAccount",
 			payload: {},
 		});
@@ -727,13 +718,10 @@ describe("onboarding workflow", () => {
 	test("identity verification fails", async () => {
 		const { router, deps } = createOnboardingRouter();
 
-		let wf: Workflow<typeof onboardingWorkflow.config> = onboardingWorkflow.createWorkflow(
-			"onb-2",
-			{
-				initialState: "Started",
-				data: { email: "bob@example.com", fullName: "Bob Jones" },
-			},
-		);
+		const wf = onboardingWorkflow.createWorkflow("onb-2", {
+			initialState: "Started",
+			data: { email: "bob@example.com", fullName: "Bob Jones" },
+		});
 
 		let result = await router.dispatch(wf, {
 			type: "SubmitIdentity",
@@ -741,9 +729,8 @@ describe("onboarding workflow", () => {
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveIdentityResult",
 			payload: { success: false, reason: "document_expired" },
 		});
@@ -762,36 +749,30 @@ describe("onboarding workflow", () => {
 	test("bank verification fails", async () => {
 		const { router, deps } = createOnboardingRouter();
 
-		let wf: Workflow<typeof onboardingWorkflow.config> = onboardingWorkflow.createWorkflow(
-			"onb-3",
-			{
-				initialState: "Started",
-				data: { email: "carol@example.com", fullName: "Carol White" },
-			},
-		);
+		const wf = onboardingWorkflow.createWorkflow("onb-3", {
+			initialState: "Started",
+			data: { email: "carol@example.com", fullName: "Carol White" },
+		});
 
 		let result = await router.dispatch(wf, {
 			type: "SubmitIdentity",
 			payload: { documentUrl: "https://docs.example.com/id.pdf" },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveIdentityResult",
 			payload: { success: true },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "InitiateBankVerification",
 			payload: { bankAccountId: "ACC-BAD" },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveBankResult",
 			payload: { success: false, reason: "account_closed" },
 		});
@@ -812,50 +793,42 @@ describe("onboarding workflow", () => {
 	test("backoffice rejects onboarding", async () => {
 		const { router } = createOnboardingRouter();
 
-		let wf: Workflow<typeof onboardingWorkflow.config> = onboardingWorkflow.createWorkflow(
-			"onb-4",
-			{
-				initialState: "Started",
-				data: { email: "dave@example.com", fullName: "Dave Brown" },
-			},
-		);
+		const wf = onboardingWorkflow.createWorkflow("onb-4", {
+			initialState: "Started",
+			data: { email: "dave@example.com", fullName: "Dave Brown" },
+		});
 
 		let result = await router.dispatch(wf, {
 			type: "SubmitIdentity",
 			payload: { documentUrl: "https://docs.example.com/id.pdf" },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveIdentityResult",
 			payload: { success: true },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "InitiateBankVerification",
 			payload: { bankAccountId: "ACC-456" },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveBankResult",
 			payload: { success: true },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "SubmitForReview",
 			payload: {},
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "RejectOnboarding",
 			payload: {
 				rejectedBy: "compliance@company.com",
@@ -875,30 +848,29 @@ describe("onboarding workflow", () => {
 	test("domain error: duplicate identity verification attempt", async () => {
 		const { router } = createOnboardingRouter();
 
-		let wf: Workflow<typeof onboardingWorkflow.config> = onboardingWorkflow.createWorkflow(
-			"onb-5",
-			{
-				initialState: "Started",
-				data: { email: "eve@example.com", fullName: "Eve Green" },
-			},
-		);
+		const wf = onboardingWorkflow.createWorkflow("onb-5", {
+			initialState: "Started",
+			data: { email: "eve@example.com", fullName: "Eve Green" },
+		});
 
 		let result = await router.dispatch(wf, {
 			type: "SubmitIdentity",
 			payload: { documentUrl: "https://docs.example.com/id.pdf" },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
+		result = await router.dispatch(result.workflow, {
 			type: "ReceiveIdentityResult",
 			payload: { success: true },
 		});
 		if (!result.ok) throw new Error();
-		wf = result.workflow;
-		expect(wf.state).toBe("IdentityVerified");
+		expect(result.workflow.state).toBe("IdentityVerified");
 
-		result = await router.dispatch(wf, {
+		// Keep reference for rollback check
+		const verifiedWf = result.workflow;
+
+		// Duplicate webhook arrives
+		result = await router.dispatch(verifiedWf, {
 			type: "ReceiveIdentityResult",
 			payload: { success: true },
 		});
@@ -909,7 +881,8 @@ describe("onboarding workflow", () => {
 			expect(result.error.code).toBe("AlreadyVerified");
 		}
 
-		expect(wf.state).toBe("IdentityVerified");
+		// Workflow unchanged (rollback)
+		expect(verifiedWf.state).toBe("IdentityVerified");
 	});
 
 	test("validation error: bad document URL in SubmitIdentity", async () => {
