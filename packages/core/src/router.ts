@@ -38,10 +38,10 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 	/** @internal */ readonly middleware: AnyMiddleware[] = [];
 	/** @internal */ readonly handlers = new Map<string, HandlerEntry>();
 
-	on<C extends CommandNames<TConfig>>(
+	on = <C extends CommandNames<TConfig>>(
 		command: C,
 		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
-	): this {
+	): this => {
 		if (fns.length === 0) throw new Error("on() requires at least a handler");
 		const handler = fns.pop() as AnyHandler;
 		const inlineMiddleware = fns as AnyMiddleware[];
@@ -50,14 +50,14 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 		};
 		this.handlers.set(command as string, { inlineMiddleware, handler: wrappedHandler });
 		return this;
-	}
+	};
 
-	use(
+	use = (
 		middleware: (ctx: Context<TConfig, TDeps, TState>, next: () => Promise<void>) => Promise<void>,
-	): this {
+	): this => {
 		this.middleware.push(middleware as AnyMiddleware);
 		return this;
-	}
+	};
 }
 
 /**
@@ -417,7 +417,14 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 					},
 				};
 			} else {
-				throw err;
+				result = {
+					ok: false as const,
+					error: {
+						category: "unexpected" as const,
+						error: err,
+						message: err instanceof Error ? err.message : String(err),
+					},
+				};
 			}
 
 			// Hook: error

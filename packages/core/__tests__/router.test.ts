@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 import { defineWorkflow } from "../src/definition.js";
 import { WorkflowRouter } from "../src/router.js";
@@ -157,6 +157,61 @@ describe("WorkflowRouter", () => {
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("domain");
 			if (result.error.category === "domain") expect(result.error.code).toBe("TitleRequired");
+		});
+	});
+
+	describe("unexpected errors", () => {
+		test("unexpected handler error returns error result with category 'unexpected'", async () => {
+			const app = new WorkflowRouter(definition, createDeps());
+			app.state("Draft", (state) => {
+				state.on("SetTitle", () => {
+					throw new TypeError("something broke");
+				});
+			});
+			const result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
+				payload: { title: "x" },
+			});
+			expect(result.ok).toBe(false);
+			if (result.ok) throw new Error();
+			expect(result.error.category).toBe("unexpected");
+			if (result.error.category === "unexpected") {
+				expect(result.error.message).toBe("something broke");
+				expect(result.error.error).toBeInstanceOf(TypeError);
+			}
+		});
+
+		test("unexpected non-Error throw returns error result", async () => {
+			const app = new WorkflowRouter(definition, createDeps());
+			app.state("Draft", (state) => {
+				state.on("SetTitle", () => {
+					throw "string error";
+				});
+			});
+			const result = await app.dispatch(wf.Draft(), {
+				type: "SetTitle",
+				payload: { title: "x" },
+			});
+			expect(result.ok).toBe(false);
+			if (result.ok) throw new Error();
+			expect(result.error.category).toBe("unexpected");
+			if (result.error.category === "unexpected") {
+				expect(result.error.message).toBe("string error");
+			}
+		});
+
+		test("dispatch:end hook fires even on unexpected errors", async () => {
+			const endHook = vi.fn();
+			const app = new WorkflowRouter(definition, createDeps());
+			app.on("dispatch:start", () => {});
+			app.on("dispatch:end", endHook);
+			app.state("Draft", (state) => {
+				state.on("SetTitle", () => {
+					throw new Error("boom");
+				});
+			});
+			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			expect(endHook).toHaveBeenCalledOnce();
 		});
 	});
 

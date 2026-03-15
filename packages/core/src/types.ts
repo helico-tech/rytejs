@@ -83,6 +83,11 @@ export type PipelineError<TConfig extends WorkflowConfig = WorkflowConfig> =
 			category: "router";
 			code: "NO_HANDLER" | "UNKNOWN_STATE";
 			message: string;
+	  }
+	| {
+			category: "unexpected";
+			error: unknown;
+			message: string;
 	  };
 
 /** Return type of {@link WorkflowRouter.dispatch}. Discriminated union on `ok`. */
