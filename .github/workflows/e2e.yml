@@ -20,7 +20,7 @@ jobs:
 
       - name: Set @rytejs/core version in E2E project
         run: |
-          cd tests/e2e
+          cd e2e
           node -e "
             const pkg = require('./package.json');
             pkg.dependencies['@rytejs/core'] = '${{ steps.version.outputs.version }}';
@@ -29,10 +29,10 @@ jobs:
 
       - name: Install E2E dependencies
         run: |
-          cd tests/e2e
+          cd e2e
           npm install
 
       - name: Run E2E tests
         run: |
-          cd tests/e2e
+          cd e2e
           npx vitest run
