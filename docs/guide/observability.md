@@ -12,10 +12,10 @@ import { createKey, definePlugin } from "@rytejs/core";
 const startTimeKey = createKey<number>("startTime");
 
 const loggingPlugin = definePlugin((router) => {
-	router.on("dispatch:start", ({ set }) => {
+	router.on("pipeline:start", ({ set }) => {
 		set(startTimeKey, Date.now());
 	});
-	router.on("dispatch:end", ({ get, command, workflow }, result) => {
+	router.on("pipeline:end", ({ get, command, workflow }, result) => {
 		const duration = Date.now() - get(startTimeKey);
 		console.log(JSON.stringify({
 			command: command.type,
@@ -27,7 +27,7 @@ const loggingPlugin = definePlugin((router) => {
 });
 ```
 
-Because `dispatch:end` is guaranteed to fire whenever `dispatch:start` fires, the duration is always recorded — even when the handler throws an unexpected error.
+Because `pipeline:end` is guaranteed to fire whenever `pipeline:start` fires, the duration is always recorded — even when the handler throws an unexpected error.
 
 ## OpenTelemetry Tracing
 
@@ -40,11 +40,11 @@ import { createKey, definePlugin } from "@rytejs/core";
 const spanKey = createKey<any>("span");
 
 const otelPlugin = definePlugin((router) => {
-	router.on("dispatch:start", ({ command, set }) => {
+	router.on("pipeline:start", ({ command, set }) => {
 		const span = tracer.startSpan(`ryte.dispatch.${command.type}`);
 		set(spanKey, span);
 	});
-	router.on("dispatch:end", ({ get }, result) => {
+	router.on("pipeline:end", ({ get }, result) => {
 		const span = get(spanKey);
 		span.setStatus({ code: result.ok ? SpanStatusCode.OK : SpanStatusCode.ERROR });
 		span.end();
@@ -81,7 +81,7 @@ const auditPlugin = definePlugin((router) => {
 });
 ```
 
-The `error` hook fires for domain and validation errors — the same errors returned in the result rather than thrown. Unexpected errors (handler throws a non-domain, non-validation error) are not captured here; use `dispatch:end` with `result.ok === false` and `result.error.category === "unexpected"` if you need those. Unexpected errors are captured as `{ category: "unexpected", error, message }` in the result, and `dispatch:end` always fires.
+The `error` hook fires for domain and validation errors — the same errors returned in the result rather than thrown. Unexpected errors (handler throws a non-domain, non-validation error) are not captured here; use `pipeline:end` with `result.ok === false` and `result.error.category === "unexpected"` if you need those. Unexpected errors are captured as `{ category: "unexpected", error, message }` in the result, and `pipeline:end` always fires.
 
 ## Metrics
 
@@ -91,7 +91,7 @@ Increments counters for every dispatch and every state transition, tagged with r
 import { definePlugin } from "@rytejs/core";
 
 const metricsPlugin = definePlugin((router) => {
-	router.on("dispatch:end", ({ command, workflow }, result) => {
+	router.on("pipeline:end", ({ command, workflow }, result) => {
 		metrics.increment("ryte.dispatch.total", {
 			command: command.type,
 			state: workflow.state,

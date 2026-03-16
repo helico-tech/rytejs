@@ -92,7 +92,7 @@ if (!result.ok && result.error.category === "unexpected") {
 }
 ```
 
-`dispatch:end` always fires even when an unexpected error occurs, so hooks and plugins that observe `dispatch:end` will always run.
+`pipeline:end` always fires even when an unexpected error occurs, so hooks and plugins that observe `pipeline:end` will always run.
 
 ### Dependency Errors
 
