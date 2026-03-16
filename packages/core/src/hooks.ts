@@ -1,9 +1,18 @@
 /** The lifecycle hook event names. */
-export type HookEvent = "dispatch:start" | "dispatch:end" | "transition" | "error" | "event";
+export type HookEvent =
+	| "dispatch:start"
+	| "dispatch:end"
+	| "pipeline:start"
+	| "pipeline:end"
+	| "transition"
+	| "error"
+	| "event";
 
 export const HOOK_EVENTS: ReadonlySet<string> = new Set<HookEvent>([
 	"dispatch:start",
 	"dispatch:end",
+	"pipeline:start",
+	"pipeline:end",
 	"transition",
 	"error",
 	"event",
