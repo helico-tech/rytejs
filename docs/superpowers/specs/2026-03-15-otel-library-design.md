@@ -39,15 +39,55 @@ type HookEvent = "dispatch:start" | "dispatch:end" | "pipeline:start" | "pipelin
 
 | Hook | Callback Signature | Has `ReadonlyContext`? |
 |---|---|---|
-| `dispatch:start` | `(workflow: Workflow, command: { type, payload }) => void` | No |
-| `dispatch:end` | `(workflow: Workflow, command: { type, payload }, result: DispatchResult) => void` | No |
+| `dispatch:start` | `(workflow: Workflow, command: { type: CommandNames, payload: unknown }) => void` | No |
+| `dispatch:end` | `(workflow: Workflow, command: { type: CommandNames, payload: unknown }, result: DispatchResult) => void` | No |
 | `pipeline:start` | `(ctx: ReadonlyContext) => void` | Yes |
 | `pipeline:end` | `(ctx: ReadonlyContext, result: DispatchResult) => void` | Yes |
 | `transition` | `(from, to, workflow) => void` | No |
 | `error` | `(error: PipelineError, ctx: ReadonlyContext) => void` | Yes |
 | `event` | `(event: { type, data }, workflow) => void` | No |
 
+Note: `dispatch:start` and `dispatch:end` receive the **original, unvalidated** command from the `dispatch()` call — `payload` is `unknown`. This differs from `pipeline:start`/`pipeline:end` where the payload has been validated through Zod. The new hooks always receive the same `(workflow, command)` pair regardless of which code path is taken, ensuring consistency.
+
 The `error` hook remains pipeline-only — it does not fire for early-return errors (UNKNOWN_STATE, command validation, NO_HANDLER). Those errors are visible via `dispatch:end`'s result.
+
+### Implementation note: `dispatch:end` guarantee
+
+The current `dispatch()` method uses bare `return` statements for early exits (UNKNOWN_STATE, command validation, NO_HANDLER). To guarantee `dispatch:end` fires after `dispatch:start`, the implementation must wrap the entire dispatch body in a `try/finally` after emitting `dispatch:start`:
+
+```ts
+async dispatch(workflow, command) {
+  await this.hookRegistry.emit("dispatch:start", ..., workflow, command);
+  try {
+    // ... validation, routing, pipeline, etc.
+    return result;
+  } finally {
+    await this.hookRegistry.emit("dispatch:end", ..., workflow, command, result);
+  }
+}
+```
+
+This also catches unexpected throws from internal methods like `getCommandSchema()`.
+
+### Migration checklist
+
+Files that must be updated for the hook rename:
+
+**Core source:**
+- `packages/core/src/hooks.ts` — `HookEvent` type (5 → 7 events), `HOOK_EVENTS` set
+- `packages/core/src/router.ts` — overload signatures (lines 201-234), emit calls (lines 370, 400, 449), add try/finally wrapper with new dispatch:start/end emits
+
+**Core tests:**
+- `packages/core/src/__tests__/hooks.test.ts` — rename `dispatch:start`/`dispatch:end` references to `pipeline:start`/`pipeline:end`, add tests for new hooks
+- `packages/core/src/__tests__/router.test.ts` — rename hook references
+- `packages/core/src/__tests__/plugin.test.ts` — rename hook references
+
+**Documentation:**
+- `docs/guide/observability.md` — all 4 example plugins use `dispatch:start`/`dispatch:end` with `ReadonlyContext` destructuring. These must be migrated to `pipeline:start`/`pipeline:end` (since the examples use context features like `{ set }`, `{ get, command, workflow }`)
+- `docs/guide/hooks-and-plugins.md` — hook event table and all examples referencing `dispatch:start`/`dispatch:end`
+
+**Testing package:**
+- `packages/testing/` — check for any hook references (unlikely but verify)
 
 ## Package Structure
 
@@ -178,7 +218,7 @@ Note: `domain` errors have no `message` field — they carry `code` and `data` o
 - **Context key:** `createKey<Span>("ryte.otel.span")` — secondary reference stored at `pipeline:start` (which receives `ReadonlyContext`). Used by the `error` hook (which receives `ReadonlyContext`) to access the span without the span map.
 - **Start time:** Stored alongside the span in the span map (as a tuple or struct), since `dispatch:start` has no context keys. Read at `dispatch:end`.
 
-The span map is set in `dispatch:start` and cleaned up in `dispatch:end` (both guaranteed to fire as a pair). For concurrent dispatches on the same workflow ID, the map entry is overwritten — this is acceptable because concurrent dispatches on the same workflow instance are not a supported pattern in @rytejs (the workflow is passed by value, and concurrent mutation would produce undefined results regardless).
+The span map is set in `dispatch:start` and cleaned up in `dispatch:end` (both guaranteed to fire as a pair). For concurrent dispatches on the same workflow ID, the map entry is overwritten — the displaced span is ended before overwriting to prevent resource leaks. Concurrent dispatches on the same workflow instance are not a supported pattern in @rytejs (the workflow is passed by value, and concurrent mutation would produce undefined results regardless), so this defensive cleanup is sufficient.
 
 ## Metrics
 
