@@ -6,6 +6,49 @@
 
 The plugin depends only on the OTEL API layer (`@opentelemetry/api`, `@opentelemetry/api-logs`). Users own their SDK setup — providers, exporters, and sampling. When no SDK is registered, all calls no-op silently per OTEL convention.
 
+## Prerequisite: Core Hook Rename
+
+This design requires a **breaking change** to `@rytejs/core`'s hook events:
+
+| Old Name | New Name | Rationale |
+|---|---|---|
+| `dispatch:start` | `pipeline:start` | Now describes when the handler pipeline begins (after validation, after context creation) |
+| `dispatch:end` | `pipeline:end` | Now describes when the handler pipeline ends |
+
+Two new hooks are added:
+
+| Hook | Signature | When |
+|---|---|---|
+| `dispatch:start` | `(workflow, command) => void` | Very top of `dispatch()`, before any validation |
+| `dispatch:end` | `(workflow, command, result) => void` | Very bottom of `dispatch()`, after everything |
+
+**Full hook lifecycle order:**
+```
+dispatch:start  →  [validation / routing]  →  pipeline:start  →  middleware + handler  →  transition / event  →  pipeline:end  →  dispatch:end
+                    ↘ (early return on error) ──────────────────────────────────────────────────────────────────────────────────↗
+```
+
+`dispatch:end` is **guaranteed** to fire if `dispatch:start` fired — including early returns from validation and routing errors. This gives the OTEL plugin full visibility over every `dispatch()` call.
+
+**Updated `HookEvent` type:**
+```ts
+type HookEvent = "dispatch:start" | "dispatch:end" | "pipeline:start" | "pipeline:end" | "transition" | "error" | "event";
+```
+
+**Hook signatures (7 total):**
+
+| Hook | Callback Signature | Has `ReadonlyContext`? |
+|---|---|---|
+| `dispatch:start` | `(workflow: Workflow, command: { type, payload }) => void` | No |
+| `dispatch:end` | `(workflow: Workflow, command: { type, payload }, result: DispatchResult) => void` | No |
+| `pipeline:start` | `(ctx: ReadonlyContext) => void` | Yes |
+| `pipeline:end` | `(ctx: ReadonlyContext, result: DispatchResult) => void` | Yes |
+| `transition` | `(from, to, workflow) => void` | No |
+| `error` | `(error: PipelineError, ctx: ReadonlyContext) => void` | Yes |
+| `event` | `(event: { type, data }, workflow) => void` | No |
+
+The `error` hook remains pipeline-only — it does not fire for early-return errors (UNKNOWN_STATE, command validation, NO_HANDLER). Those errors are visible via `dispatch:end`'s result.
+
 ## Package Structure
 
 ```
@@ -75,17 +118,18 @@ When no OTEL SDK is registered, all tracer/meter/logger calls are no-ops. No war
 
 | Hook | Action |
 |---|---|
-| `dispatch:start` | Create span, store in context key + span map, set initial attributes |
-| `transition` | Add span event `ryte.transition` (span retrieved from span map) |
-| `event` | Add span event `ryte.event` (span retrieved from span map) |
-| `error` | Add error attributes to span (span retrieved from context key) |
+| `dispatch:start` | Create span, store in span map, set initial attributes, record start time |
+| `pipeline:start` | Store span reference in context key (for `error` hook access) |
+| `transition` | Add span event `ryte.transition` (span from span map) |
+| `event` | Add span event `ryte.event` (span from span map) |
+| `error` | Add error attributes to span (span from context key) |
 | `dispatch:end` | Set span status, end span, remove from span map |
 
 ### Span naming
 
 `ryte.dispatch.{CommandType}` — e.g., `ryte.dispatch.PlaceOrder`
 
-### Span attributes (set at start)
+### Span attributes (set at dispatch:start)
 
 | Attribute | Source | Example |
 |---|---|---|
@@ -130,11 +174,11 @@ Note: `domain` errors have no `message` field — they carry `code` and `data` o
 
 **Dual storage strategy** — needed because not all hooks receive `ReadonlyContext`:
 
-- **Context key:** `createKey<Span>("ryte.otel.span")` — used by `dispatch:start`, `error`, and `dispatch:end` hooks, which receive `ReadonlyContext` and can call `ctx.get(spanKey)` / `ctx.set(spanKey, span)`.
-- **Span map:** `Map<string, Span>` keyed on `workflow.id` — used by `transition` and `event` hooks, which receive `(from, to, workflow)` and `(event, workflow)` respectively (no `ReadonlyContext`). The map is scoped to the plugin closure.
-- **Start time:** `createKey<number>("ryte.otel.startTime")` — stored via context key, only read in `dispatch:end`.
+- **Span map:** `Map<string, Span>` keyed on `workflow.id` — the primary storage. Set at `dispatch:start` (which has no `ReadonlyContext`), read by `transition` and `event` hooks (which also lack context), cleaned up at `dispatch:end`. Scoped to the plugin closure.
+- **Context key:** `createKey<Span>("ryte.otel.span")` — secondary reference stored at `pipeline:start` (which receives `ReadonlyContext`). Used by the `error` hook (which receives `ReadonlyContext`) to access the span without the span map.
+- **Start time:** Stored alongside the span in the span map (as a tuple or struct), since `dispatch:start` has no context keys. Read at `dispatch:end`.
 
-The span map is set in `dispatch:start` and cleaned up in `dispatch:end` (which is guaranteed to fire). For concurrent dispatches on the same workflow ID, the map entry is overwritten — this is acceptable because concurrent dispatches on the same workflow instance are not a supported pattern in @rytejs (the workflow is passed by value, and concurrent mutation would produce undefined results regardless).
+The span map is set in `dispatch:start` and cleaned up in `dispatch:end` (both guaranteed to fire as a pair). For concurrent dispatches on the same workflow ID, the map entry is overwritten — this is acceptable because concurrent dispatches on the same workflow instance are not a supported pattern in @rytejs (the workflow is passed by value, and concurrent mutation would produce undefined results regardless).
 
 ## Metrics
 
@@ -142,7 +186,7 @@ Three instruments from a single `Meter` named `ryte`:
 
 ### Counter: `ryte.dispatch.count`
 
-Incremented on every `dispatch:end`.
+Incremented on every `dispatch:end`. Captures **all** dispatches including early returns.
 
 | Attribute | Value |
 |---|---|
@@ -153,7 +197,7 @@ Incremented on every `dispatch:end`.
 
 ### Histogram: `ryte.dispatch.duration`
 
-Records millisecond duration on every `dispatch:end`. Uses start time from context key.
+Records millisecond duration on every `dispatch:end`. Uses start time stored in the span map.
 
 | Attribute | Value |
 |---|---|
@@ -215,18 +259,20 @@ Transitions and domain events are captured as span events in tracing. They are n
 
 `createOtelPlugin()` returns a `definePlugin(...)` that:
 
-1. Creates context keys for span and start time
-2. Creates a `Map<string, Span>` for span lookup from hooks without `ReadonlyContext`
+1. Creates a `Map<string, { span: Span, startTime: number }>` for span + timing storage
+2. Creates a context key for span reference in pipeline hooks
 3. Acquires tracer/meter/logger (from options or global OTEL API)
 4. Creates metric instruments (counters, histogram)
-5. Registers all 5 hooks:
-   - `dispatch:start` (receives `ReadonlyContext`) — create span, store in context key + span map, store start time, set initial attributes
+5. Registers all 7 hooks:
+   - `dispatch:start` (receives `workflow, command`) — create span, store in span map with start time, set initial attributes
+   - `pipeline:start` (receives `ReadonlyContext`) — store span reference in context key (for `error` hook)
    - `transition` (receives `from, to, workflow`) — look up span from span map via `workflow.id`, add span event, increment transition counter
    - `event` (receives `event, workflow`) — look up span from span map via `workflow.id`, add span event
    - `error` (receives `error, ReadonlyContext`) — retrieve span from context key, add error attributes, emit error log
-   - `dispatch:end` (receives `ReadonlyContext, result`) — retrieve span from context key, set span status, record duration, increment dispatch counter, emit dispatch log, end span, remove from span map
+   - `pipeline:end` (receives `ReadonlyContext, result`) — no action (dispatch:end handles everything)
+   - `dispatch:end` (receives `workflow, command, result`) — look up span from span map, set span status, record duration histogram, increment dispatch counter, emit dispatch log, end span, remove from span map
 
-The plugin is generic over `WorkflowConfig` and `TDeps`, matching the `definePlugin` signature. The `transition` and `event` hooks do not receive `ReadonlyContext` — they access the span via the plugin-scoped `Map<string, Span>` keyed on `workflow.id`.
+The plugin is generic over `WorkflowConfig` and `TDeps`, matching the `definePlugin` signature. Hooks without `ReadonlyContext` (`dispatch:start`, `dispatch:end`, `transition`, `event`) access the span via the plugin-scoped span map. Hooks with `ReadonlyContext` (`pipeline:start`, `error`, `pipeline:end`) can also use the context key.
 
 ## Testing Strategy
 
@@ -238,6 +284,7 @@ Each test file creates an in-memory OTEL SDK using the official `@opentelemetry/
 
 - Successful dispatch creates span with correct name, attributes, OK status
 - Failed dispatch (each of 5 error categories) creates span with ERROR status and correct error attributes
+- Early-return errors (UNKNOWN_STATE, NO_HANDLER, command validation) still create and end spans
 - Transition adds span event with from/to
 - Domain event adds span event with event type
 - Span ends even when handler throws (dispatch:end guarantee)
@@ -245,6 +292,7 @@ Each test file creates an in-memory OTEL SDK using the official `@opentelemetry/
 ### Metrics tests (`metrics.test.ts`)
 
 - Dispatch increments `ryte.dispatch.count` with correct attributes
+- Early-return errors are counted (full visibility)
 - Dispatch records `ryte.dispatch.duration` histogram (value > 0)
 - Transition increments `ryte.transition.count` with from/to
 - Error dispatches tag counter with error category
@@ -254,23 +302,33 @@ Each test file creates an in-memory OTEL SDK using the official `@opentelemetry/
 - Successful dispatch emits INFO log
 - Error dispatch emits WARN log with error details
 - Unexpected/dependency errors emit ERROR severity
+- Early-return errors emit logs via dispatch:end
 - Log attributes match span attributes for correlation
 
 ### Plugin integration tests (`plugin.test.ts`)
 
 - `createOtelPlugin()` with no config works (uses global OTEL API)
 - Custom tracer/meter/logger overrides are used when provided
-- Plugin registers on all 5 hook events
+- Plugin registers on all 7 hook events
 - Multiple dispatches create independent spans
 - No-op behavior when no SDK is registered (no errors, no output)
+
+### Core hook rename tests
+
+The core hook rename (`dispatch:start/end` → `pipeline:start/end` + new `dispatch:start/end`) needs its own tests in `packages/core`:
+
+- `dispatch:start` fires before validation (receives workflow + command)
+- `dispatch:end` fires after early returns (UNKNOWN_STATE, validation, NO_HANDLER)
+- `dispatch:end` fires after successful pipeline completion
+- `dispatch:end` fires after pipeline errors (domain, unexpected, dependency)
+- `pipeline:start` fires after context creation, before handler
+- `pipeline:end` fires after handler completion or pipeline error
+- `dispatch:start` → `dispatch:end` guarantee holds for all code paths
+- `pipeline:start` → `pipeline:end` guarantee holds once pipeline is entered
 
 ### Test utilities
 
 Use `@rytejs/testing`'s `createTestWorkflow`, `expectOk`, `expectError` for workflow setup and assertions.
-
-## Known Limitations
-
-**Early-return dispatches are invisible.** Router-level errors (`UNKNOWN_STATE`, command validation failure, `NO_HANDLER`) return before `dispatch:start` fires, so no hooks run and the plugin never sees them. This means `ryte.dispatch.count` reflects dispatches that entered the pipeline, not all `router.dispatch()` calls. This is an inherent limitation of the hook system — the plugin cannot work around it without changes to core.
 
 ## Decision Log
 
@@ -285,3 +343,4 @@ Use `@rytejs/testing`'s `createTestWorkflow`, `expectOk`, `expectError` for work
 | No SDK behavior | Silent no-ops | OTEL convention |
 | Plugin structure | Single composite | Unused signals no-op anyway |
 | Naming | `ryte.*` namespace | No OTEL semantic convention for workflow engines |
+| Hook rename | `dispatch:*` → `pipeline:*` + new `dispatch:*` | Gives OTEL full visibility including early returns; `dispatch:*` is the natural name for the entire call |
