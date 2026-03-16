@@ -100,10 +100,10 @@ const definition = defineWorkflow("hook-test", {
 });
 
 describe("router hook integration", () => {
-	test("dispatch:start fires before handler", async () => {
+	test("pipeline:start fires before handler", async () => {
 		const order: string[] = [];
 		const router = new WorkflowRouter(definition);
-		router.on("dispatch:start", () => {
+		router.on("pipeline:start", () => {
 			order.push("hook:start");
 		});
 		router.state("Draft", (state) => {
@@ -121,10 +121,10 @@ describe("router hook integration", () => {
 		expect(order).toEqual(["hook:start", "handler"]);
 	});
 
-	test("dispatch:end fires after handler with result", async () => {
+	test("pipeline:end fires after handler with result", async () => {
 		let capturedResult: unknown;
 		const router = new WorkflowRouter(definition);
-		router.on("dispatch:end", (_ctx, result) => {
+		router.on("pipeline:end", (_ctx, result) => {
 			capturedResult = result;
 		});
 		router.state("Draft", (state) => {
@@ -227,7 +227,7 @@ describe("router hook integration", () => {
 		const errors: unknown[] = [];
 		const router = new WorkflowRouter(definition, {}, { onHookError: (err) => errors.push(err) });
 		const hookError = new Error("hook broke");
-		router.on("dispatch:start", () => {
+		router.on("pipeline:start", () => {
 			throw hookError;
 		});
 		router.state("Draft", (state) => {
@@ -245,10 +245,10 @@ describe("router hook integration", () => {
 		expect(errors).toEqual([hookError]);
 	});
 
-	test("hooks do not fire on early validation/routing errors", async () => {
+	test("pipeline hooks do not fire on early validation/routing errors", async () => {
 		const startHook = vi.fn();
 		const router = new WorkflowRouter(definition);
-		router.on("dispatch:start", startHook);
+		router.on("pipeline:start", startHook);
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
 		const result = await router.dispatch(wf, {
@@ -257,5 +257,139 @@ describe("router hook integration", () => {
 		});
 		expect(result.ok).toBe(false);
 		expect(startHook).not.toHaveBeenCalled();
+	});
+
+	test("dispatch:start fires before validation", async () => {
+		let captured: { workflow: unknown; command: unknown } | undefined;
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:start", (workflow, command) => {
+			captured = { workflow, command };
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(captured).toBeDefined();
+		expect(captured!.workflow).toBe(wf);
+		expect(captured!.command).toEqual({ type: "Publish", payload: { title: "Hello" } });
+	});
+
+	test("dispatch:end fires after early return (NO_HANDLER)", async () => {
+		let capturedResult: unknown;
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:end", (_workflow, _command, result) => {
+			capturedResult = result;
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(capturedResult).toEqual(result);
+		expect(result.ok).toBe(false);
+	});
+
+	test("dispatch:end fires after early return (UNKNOWN_STATE)", async () => {
+		let hookFired = false;
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:end", () => {
+			hookFired = true;
+		});
+
+		// biome-ignore lint/suspicious/noExplicitAny: intentionally creating invalid workflow
+		const badWf = {
+			id: "x",
+			definitionName: "hook-test",
+			state: "nonexistent",
+			data: {},
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as any;
+		await router.dispatch(badWf, { type: "Publish", payload: { title: "Hello" } });
+		expect(hookFired).toBe(true);
+	});
+
+	test("dispatch:end fires after early return (command validation)", async () => {
+		let hookFired = false;
+		const router = new WorkflowRouter(definition);
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", { title: ctx.command.payload.title, publishedAt: new Date() });
+			});
+		});
+		router.on("dispatch:end", () => {
+			hookFired = true;
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid payload
+		await router.dispatch(wf, { type: "Publish", payload: {} as any });
+		expect(hookFired).toBe(true);
+	});
+
+	test("dispatch:end fires after successful pipeline", async () => {
+		let capturedResult: unknown;
+		const router = new WorkflowRouter(definition);
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", { title: ctx.command.payload.title, publishedAt: new Date() });
+			});
+		});
+		router.on("dispatch:end", (_workflow, _command, result) => {
+			capturedResult = result;
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(capturedResult).toEqual(result);
+		expect(result.ok).toBe(true);
+	});
+
+	test("dispatch:end fires after pipeline errors (unexpected)", async () => {
+		let capturedResult: unknown;
+		const router = new WorkflowRouter(definition);
+		router.state("Draft", (state) => {
+			state.on("Publish", () => {
+				throw new Error("boom");
+			});
+		});
+		router.on("dispatch:end", (_workflow, _command, result) => {
+			capturedResult = result;
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(capturedResult).toEqual(result);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.category).toBe("unexpected");
+	});
+
+	test("dispatch:start fires before pipeline:start", async () => {
+		const order: string[] = [];
+		const router = new WorkflowRouter(definition);
+		router.on("dispatch:start", () => order.push("dispatch:start"));
+		router.on("pipeline:start", () => order.push("pipeline:start"));
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", { title: ctx.command.payload.title, publishedAt: new Date() });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(order).toEqual(["dispatch:start", "pipeline:start"]);
+	});
+
+	test("pipeline:end fires before dispatch:end", async () => {
+		const order: string[] = [];
+		const router = new WorkflowRouter(definition);
+		router.on("pipeline:end", () => order.push("pipeline:end"));
+		router.on("dispatch:end", () => order.push("dispatch:end"));
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", { title: ctx.command.payload.title, publishedAt: new Date() });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(order).toEqual(["pipeline:end", "dispatch:end"]);
 	});
 });

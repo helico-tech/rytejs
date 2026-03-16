@@ -41,10 +41,10 @@ describe("router.use() with plugins", () => {
 		const log: string[] = [];
 		const loggingPlugin = definePlugin<typeof definition.config, Record<string, never>>(
 			(router) => {
-				router.on("dispatch:start", () => {
+				router.on("pipeline:start", () => {
 					log.push("plugin:start");
 				});
-				router.on("dispatch:end", () => {
+				router.on("pipeline:end", () => {
 					log.push("plugin:end");
 				});
 			},

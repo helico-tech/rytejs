@@ -200,11 +200,11 @@ describe("WorkflowRouter", () => {
 			}
 		});
 
-		test("dispatch:end hook fires even on unexpected errors", async () => {
+		test("pipeline:end hook fires even on unexpected errors", async () => {
 			const endHook = vi.fn();
 			const app = new WorkflowRouter(definition, createDeps());
-			app.on("dispatch:start", () => {});
-			app.on("dispatch:end", endHook);
+			app.on("pipeline:start", () => {});
+			app.on("pipeline:end", endHook);
 			app.state("Draft", (state) => {
 				state.on("SetTitle", () => {
 					throw new Error("boom");
@@ -673,7 +673,7 @@ describe("WorkflowRouter", () => {
 			}
 		});
 
-		test("dispatch:end hook fires on dependency error", async () => {
+		test("pipeline:end hook fires on dependency error", async () => {
 			const deps = {
 				db: {
 					save: () => {
@@ -688,7 +688,7 @@ describe("WorkflowRouter", () => {
 				});
 			});
 			let hookFired = false;
-			router.on("dispatch:end", () => {
+			router.on("pipeline:end", () => {
 				hookFired = true;
 			});
 
