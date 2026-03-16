@@ -43,7 +43,7 @@ pnpm biome check --fix .                  # autofix
 ## CRITICAL Rules
 
 - **NEVER use `any` in consumer-facing types.** Internal `any` is OK with a `biome-ignore` comment explaining why. Use `unknown` or proper generics instead.
-- **StateBuilder methods are arrow functions.** `({ on, use }) =>` destructuring works and is the documented style. NEVER convert them to regular methods.
+- **StateBuilder methods are bound in the constructor.** `on` and `use` are regular methods (for better IDE generic inference) with `this.on = this.on.bind(this)` in the constructor, so `({ on, use }) =>` destructuring still works.
 - **dispatch() never throws.** All errors (including unexpected handler errors) are caught and returned as `{ ok: false, error: { category: "unexpected" } }`. The `dispatch:end` hook MUST always fire if `dispatch:start` fired.
 - **Build core before running testing package tests.** The testing package imports from `@rytejs/core` dist, not source. Run `cd packages/core && npx tsup` after changing core source.
 - **Git push after every task.** Don't batch pushes.
