@@ -121,7 +121,6 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				);
 			}
 			const now = new Date();
-			// biome-ignore lint/suspicious/noExplicitAny: narrowed by the public overload's generic S parameter
 			return {
 				id,
 				definitionName: name,
@@ -129,6 +128,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				data: result.data,
 				createdAt: now,
 				updatedAt: now,
+				// biome-ignore lint/suspicious/noExplicitAny: narrowed by the public overload's generic S parameter
 			} as any;
 		},
 
