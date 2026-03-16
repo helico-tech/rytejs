@@ -364,8 +364,8 @@ describe("router hook integration", () => {
 	test("dispatch:start fires before pipeline:start", async () => {
 		const order: string[] = [];
 		const router = new WorkflowRouter(definition);
-		router.on("dispatch:start", () => order.push("dispatch:start"));
-		router.on("pipeline:start", () => order.push("pipeline:start"));
+		router.on("dispatch:start", (_wf, _cmd) => order.push("dispatch:start"));
+		router.on("pipeline:start", (_ctx) => order.push("pipeline:start"));
 		router.state("Draft", (state) => {
 			state.on("Publish", (ctx) => {
 				ctx.transition("Published", { title: ctx.command.payload.title, publishedAt: new Date() });
@@ -380,8 +380,8 @@ describe("router hook integration", () => {
 	test("pipeline:end fires before dispatch:end", async () => {
 		const order: string[] = [];
 		const router = new WorkflowRouter(definition);
-		router.on("pipeline:end", () => order.push("pipeline:end"));
-		router.on("dispatch:end", () => order.push("dispatch:end"));
+		router.on("pipeline:end", (_ctx, _result) => order.push("pipeline:end"));
+		router.on("dispatch:end", (_wf, _cmd, _result) => order.push("dispatch:end"));
 		router.state("Draft", (state) => {
 			state.on("Publish", (ctx) => {
 				ctx.transition("Published", { title: ctx.command.payload.title, publishedAt: new Date() });
