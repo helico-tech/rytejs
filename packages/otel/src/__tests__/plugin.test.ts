@@ -1,4 +1,3 @@
-import { trace } from "@opentelemetry/api";
 import {
 	BasicTracerProvider,
 	InMemorySpanExporter,

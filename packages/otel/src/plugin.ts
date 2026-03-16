@@ -1,9 +1,9 @@
-import type { Meter, Span, Tracer } from "@opentelemetry/api";
+import type { Meter, Tracer } from "@opentelemetry/api";
 import { metrics, trace } from "@opentelemetry/api";
 import type { Logger } from "@opentelemetry/api-logs";
 import { logs } from "@opentelemetry/api-logs";
 import type { Plugin, WorkflowConfig } from "@rytejs/core";
-import { createKey, definePlugin } from "@rytejs/core";
+import { definePlugin } from "@rytejs/core";
 import { SCOPE_NAME } from "./conventions.js";
 import { emitDispatchLog, emitErrorLog } from "./logging.js";
 import { createInstruments, recordDispatch, recordTransition } from "./metrics.js";
@@ -30,9 +30,7 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 	const logger = options?.logger ?? logs.getLogger(SCOPE_NAME);
 	const instruments = createInstruments(meter);
 	const spanMap = new Map<string, SpanEntry>();
-	const spanKey = createKey<Span>("ryte.otel.span");
 
-	// biome-ignore lint/suspicious/noExplicitAny: plugin hooks only use base Workflow/DispatchResult types — safe to erase config
 	return definePlugin<WorkflowConfig, unknown>((router) => {
 		router.on("dispatch:start", (workflow, command) => {
 			const existing = spanMap.get(workflow.id);
@@ -42,13 +40,6 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 			const span = tracer.startSpan(spanName(command.type as string));
 			setSpanAttributes(span, workflow, command as { type: string; payload: unknown });
 			spanMap.set(workflow.id, { span, startTime: Date.now() });
-		});
-
-		router.on("pipeline:start", (ctx) => {
-			const entry = spanMap.get(ctx.workflow.id);
-			if (entry) {
-				ctx.set(spanKey, entry.span);
-			}
 		});
 
 		router.on("transition", (from, to, workflow) => {

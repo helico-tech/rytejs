@@ -344,7 +344,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			};
 		} finally {
 			// Hook: dispatch:end (guaranteed to fire if dispatch:start fired)
-			// biome-ignore lint/correctness/noUnsafeFinally: result is always assigned — either by try or catch
+			// biome-ignore lint/style/noNonNullAssertion: result is always assigned — either by try or catch
 			await this.hookRegistry.emit("dispatch:end", this.onHookError, workflow, command, result!);
 		}
 		return result;
