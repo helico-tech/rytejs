@@ -40,10 +40,26 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 	/** @internal */ readonly middleware: AnyMiddleware[] = [];
 	/** @internal */ readonly handlers = new Map<string, HandlerEntry>();
 
-	on = <C extends CommandNames<TConfig>>(
+	constructor() {
+		this.on = this.on.bind(this);
+		this.use = this.use.bind(this);
+	}
+
+	// Overload 1: handler only (no middleware) — covers 90% of usage
+	on<C extends CommandNames<TConfig>>(
+		command: C,
+		handler: (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>,
+	): this;
+	// Overload 2: middleware + handler (variadic)
+	on<C extends CommandNames<TConfig>>(
 		command: C,
 		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
-	): this => {
+	): this;
+	// Implementation
+	on<C extends CommandNames<TConfig>>(
+		command: C,
+		...fns: [...AnyMiddleware[], (ctx: Context<TConfig, TDeps, TState, C>) => void | Promise<void>]
+	): this {
 		if (fns.length === 0) throw new Error("on() requires at least a handler");
 		const handler = fns.pop() as AnyHandler;
 		const inlineMiddleware = fns as AnyMiddleware[];
@@ -52,14 +68,14 @@ class StateBuilder<TConfig extends WorkflowConfig, TDeps, TState extends StateNa
 		};
 		this.handlers.set(command as string, { inlineMiddleware, handler: wrappedHandler });
 		return this;
-	};
+	}
 
-	use = (
+	use(
 		middleware: (ctx: Context<TConfig, TDeps, TState>, next: () => Promise<void>) => Promise<void>,
-	): this => {
+	): this {
 		this.middleware.push(middleware as AnyMiddleware);
 		return this;
-	};
+	}
 }
 
 /**
@@ -236,7 +252,18 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	 * Registers a wildcard handler that matches any state.
 	 * @param state - Must be `"*"` to match all states
 	 * @param command - The command name to handle
-	 * @param fns - Optional inline middleware followed by the terminal handler
+	 * @param handler - The terminal handler
+	 */
+	on<C extends CommandNames<TConfig>>(
+		state: "*",
+		command: C,
+		handler: (ctx: Context<TConfig, TDeps, StateNames<TConfig>, C>) => void | Promise<void>,
+	): this;
+	/**
+	 * Registers a wildcard handler that matches any state, with inline middleware.
+	 * @param state - Must be `"*"` to match all states
+	 * @param command - The command name to handle
+	 * @param fns - Inline middleware followed by the terminal handler
 	 */
 	on<C extends CommandNames<TConfig>>(
 		state: "*",
