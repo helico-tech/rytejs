@@ -1,6 +1,6 @@
 {
 	"name": "@rytejs/core",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"description": "Type-safe workflow engine with Zod validation and middleware pipelines",
 	"license": "MIT",
 	"type": "module",
