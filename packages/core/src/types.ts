@@ -40,29 +40,28 @@ export type CommandNames<T extends WorkflowConfig> = keyof T["commands"] & strin
 export type EventNames<T extends WorkflowConfig> = keyof T["events"] & string;
 export type ErrorCodes<T extends WorkflowConfig> = keyof T["errors"] & string;
 
+/** Forces TypeScript to flatten a type for better IDE autocomplete. */
+type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
 /** Resolves the data type for a given state from pre-computed types. */
-export type StateData<
-	T extends WorkflowConfig,
-	S extends StateNames<T>,
-> = T["_resolved"]["states"][S];
+export type StateData<T extends WorkflowConfig, S extends StateNames<T>> = Prettify<
+	T["_resolved"]["states"][S]
+>;
 
 /** Resolves the payload type for a given command from pre-computed types. */
-export type CommandPayload<
-	T extends WorkflowConfig,
-	C extends CommandNames<T>,
-> = T["_resolved"]["commands"][C];
+export type CommandPayload<T extends WorkflowConfig, C extends CommandNames<T>> = Prettify<
+	T["_resolved"]["commands"][C]
+>;
 
 /** Resolves the data type for a given event from pre-computed types. */
-export type EventData<
-	T extends WorkflowConfig,
-	E extends EventNames<T>,
-> = T["_resolved"]["events"][E];
+export type EventData<T extends WorkflowConfig, E extends EventNames<T>> = Prettify<
+	T["_resolved"]["events"][E]
+>;
 
 /** Resolves the data type for a given error code from pre-computed types. */
-export type ErrorData<
-	T extends WorkflowConfig,
-	C extends ErrorCodes<T>,
-> = T["_resolved"]["errors"][C];
+export type ErrorData<T extends WorkflowConfig, C extends ErrorCodes<T>> = Prettify<
+	T["_resolved"]["errors"][C]
+>;
 
 /** Workflow narrowed to a specific known state. */
 export interface WorkflowOf<TConfig extends WorkflowConfig, S extends StateNames<TConfig>> {

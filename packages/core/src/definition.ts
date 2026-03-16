@@ -219,7 +219,8 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 					createdAt: new Date(snap.createdAt),
 					updatedAt: new Date(snap.updatedAt),
 				},
-			};
+				// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
+			} as any;
 		},
 	};
 }
