@@ -6,21 +6,21 @@
 
 ## Commands
 
-Use `pnpm` for workspace-level commands, `npx` for per-package tools.
+Use `pnpm` for all commands.
 
 ```bash
 # Full check (workspace-level, uses turbo)
 pnpm run check                            # typecheck + test + lint
 
-# Per-package (use npx, NOT pnpm — these are not workspace scripts)
-cd packages/core && npx vitest run        # 149 tests
-cd packages/testing && npx vitest run     # 29 tests
-cd packages/core && npx tsc --noEmit      # typecheck
-cd packages/core && npx tsup              # build dist (REQUIRED before testing package tests)
+# Per-package (use --filter from workspace root)
+pnpm --filter @rytejs/core vitest run     # 149 tests
+pnpm --filter @rytejs/testing vitest run  # 29 tests
+pnpm --filter @rytejs/core tsc --noEmit   # typecheck
+pnpm --filter @rytejs/core tsup           # build dist (REQUIRED before testing package tests)
 
 # Lint
-npx biome check .                         # check
-npx biome check --fix .                   # autofix
+pnpm biome check .                        # check
+pnpm biome check --fix .                  # autofix
 ```
 
 ## Architecture
