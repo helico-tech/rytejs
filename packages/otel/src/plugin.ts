@@ -1,8 +1,11 @@
 import type { Meter, Span, Tracer } from "@opentelemetry/api";
 import { metrics, trace } from "@opentelemetry/api";
+import type { Logger } from "@opentelemetry/api-logs";
+import { logs } from "@opentelemetry/api-logs";
 import type { Plugin, WorkflowConfig } from "@rytejs/core";
 import { createKey, definePlugin } from "@rytejs/core";
 import { SCOPE_NAME } from "./conventions.js";
+import { emitDispatchLog, emitErrorLog } from "./logging.js";
 import { createInstruments, recordDispatch, recordTransition } from "./metrics.js";
 import {
 	addDomainEventEvent,
@@ -16,6 +19,7 @@ import {
 export interface OtelPluginOptions {
 	tracer?: Tracer;
 	meter?: Meter;
+	logger?: Logger;
 }
 
 export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig, TDeps = unknown>(
@@ -23,6 +27,7 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 ): Plugin<TConfig, TDeps> {
 	const tracer = options?.tracer ?? trace.getTracer(SCOPE_NAME);
 	const meter = options?.meter ?? metrics.getMeter(SCOPE_NAME);
+	const logger = options?.logger ?? logs.getLogger(SCOPE_NAME);
 	const instruments = createInstruments(meter);
 	const spanMap = new Map<string, SpanEntry>();
 	const spanKey = createKey<Span>("ryte.otel.span");
@@ -61,9 +66,8 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 			}
 		});
 
-		router.on("error", (_error, _ctx) => {
-			// Error attributes are set when span ends in dispatch:end
-			// The error hook provides early visibility but endSpan handles all cases
+		router.on("error", (error, _ctx) => {
+			emitErrorLog(logger, error);
 		});
 
 		router.on("dispatch:end", (workflow, command, result) => {
@@ -71,6 +75,14 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 			if (entry) {
 				const durationMs = Date.now() - entry.startTime;
 				recordDispatch(instruments, command.type as string, workflow.state, durationMs, result);
+				emitDispatchLog(
+					logger,
+					command.type as string,
+					workflow.id,
+					workflow.state,
+					durationMs,
+					result,
+				);
 				endSpan(entry.span, result);
 				spanMap.delete(workflow.id);
 			}
