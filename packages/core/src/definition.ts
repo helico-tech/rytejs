@@ -1,6 +1,13 @@
 import type { ZodType, z } from "zod";
 import type { WorkflowSnapshot } from "./snapshot.js";
-import type { StateNames, Workflow, WorkflowConfig, WorkflowOf } from "./types.js";
+import type {
+	StateData,
+	StateNames,
+	Workflow,
+	WorkflowConfig,
+	WorkflowConfigInput,
+	WorkflowOf,
+} from "./types.js";
 import { ValidationError } from "./types.js";
 
 /**
@@ -20,7 +27,7 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	 */
 	createWorkflow<S extends StateNames<TConfig>>(
 		id: string,
-		config: { initialState: S; data: z.infer<TConfig["states"][S]> },
+		config: { initialState: S; data: StateData<TConfig, S> },
 	): WorkflowOf<TConfig, S>;
 	/**
 	 * Returns the Zod schema for a given state name.
@@ -81,24 +88,40 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
  * @param config - Object with `states`, `commands`, `events`, `errors` — each a record of Zod schemas
  * @returns A {@link WorkflowDefinition} with methods for creating instances and accessing schemas
  */
-export function defineWorkflow<const TConfig extends WorkflowConfig>(
+// Zod v4 uses conditional types for z.infer which TypeScript defers in deep
+// generic chains, breaking IDE completion. We pre-compute all inferred types
+// at this call site (where TConfig is concrete) and attach them as _resolved,
+// so downstream utility types can use direct indexed access instead.
+export function defineWorkflow<const TConfig extends WorkflowConfigInput>(
 	name: string,
 	config: TConfig,
-): WorkflowDefinition<TConfig> {
+): WorkflowDefinition<
+	TConfig & {
+		_resolved: {
+			states: { [K in keyof TConfig["states"]]: z.infer<TConfig["states"][K]> };
+			commands: { [K in keyof TConfig["commands"]]: z.infer<TConfig["commands"][K]> };
+			events: { [K in keyof TConfig["events"]]: z.infer<TConfig["events"][K]> };
+			errors: { [K in keyof TConfig["errors"]]: z.infer<TConfig["errors"][K]> };
+		};
+	}
+>;
+// biome-ignore lint/suspicious/noExplicitAny: implementation overload — public signature above provides consumer-facing type safety; internally TConfig extends WorkflowConfigInput which lacks _resolved
+export function defineWorkflow(name: string, config: WorkflowConfigInput): WorkflowDefinition<any> {
 	return {
 		config,
 		name,
 
-		createWorkflow(id, wfConfig) {
-			const schema = config.states[wfConfig.initialState as string];
-			if (!schema) throw new Error(`Unknown state: ${wfConfig.initialState as string}`);
+		createWorkflow(id: string, wfConfig: { initialState: string; data: unknown }) {
+			const schema = config.states[wfConfig.initialState];
+			if (!schema) throw new Error(`Unknown state: ${wfConfig.initialState}`);
 			const result = schema.safeParse(wfConfig.data);
 			if (!result.success) {
 				throw new Error(
-					`Invalid initial data for state '${wfConfig.initialState as string}': ${result.error.issues.map((i) => i.message).join(", ")}`,
+					`Invalid initial data for state '${wfConfig.initialState}': ${result.error.issues.map((i) => i.message).join(", ")}`,
 				);
 			}
 			const now = new Date();
+			// biome-ignore lint/suspicious/noExplicitAny: narrowed by the public overload's generic S parameter
 			return {
 				id,
 				definitionName: name,
@@ -106,7 +129,7 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 				data: result.data,
 				createdAt: now,
 				updatedAt: now,
-			} as WorkflowOf<TConfig, typeof wfConfig.initialState>;
+			} as any;
 		},
 
 		getStateSchema(stateName: string): ZodType {
@@ -137,7 +160,13 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 			return stateName in config.states;
 		},
 
-		snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig> {
+		snapshot(workflow: {
+			id: string;
+			state: string;
+			data: unknown;
+			createdAt: Date;
+			updatedAt: Date;
+		}) {
 			return {
 				id: workflow.id,
 				definitionName: name,
@@ -146,13 +175,18 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 				createdAt: workflow.createdAt.toISOString(),
 				updatedAt: workflow.updatedAt.toISOString(),
 				modelVersion: config.modelVersion ?? 1,
-			} as WorkflowSnapshot<TConfig>;
+			};
 		},
 
-		restore(
-			snap: WorkflowSnapshot<TConfig>,
-		): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError } {
-			const stateSchema = config.states[snap.state as string];
+		restore(snap: {
+			id: string;
+			definitionName: string;
+			state: string;
+			data: unknown;
+			createdAt: string;
+			updatedAt: string;
+		}) {
+			const stateSchema = config.states[snap.state];
 			if (!stateSchema) {
 				return {
 					ok: false,
@@ -184,7 +218,7 @@ export function defineWorkflow<const TConfig extends WorkflowConfig>(
 					data: result.data,
 					createdAt: new Date(snap.createdAt),
 					updatedAt: new Date(snap.updatedAt),
-				} as Workflow<TConfig>,
+				},
 			};
 		},
 	};

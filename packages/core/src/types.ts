@@ -2,8 +2,9 @@ import type { ZodType, z } from "zod";
 
 /**
  * Shape of the configuration object passed to {@link defineWorkflow}.
+ * Exported for internal package use only — not re-exported from index.ts.
  */
-export interface WorkflowConfig {
+export interface WorkflowConfigInput {
 	/** Optional version number for schema migrations. Defaults to 1. */
 	modelVersion?: number;
 	/** Record of state names to Zod schemas defining their data shape. */
@@ -16,34 +17,52 @@ export interface WorkflowConfig {
 	errors: Record<string, ZodType>;
 }
 
+/**
+ * Workflow configuration with pre-resolved types for IDE completion.
+ *
+ * Extends {@link WorkflowConfigInput} with a `_resolved` phantom type that
+ * caches `z.infer` results. This exists because Zod v4's `z.infer` uses
+ * conditional types that TypeScript defers in deep generic chains, breaking
+ * IDE autocomplete. The `_resolved` property is never set at runtime — it is
+ * populated at the type level by {@link defineWorkflow}'s return type.
+ */
+export interface WorkflowConfig extends WorkflowConfigInput {
+	_resolved: {
+		states: Record<string, unknown>;
+		commands: Record<string, unknown>;
+		events: Record<string, unknown>;
+		errors: Record<string, unknown>;
+	};
+}
+
 export type StateNames<T extends WorkflowConfig> = keyof T["states"] & string;
 export type CommandNames<T extends WorkflowConfig> = keyof T["commands"] & string;
 export type EventNames<T extends WorkflowConfig> = keyof T["events"] & string;
 export type ErrorCodes<T extends WorkflowConfig> = keyof T["errors"] & string;
 
-/** Infers the data type for a given state. */
+/** Resolves the data type for a given state from pre-computed types. */
 export type StateData<
 	T extends WorkflowConfig,
 	S extends StateNames<T>,
-> = T["states"][S] extends ZodType ? z.infer<T["states"][S]> : never;
+> = T["_resolved"]["states"][S];
 
-/** Infers the payload type for a given command. */
+/** Resolves the payload type for a given command from pre-computed types. */
 export type CommandPayload<
 	T extends WorkflowConfig,
 	C extends CommandNames<T>,
-> = T["commands"][C] extends ZodType ? z.infer<T["commands"][C]> : never;
+> = T["_resolved"]["commands"][C];
 
-/** Infers the data type for a given event. */
+/** Resolves the data type for a given event from pre-computed types. */
 export type EventData<
 	T extends WorkflowConfig,
 	E extends EventNames<T>,
-> = T["events"][E] extends ZodType ? z.infer<T["events"][E]> : never;
+> = T["_resolved"]["events"][E];
 
-/** Infers the data type for a given error code. */
+/** Resolves the data type for a given error code from pre-computed types. */
 export type ErrorData<
 	T extends WorkflowConfig,
 	C extends ErrorCodes<T>,
-> = T["errors"][C] extends ZodType ? z.infer<T["errors"][C]> : never;
+> = T["_resolved"]["errors"][C];
 
 /** Workflow narrowed to a specific known state. */
 export interface WorkflowOf<TConfig extends WorkflowConfig, S extends StateNames<TConfig>> {
