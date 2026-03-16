@@ -101,3 +101,7 @@ These are errors that have actually happened in this codebase. Read before writi
 
 ### Internal exports
 - **Only export what consumers need.** `HookRegistry`, `HOOK_EVENTS`, `NormalizedMigration` are internal. Check `index.ts` after subagents modify it.
+
+### IDE autocomplete and variadic tuples
+- **JetBrains IDEs (WebStorm/IntelliJ) can't infer generic parameters on arrow function class properties with variadic tuple rest params.** The fix: convert to regular methods (WebStorm uses a faster generic inference path for methods) and add a non-variadic overload for the common case (e.g. handler-only, no middleware). Use `this.method = this.method.bind(this)` in the constructor to preserve destructuring support.
+- **Always add a simple overload above variadic ones.** IDEs try overloads in order — a trivial `(command, handler)` signature resolves instantly without variadic inference.
