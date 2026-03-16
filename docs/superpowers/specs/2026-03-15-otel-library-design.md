@@ -78,9 +78,9 @@ Files that must be updated for the hook rename:
 - `packages/core/src/router.ts` — overload signatures (lines 201-234), emit calls (lines 370, 400, 449), add try/finally wrapper with new dispatch:start/end emits
 
 **Core tests:**
-- `packages/core/src/__tests__/hooks.test.ts` — rename `dispatch:start`/`dispatch:end` references to `pipeline:start`/`pipeline:end`, add tests for new hooks
-- `packages/core/src/__tests__/router.test.ts` — rename hook references
-- `packages/core/src/__tests__/plugin.test.ts` — rename hook references
+- `packages/core/__tests__/hooks.test.ts` — rename `dispatch:start`/`dispatch:end` references to `pipeline:start`/`pipeline:end`, add tests for new hooks
+- `packages/core/__tests__/router.test.ts` — rename hook references
+- `packages/core/__tests__/plugin.test.ts` — rename hook references
 
 **Documentation:**
 - `docs/guide/observability.md` — all 4 example plugins use `dispatch:start`/`dispatch:end` with `ReadonlyContext` destructuring. These must be migrated to `pipeline:start`/`pipeline:end` (since the examples use context features like `{ set }`, `{ get, command, workflow }`)
