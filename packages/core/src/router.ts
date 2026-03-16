@@ -217,10 +217,25 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	 */
 	on(
 		event: "dispatch:start",
-		callback: (ctx: ReadonlyContext<TConfig, TDeps>) => void | Promise<void>,
+		callback: (
+			workflow: Workflow<TConfig>,
+			command: { type: CommandNames<TConfig>; payload: unknown },
+		) => void | Promise<void>,
 	): this;
 	on(
 		event: "dispatch:end",
+		callback: (
+			workflow: Workflow<TConfig>,
+			command: { type: CommandNames<TConfig>; payload: unknown },
+			result: DispatchResult<TConfig>,
+		) => void | Promise<void>,
+	): this;
+	on(
+		event: "pipeline:start",
+		callback: (ctx: ReadonlyContext<TConfig, TDeps>) => void | Promise<void>,
+	): this;
+	on(
+		event: "pipeline:end",
 		callback: (
 			ctx: ReadonlyContext<TConfig, TDeps>,
 			result: DispatchResult<TConfig>,
@@ -312,6 +327,33 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		workflow: Workflow<TConfig>,
 		command: { type: CommandNames<TConfig>; payload: unknown },
 	): Promise<DispatchResult<TConfig>> {
+		// Hook: dispatch:start (fires before any validation)
+		await this.hookRegistry.emit("dispatch:start", this.onHookError, workflow, command);
+
+		let result: DispatchResult<TConfig>;
+		try {
+			result = await this.executePipeline(workflow, command);
+		} catch (err) {
+			result = {
+				ok: false as const,
+				error: {
+					category: "unexpected" as const,
+					error: err,
+					message: err instanceof Error ? err.message : String(err),
+				},
+			};
+		} finally {
+			// Hook: dispatch:end (guaranteed to fire if dispatch:start fired)
+			// biome-ignore lint/correctness/noUnsafeFinally: result is always assigned — either by try or catch
+			await this.hookRegistry.emit("dispatch:end", this.onHookError, workflow, command, result!);
+		}
+		return result;
+	}
+
+	private async executePipeline(
+		workflow: Workflow<TConfig>,
+		command: { type: CommandNames<TConfig>; payload: unknown },
+	): Promise<DispatchResult<TConfig>> {
 		if (!this.definition.hasState(workflow.state)) {
 			return {
 				ok: false,
@@ -393,8 +435,8 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			{ wrapDeps: this.wrapDeps },
 		);
 
-		// Hook: dispatch:start
-		await this.hookRegistry.emit("dispatch:start", this.onHookError, ctx);
+		// Hook: pipeline:start
+		await this.hookRegistry.emit("pipeline:start", this.onHookError, ctx);
 
 		try {
 			const composed = compose(chain);
@@ -423,8 +465,8 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 				}
 			}
 
-			// Hook: dispatch:end
-			await this.hookRegistry.emit("dispatch:end", this.onHookError, ctx, result);
+			// Hook: pipeline:end
+			await this.hookRegistry.emit("pipeline:end", this.onHookError, ctx, result);
 
 			return result;
 		} catch (err) {
@@ -472,8 +514,8 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 			// Hook: error
 			await this.hookRegistry.emit("error", this.onHookError, result.error, ctx);
 
-			// Hook: dispatch:end
-			await this.hookRegistry.emit("dispatch:end", this.onHookError, ctx, result);
+			// Hook: pipeline:end
+			await this.hookRegistry.emit("pipeline:end", this.onHookError, ctx, result);
 
 			return result;
 		}
