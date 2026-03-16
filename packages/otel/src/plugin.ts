@@ -1,11 +1,8 @@
 import type { Meter, Tracer } from "@opentelemetry/api";
 import { metrics, trace } from "@opentelemetry/api";
-import type { Logger } from "@opentelemetry/api-logs";
-import { logs } from "@opentelemetry/api-logs";
 import type { Plugin, WorkflowConfig } from "@rytejs/core";
 import { definePlugin } from "@rytejs/core";
 import { SCOPE_NAME } from "./conventions.js";
-import { emitDispatchLog, emitErrorLog } from "./logging.js";
 import { createInstruments, recordDispatch, recordTransition } from "./metrics.js";
 import {
 	addDomainEventEvent,
@@ -19,7 +16,6 @@ import {
 export interface OtelPluginOptions {
 	tracer?: Tracer;
 	meter?: Meter;
-	logger?: Logger;
 }
 
 export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig, TDeps = unknown>(
@@ -27,7 +23,6 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 ): Plugin<TConfig, TDeps> {
 	const tracer = options?.tracer ?? trace.getTracer(SCOPE_NAME);
 	const meter = options?.meter ?? metrics.getMeter(SCOPE_NAME);
-	const logger = options?.logger ?? logs.getLogger(SCOPE_NAME);
 	const instruments = createInstruments(meter);
 	const spanMap = new Map<string, SpanEntry>();
 
@@ -57,23 +52,11 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 			}
 		});
 
-		router.on("error", (error, _ctx) => {
-			emitErrorLog(logger, error);
-		});
-
 		router.on("dispatch:end", (workflow, command, result) => {
 			const entry = spanMap.get(workflow.id);
 			if (entry) {
 				const durationMs = Date.now() - entry.startTime;
 				recordDispatch(instruments, command.type as string, workflow.state, durationMs, result);
-				emitDispatchLog(
-					logger,
-					command.type as string,
-					workflow.id,
-					workflow.state,
-					durationMs,
-					result,
-				);
 				endSpan(entry.span, result);
 				spanMap.delete(workflow.id);
 			}

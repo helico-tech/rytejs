@@ -15,7 +15,6 @@ export const ATTR_ERROR_MESSAGE = "ryte.error.message";
 export const ATTR_TRANSITION_FROM = "ryte.transition.from";
 export const ATTR_TRANSITION_TO = "ryte.transition.to";
 export const ATTR_EVENT_TYPE = "ryte.event.type";
-export const ATTR_DISPATCH_DURATION_MS = "ryte.dispatch.duration_ms";
 
 // Span event names
 export const SPAN_EVENT_TRANSITION = "ryte.transition";
