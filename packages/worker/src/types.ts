@@ -85,9 +85,7 @@ export interface WorkerHookRegistry {
 	on<E extends WorkerHookEvent>(event: E, callback: (payload: WorkerHookPayloads[E]) => void): void;
 }
 
-export type WorkerPlugin = {
+export interface WorkerPlugin {
 	(hooks: WorkerHookRegistry): void;
-	readonly __brand: typeof WORKER_PLUGIN_BRAND;
-};
-
-declare const WORKER_PLUGIN_BRAND: unique symbol;
+	readonly __brand: "@rytejs/worker/plugin";
+}

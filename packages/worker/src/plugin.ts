@@ -1,6 +1,6 @@
 import type { WorkerHookRegistry, WorkerPlugin } from "./types.js";
 
-const WORKER_PLUGIN_BRAND = Symbol.for("@rytejs/worker/plugin");
+const WORKER_PLUGIN_BRAND = "@rytejs/worker/plugin" as const;
 
 export function defineWorkerPlugin(fn: (hooks: WorkerHookRegistry) => void): WorkerPlugin {
 	const plugin = fn as WorkerPlugin;
