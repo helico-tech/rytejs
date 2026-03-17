@@ -14,25 +14,7 @@ IO (read)  →  Domain (dispatch)  →  IO (write)
 2. **Domain:** Dispatch the command — pure logic, no IO
 3. **IO out:** Persist the updated workflow, publish events, send notifications
 
-```ts
-// 1. IO in — load state
-const snapshot = await db.get(workflowId);
-const restored = definition.restore(snapshot);
-if (!restored.ok) throw new Error("Invalid workflow");
-
-// 2. Domain — pure logic, no side effects
-const result = await router.dispatch(restored.workflow, command);
-
-// 3. IO out — persist + publish
-if (result.ok) {
-	await db.transaction(async (tx) => {
-		await tx.set(workflowId, definition.snapshot(result.workflow));
-		for (const event of result.events) {
-			await tx.publish("workflow-events", event);
-		}
-	});
-}
-```
+<<< @/snippets/guide/architecture.ts#io-domain-io
 
 The key insight: **handlers never touch the database, send emails, or call external services directly.** They emit events that describe what happened. The IO layer at the end decides how to act on those events.
 
@@ -42,29 +24,7 @@ The key insight: **handlers never touch the database, send emails, or call exter
 
 Handlers that perform IO are hard to test, hard to reason about, and fragile. When a handler calls a payment API inside `dispatch()`, you can't test the state transition without mocking the payment service. When the payment service is down, your state machine breaks.
 
-```ts
-// Bad: IO inside the handler
-on("PlaceOrder", async ({ data, error, transition }) => {
-	const charge = await paymentService.charge(data.total); // IO in handler
-	if (!charge.ok) return error({ code: "PaymentFailed", data: {} });
-	transition("Placed", { ... });
-});
-
-// Good: handler emits intent, IO layer acts on it
-on("PlaceOrder", ({ data, transition, emit, workflow }) => {
-	transition("Placed", { ... });
-	emit({ type: "OrderPlaced", data: { orderId: workflow.id, total: data.total } });
-});
-
-// After dispatch, the IO layer processes events
-if (result.ok) {
-	for (const event of result.events) {
-		if (event.type === "OrderPlaced") {
-			await paymentService.charge(event.data.total);
-		}
-	}
-}
-```
+<<< @/snippets/guide/architecture.ts#pure-handlers
 
 ### Transactional Consistency
 
@@ -83,22 +43,7 @@ Events are the contract between your domain logic and the outside world. They're
 
 Sometimes handlers need to read external data to make decisions (e.g., check inventory before placing an order). Use dependency injection for this — pass read-only services via `deps`:
 
-```ts
-type Deps = {
-	inventory: { check: (sku: string) => Promise<boolean> };
-};
-
-const router = new WorkflowRouter(definition, deps);
-
-on("PlaceOrder", async ({ deps, data, error, transition, emit }) => {
-	const inStock = await deps.inventory.check(data.sku);
-	if (!inStock) {
-		return error({ code: "OutOfStock", data: { sku: data.sku } });
-	}
-	transition("Placed", { ... });
-	emit({ type: "OrderPlaced", data: { ... } });
-});
-```
+<<< @/snippets/guide/architecture.ts#deps-reads
 
 This is acceptable — reads are side-effect-free and easy to stub in tests. The rule is: **reads via deps, writes via events.**
 
