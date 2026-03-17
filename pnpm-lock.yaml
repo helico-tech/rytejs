@@ -260,6 +260,9 @@ importers:
       '@rytejs/core':
         specifier: workspace:*
         version: link:../core
+      '@rytejs/sync':
+        specifier: workspace:*
+        version: link:../sync
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -293,6 +296,21 @@ importers:
       zod:
         specifier: ^4.0.0
         version: 4.3.6
+
+  packages/sync:
+    devDependencies:
+      '@rytejs/core':
+        specifier: workspace:^
+        version: link:../core
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.5.0)(jsdom@26.1.0)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/testing:
     devDependencies:

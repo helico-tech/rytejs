@@ -12,6 +12,7 @@ function createReturn<TConfig extends WorkflowConfig>(
 		data: snapshot.workflow.data,
 		isDispatching: snapshot.isDispatching,
 		error: snapshot.error,
+		connectionStatus: snapshot.connectionStatus,
 		dispatch,
 		// biome-ignore lint/suspicious/noExplicitAny: match overloads handled by UseWorkflowReturn type
 		match(matchers: Record<string, any>, fallback?: (workflow: Workflow<TConfig>) => any): any {

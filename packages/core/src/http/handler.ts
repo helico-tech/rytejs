@@ -86,7 +86,7 @@ export function createHandler(
 				}
 				return jsonResponse(200, {
 					ok: true,
-					workflow: stored.snapshot,
+					snapshot: stored.snapshot,
 					version: stored.version,
 				});
 			} catch (err) {
@@ -118,7 +118,7 @@ export function createHandler(
 				});
 				return jsonResponse(201, {
 					ok: true,
-					workflow: result.workflow,
+					snapshot: result.workflow,
 					version: result.version,
 				});
 			} catch (err) {
@@ -162,9 +162,11 @@ export function createHandler(
 					return jsonResponse(status, { ok: false, error });
 				}
 
+				const router = engine.getRouter(name);
+				const snapshot = router.definition.snapshot(execResult.result.workflow);
 				return jsonResponse(200, {
 					ok: true,
-					workflow: execResult.result.workflow,
+					snapshot,
 					events: execResult.events,
 					version: execResult.version,
 				});
