@@ -4,13 +4,14 @@ import { createElement } from "react";
 import { describe, expect, test } from "vitest";
 import { createWorkflowContext } from "../src/context.js";
 import { createWorkflowStore } from "../src/store.js";
-import { createTestRouter, definition } from "./helpers.js";
+import type { WorkflowStore } from "../src/types.js";
+import { createTestRouter, definition, type TodoConfig } from "./helpers.js";
 
 const TodoWorkflow = createWorkflowContext(definition);
 
-function createWrapper(store: ReturnType<typeof createWorkflowStore>) {
+function createWrapper(store: WorkflowStore<TodoConfig>) {
 	return function Wrapper({ children }: { children: ReactNode }) {
-		return createElement(TodoWorkflow.Provider, { store }, children);
+		return createElement(TodoWorkflow.Provider, { store, children });
 	};
 }
 
