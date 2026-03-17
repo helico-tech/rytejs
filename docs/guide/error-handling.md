@@ -43,34 +43,11 @@ if (!result.ok && result.error.category === "validation") {
 
 Business rule violations defined upfront in the workflow definition. Each error code has a Zod schema, making your failure modes part of the workflow's contract:
 
-```ts
-const orderWorkflow = defineWorkflow("order", {
-  // ... states, commands, events
-  errors: {
-    InsufficientPayment: z.object({ required: z.number(), received: z.number() }),
-    AlreadyShipped: z.object({}),
-  },
-});
-```
+<<< @/snippets/guide/error-handling.ts#domain-definition
 
 Handlers raise them via `error()`:
 
-```ts
-router.state("Created", ({ on }) => {
-  on("Pay", ({ command, data, error }) => {
-    if (command.payload.amount < data.total) {
-      error({
-        code: "InsufficientPayment",
-        data: {
-          required: data.total,
-          received: command.payload.amount,
-        },
-      });
-    }
-    // ... transition to Paid
-  });
-});
-```
+<<< @/snippets/guide/error-handling.ts#domain-handler
 
 Domain errors carry a typed `code` and `data`, validated against the error schema defined in the workflow:
 
@@ -136,19 +113,7 @@ if (!result.ok && result.error.category === "router") {
 
 All mutations are provisional. If dispatch fails for any reason, the original workflow object is unchanged.
 
-```ts
-const task = taskWorkflow.createWorkflow("task-1", {
-  initialState: "Todo",
-  data: { title: "Original" },
-});
-
-const result = await router.dispatch(task, { type: "Start", payload: { assignee: "x" } });
-
-if (!result.ok) {
-  console.log(task.state);      // still "Todo"
-  console.log(task.data.title); // still "Original"
-}
-```
+<<< @/snippets/guide/error-handling.ts#rollback
 
 The router works on internal copies. On error, those copies are discarded.
 
@@ -156,34 +121,4 @@ The router works on internal copies. On error, those copies are discarded.
 
 Use the `category` field to narrow and access category-specific fields:
 
-```ts
-const result = await router.dispatch(workflow, command);
-
-if (!result.ok) {
-  switch (result.error.category) {
-    case "validation":
-      // result.error.source, result.error.issues, result.error.message
-      console.log("Validation failed:", result.error.source);
-      for (const issue of result.error.issues) {
-        console.log(`  - ${issue.message}`);
-      }
-      break;
-    case "domain":
-      // result.error.code, result.error.data
-      console.log("Business rule:", result.error.code);
-      break;
-    case "router":
-      // result.error.code, result.error.message
-      console.log("Router:", result.error.message);
-      break;
-    case "dependency":
-      // result.error.name, result.error.error, result.error.message
-      console.log("Dependency failed:", result.error.name);
-      break;
-    case "unexpected":
-      // result.error.error, result.error.message
-      console.log("Unexpected:", result.error.message);
-      break;
-  }
-}
-```
+<<< @/snippets/guide/error-handling.ts#narrowing
