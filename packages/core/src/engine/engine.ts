@@ -136,9 +136,11 @@ export class ExecutionEngine {
 				payload: e.data,
 			}));
 
-			// biome-ignore lint/suspicious/noExplicitAny: cast through unknown to check if store and queue are the same object (transactional adapter)
-			const storeAsAny = this.store as any;
-			if (this.queue && storeAsAny === this.queue && hasTransaction(this.store)) {
+			const useTransaction =
+				this.queue &&
+				(this.store as unknown) === (this.queue as unknown) &&
+				hasTransaction(this.store);
+			if (useTransaction) {
 				await this.store.transaction(async (tx) => {
 					await tx.store.save({
 						id,
