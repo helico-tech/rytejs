@@ -6,31 +6,7 @@ Lifecycle hooks observe dispatch events without affecting the pipeline. Plugins 
 
 Register hooks with `router.on()`:
 
-```ts
-import { WorkflowRouter } from "@rytejs/core";
-
-const router = new WorkflowRouter(definition);
-
-router.on("pipeline:start", ({ command }) => {
-	console.log(`→ ${command.type}`);
-});
-
-router.on("pipeline:end", (_ctx, result) => {
-	console.log(`← ${result.ok ? "ok" : "error"}`);
-});
-
-router.on("transition", (from, to, workflow) => {
-	console.log(`${from} → ${to}`);
-});
-
-router.on("error", (error, _ctx) => {
-	console.log(`error: ${error.category}`);
-});
-
-router.on("event", (event, workflow) => {
-	console.log(`event: ${event.type}`);
-});
-```
+<<< @/snippets/guide/hooks-and-plugins.ts#lifecycle-hooks
 
 ### Hook Events
 
@@ -59,11 +35,7 @@ Pipeline hooks (`pipeline:start`, `pipeline:end`, `error`) receive a `ReadonlyCo
 
 Hook errors never affect the dispatch result. By default they are logged to `console.error`. You can provide a custom handler:
 
-```ts
-const router = new WorkflowRouter(definition, deps, {
-	onHookError: (err) => myLogger.warn("Hook error:", err),
-});
-```
+<<< @/snippets/guide/hooks-and-plugins.ts#hook-error
 
 ### Execution Order
 
@@ -77,27 +49,13 @@ A plugin is a function that receives the router and configures it — registerin
 
 ### Defining a Plugin
 
-```ts
-import { definePlugin } from "@rytejs/core";
-
-const loggingPlugin = definePlugin((router) => {
-	router.on("pipeline:start", ({ command }) => {
-		console.log(`[${new Date().toISOString()}] → ${command.type}`);
-	});
-	router.on("pipeline:end", (_ctx, result) => {
-		console.log(`[${new Date().toISOString()}] ← ${result.ok ? "ok" : "error"}`);
-	});
-});
-```
+<<< @/snippets/guide/hooks-and-plugins.ts#define-plugin
 
 ### Using a Plugin
 
 Pass it to `router.use()`:
 
-```ts
-const router = new WorkflowRouter(definition);
-router.use(loggingPlugin);
-```
+<<< @/snippets/guide/hooks-and-plugins.ts#use-plugin
 
 ### How `.use()` Discriminates
 
@@ -115,17 +73,4 @@ Plugins are branded with a symbol by `definePlugin()`, so the router can tell th
 
 Plugins can register both hooks and middleware:
 
-```ts
-const authPlugin = definePlugin((router) => {
-	// Middleware: runs in the dispatch pipeline
-	router.use(async ({ deps }, next) => {
-		if (!deps.currentUser) throw new Error("Unauthorized");
-		await next();
-	});
-
-	// Hook: observes after the fact
-	router.on("pipeline:end", ({ command }, result) => {
-		auditLog.record(command, result);
-	});
-});
-```
+<<< @/snippets/guide/hooks-and-plugins.ts#plugin-middleware

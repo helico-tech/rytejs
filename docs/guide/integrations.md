@@ -6,30 +6,7 @@ Ryte is pure logic -- it has no opinion about where commands come from or where 
 
 Every integration is five steps:
 
-```ts
-// 1. Receive a command (HTTP request, Kafka message, etc.)
-const { workflowId, command } = parseInput(request);
-
-// 2. Load the workflow from storage
-const snapshot = await store.get(workflowId);
-const restored = definition.restore(snapshot);
-if (!restored.ok) throw new Error("Invalid workflow data");
-
-// 3. Dispatch the command
-const result = await router.dispatch(restored.workflow, command);
-
-// 4. Persist the updated workflow
-if (result.ok) {
-  await store.set(workflowId, definition.snapshot(result.workflow));
-}
-
-// 5. Publish events
-if (result.ok) {
-  for (const event of result.events) {
-    console.log(`Event: ${event.type}`, event.data);
-  }
-}
-```
+<<< @/snippets/guide/integrations.ts#pattern
 
 The `snapshot()` and `restore()` methods handle serialization -- dates become ISO strings, data is validated against Zod schemas on restore. You can store snapshots in any JSON-compatible database.
 
@@ -206,19 +183,7 @@ See the full example: [examples/kafka](https://github.com/helico-tech/rytejs/tre
 
 Use [hooks](/guide/hooks-and-plugins) to add logging, metrics, or event publishing without touching handlers:
 
-```ts
-const router = new WorkflowRouter(taskWorkflow)
-  .on("transition", (from, to, workflow) => {
-    console.log(`[${workflow.id}] ${from} → ${to}`);
-  })
-  .on("event", (event, workflow) => {
-    console.log(`[${workflow.id}] Event: ${event.type}`);
-  })
-  .on("error", (error) => {
-    console.error(`Error: ${error.category}`, error);
-  })
-  .state("Todo", ({ on }) => { /* ... */ });
-```
+<<< @/snippets/guide/integrations.ts#hooks
 
 ## Choosing a Storage Backend
 
