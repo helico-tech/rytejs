@@ -4,10 +4,14 @@ import { defineWorkflow } from "../../src/definition.js";
 import { createEngine, ExecutionEngine } from "../../src/engine/engine.js";
 import {
 	ConcurrencyConflictError,
+	LockConflictError,
 	RouterNotFoundError,
 	WorkflowAlreadyExistsError,
 	WorkflowNotFoundError,
 } from "../../src/engine/errors.js";
+import { memoryAdapter } from "../../src/engine/memory-adapter.js";
+import { memoryLock } from "../../src/engine/memory-lock.js";
+import { memoryQueue } from "../../src/engine/memory-queue.js";
 import { memoryStore } from "../../src/engine/memory-store.js";
 import type { StoreAdapter } from "../../src/engine/types.js";
 import { WorkflowRouter } from "../../src/router.js";
@@ -246,6 +250,62 @@ describe("ExecutionEngine", () => {
 					payload: {},
 				}),
 			).rejects.toThrow(ConcurrencyConflictError);
+		});
+
+		test("execute throws LockConflictError when lock is held", async () => {
+			const lock = memoryLock({ ttl: 30_000 });
+			const engine = createEngine({ store: memoryStore(), routers: { task: taskRouter }, lock });
+
+			await engine.create("task", "task-1", { initialState: "Todo", data: { title: "Test" } });
+
+			// Acquire lock externally
+			await lock.acquire("task-1");
+
+			await expect(
+				engine.execute("task", "task-1", { type: "Complete", payload: {} }),
+			).rejects.toThrow(LockConflictError);
+
+			// Release and verify it works now
+			await lock.release("task-1");
+			const result = await engine.execute("task", "task-1", { type: "Complete", payload: {} });
+			expect(result.result.ok).toBe(true);
+		});
+
+		test("execute enqueues events to queue when queue is provided", async () => {
+			const store = memoryStore();
+			const queue = memoryQueue();
+			const engine = createEngine({ store, routers: { task: taskRouter }, queue });
+
+			await engine.create("task", "task-1", { initialState: "Todo", data: { title: "Test" } });
+			const result = await engine.execute("task", "task-1", { type: "Complete", payload: {} });
+
+			expect(result.result.ok).toBe(true);
+			expect(result.events).toHaveLength(1);
+
+			// Events should be in the queue
+			const messages = await queue.dequeue(10);
+			expect(messages).toHaveLength(1);
+			expect(messages[0].type).toBe("TaskCompleted");
+			expect(messages[0].routerName).toBe("task");
+			expect(messages[0].workflowId).toBe("task-1");
+		});
+
+		test("execute uses transactional path when store === queue", async () => {
+			const adapter = memoryAdapter({ ttl: 30_000 });
+			const engine = createEngine({
+				store: adapter,
+				routers: { task: taskRouter },
+				queue: adapter,
+				lock: adapter,
+			});
+
+			await engine.create("task", "task-1", { initialState: "Todo", data: { title: "Test" } });
+			const result = await engine.execute("task", "task-1", { type: "Complete", payload: {} });
+
+			expect(result.result.ok).toBe(true);
+			const messages = await adapter.dequeue(10);
+			expect(messages).toHaveLength(1);
+			expect(messages[0].type).toBe("TaskCompleted");
 		});
 	});
 });
