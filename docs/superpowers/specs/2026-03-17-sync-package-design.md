@@ -70,7 +70,6 @@ Split adapter pattern, consistent with the engine's `StoreAdapter` / `QueueAdapt
 interface CommandTransport {
 	dispatch(
 		workflowId: string,
-		routerName: string,
 		command: { type: string; payload: unknown },
 	): Promise<CommandResult>;
 }
@@ -87,7 +86,6 @@ interface UpdateMessage {
 interface UpdateTransport {
 	subscribe(
 		workflowId: string,
-		routerName: string,
 		listener: (message: UpdateMessage) => void,
 	): Subscription;
 }
@@ -116,7 +114,7 @@ Consumers discriminate on `error.category` — `"transport"` vs `"validation"` /
 
 ### Design decisions
 
-- **`routerName` in both dispatch and subscribe** — the engine supports multiple routers, so both transports need to know which one. `CommandTransport.dispatch()` and `UpdateTransport.subscribe()` both take `routerName`, matching `engine.execute(routerName, id, command)`.
+- **`routerName` scoped to transport creation, not per-call** — the engine supports multiple routers, but a transport instance is always scoped to one router. Built-in implementations take `router` in their options for URL construction. The transport interface methods only take `workflowId` — keeping the per-call API minimal. The React store knows `router.definition.name` and can pass it when constructing the transport. The server-side broadcaster still takes `routerName` per-call since it wraps the engine and serves all routers.
 - **`CommandResult` is a discriminated union on `ok`** — consistent with `DispatchResult`. `{ ok: true }` guarantees `snapshot` and `version` are present; `{ ok: false }` guarantees `error`.
 - **`UpdateMessage` carries both `snapshot` and `version`** — `WorkflowSnapshot` doesn't include a version (versions live in the engine's `StoredWorkflow`). The version is sent alongside the snapshot so the client can detect conflicts during optimistic dispatch.
 - **`subscribe` returns a `Subscription` object** — cleaner for transports that need to track connection state.
@@ -131,6 +129,8 @@ Consumers discriminate on `error.category` — `"transport"` vs `"validation"` /
 interface HttpCommandOptions {
 	/** Base URL of the engine HTTP handler */
 	url: string;
+	/** Router name for URL construction (e.g. "orders" → POST {url}/orders/{id}) */
+	router: string;
 	/** Headers sent with every request (auth tokens, etc.) */
 	headers?: Record<string, string> | (() => Record<string, string>);
 }
@@ -138,7 +138,7 @@ interface HttpCommandOptions {
 function httpCommandTransport(options: HttpCommandOptions): CommandTransport;
 ```
 
-- `dispatch(workflowId, routerName, command)` → `POST {url}/{routerName}/{workflowId}` with `{ type, payload }` body
+- `dispatch(workflowId, command)` → `POST {url}/{router}/{workflowId}` with `{ type, payload }` body
 - Maps to the existing engine HTTP handler's `POST /:name/:id` route
 - `headers` can be a function for dynamic tokens that rotate
 - Uses native `fetch` — works in browsers, Node 18+, Bun, Deno
@@ -151,6 +151,8 @@ function httpCommandTransport(options: HttpCommandOptions): CommandTransport;
 interface SseUpdateOptions {
 	/** Base URL for SSE endpoint */
 	url: string;
+	/** Router name for URL construction (e.g. "orders" → GET {url}/orders/{id}/events) */
+	router: string;
 	/** Headers for the connection (auth, etc.) */
 	headers?: Record<string, string> | (() => Record<string, string>);
 	/** Reconnect delay in ms after connection drop. Default: 1000 */
@@ -160,7 +162,7 @@ interface SseUpdateOptions {
 function sseUpdateTransport(options: SseUpdateOptions): UpdateTransport;
 ```
 
-- `subscribe(workflowId, routerName, listener)` → opens fetch-based SSE connection to `{url}/{routerName}/{workflowId}/events`
+- `subscribe(workflowId, listener)` → opens fetch-based SSE connection to `{url}/{router}/{workflowId}/events`
 - Uses a fetch-based SSE reader (`ReadableStream` parsing) instead of native `EventSource` — native `EventSource` doesn't support custom headers in browsers
 - On each SSE message, parses the `UpdateMessage` JSON (`{ snapshot, version }`) and calls listener
 - On connection open, server sends current snapshot immediately (solves reconnect catch-up)
@@ -318,7 +320,7 @@ const result = await store.dispatch("PlaceOrder", { items }, { optimistic: true 
 
 **Server-authoritative flow:**
 1. Set `isDispatching: true`
-2. Send command via `CommandTransport.dispatch(workflowId, routerName, command)`
+2. Send command via `CommandTransport.dispatch(workflowId, command)`
 3. If `result.ok` → restore snapshot to `Workflow` via `definition.restore()`, call `setWorkflow()`
 4. If `!result.ok` and `error.category === "transport"` → set `error` on snapshot, workflow unchanged
 5. If `!result.ok` and error is a `PipelineError` → set `error` on snapshot, workflow unchanged
@@ -340,7 +342,7 @@ The store already holds a reference to the `WorkflowRouter` (passed at creation)
 
 ### Subscription wiring
 
-Automatic when `sync` is provided. On store creation, calls `UpdateTransport.subscribe(workflowId, routerName, listener)` using the workflow ID from `initialConfig.id` and `router.definition.name` as `routerName`. Incoming `UpdateMessage`s are restored via `definition.restore(message.snapshot)` and applied via `setWorkflow()`. Unsubscribes on store cleanup.
+Automatic when `sync` is provided. On store creation, calls `UpdateTransport.subscribe(workflowId, listener)` using the workflow ID from `initialConfig.id`. Incoming `UpdateMessage`s are restored via `definition.restore(message.snapshot)` and applied via `setWorkflow()`. Unsubscribes on store cleanup.
 
 ### Connection status and error type changes
 
@@ -391,8 +393,8 @@ import { composeSyncTransport, httpCommandTransport, sseUpdateTransport } from "
 import { createWorkflowStore } from "@rytejs/react";
 
 const transport = composeSyncTransport({
-	commands: httpCommandTransport({ url: "/api" }),
-	updates: sseUpdateTransport({ url: "/api" }),
+	commands: httpCommandTransport({ url: "/api", router: "orders" }),
+	updates: sseUpdateTransport({ url: "/api", router: "orders" }),
 });
 
 // Store created with known ID and sync transport
@@ -484,7 +486,6 @@ Shipped as a subpath export for consumers testing sync-enabled components withou
 function mockCommandTransport(
 	handler: (
 		workflowId: string,
-		routerName: string,
 		command: { type: string; payload: unknown },
 	) => CommandResult,
 ): CommandTransport;
