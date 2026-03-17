@@ -21,7 +21,7 @@ describe("memoryStore", () => {
 	test("save with expectedVersion 0 creates a new record", async () => {
 		const store = memoryStore();
 		const snapshot = makeSnapshot("wf-1");
-		await store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 0 });
+		await store.save({ id: "wf-1", snapshot, expectedVersion: 0 });
 
 		const stored = await store.load("wf-1");
 		expect(stored).not.toBeNull();
@@ -32,8 +32,8 @@ describe("memoryStore", () => {
 	test("save increments version on each call", async () => {
 		const store = memoryStore();
 		const snapshot = makeSnapshot("wf-1");
-		await store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 0 });
-		await store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 1 });
+		await store.save({ id: "wf-1", snapshot, expectedVersion: 0 });
+		await store.save({ id: "wf-1", snapshot, expectedVersion: 1 });
 
 		const stored = await store.load("wf-1");
 		expect(stored!.version).toBe(2);
@@ -42,20 +42,20 @@ describe("memoryStore", () => {
 	test("save throws ConcurrencyConflictError on version mismatch", async () => {
 		const store = memoryStore();
 		const snapshot = makeSnapshot("wf-1");
-		await store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 0 });
+		await store.save({ id: "wf-1", snapshot, expectedVersion: 0 });
 
-		await expect(
-			store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 0 }),
-		).rejects.toThrow(ConcurrencyConflictError);
+		await expect(store.save({ id: "wf-1", snapshot, expectedVersion: 0 })).rejects.toThrow(
+			ConcurrencyConflictError,
+		);
 	});
 
 	test("save with expectedVersion 0 throws if record already exists", async () => {
 		const store = memoryStore();
 		const snapshot = makeSnapshot("wf-1");
-		await store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 0 });
+		await store.save({ id: "wf-1", snapshot, expectedVersion: 0 });
 
-		await expect(
-			store.save({ id: "wf-1", snapshot, events: [], expectedVersion: 0 }),
-		).rejects.toThrow(ConcurrencyConflictError);
+		await expect(store.save({ id: "wf-1", snapshot, expectedVersion: 0 })).rejects.toThrow(
+			ConcurrencyConflictError,
+		);
 	});
 });
