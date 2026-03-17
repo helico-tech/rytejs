@@ -168,12 +168,7 @@ export class DomainErrorSignal extends Error {
  * @param error - The original error thrown by the dependency
  */
 /** Extracts the WorkflowConfig type from a WorkflowRouter instance. */
-export type ConfigOf<R> = R extends import("./router.js").WorkflowRouter<
-	infer C extends WorkflowConfig,
-	unknown
->
-	? C
-	: never;
+export type ConfigOf<R> = R extends { definition: { config: infer C } } ? C : never;
 
 export class DependencyErrorSignal extends Error {
 	constructor(
