@@ -26,9 +26,18 @@ importers:
       '@rytejs/core':
         specifier: workspace:^
         version: link:../packages/core
+      '@rytejs/otel':
+        specifier: workspace:^
+        version: link:../packages/otel
+      '@rytejs/react':
+        specifier: workspace:^
+        version: link:../packages/react
       '@rytejs/testing':
         specifier: workspace:^
         version: link:../packages/testing
+      '@rytejs/worker':
+        specifier: workspace:^
+        version: link:../packages/worker
       typedoc:
         specifier: ^0.27.9
         version: 0.27.9(typescript@5.9.3)

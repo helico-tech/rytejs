@@ -46,6 +46,14 @@ export default defineConfig({
 						{ text: "Testing", link: "/guide/testing" },
 					],
 				},
+				{
+					text: "Packages",
+					items: [
+						{ text: "Engine", link: "/guide/engine" },
+						{ text: "Worker", link: "/guide/worker" },
+						{ text: "React", link: "/guide/react" },
+					],
+				},
 			],
 			"/api/": [
 				{
