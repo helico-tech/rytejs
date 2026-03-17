@@ -48,3 +48,11 @@ export class RestoreError extends Error {
 		super(`Failed to restore workflow "${workflowId}": ${validationError.message}`);
 	}
 }
+
+export class LockConflictError extends Error {
+	readonly name = "LockConflictError";
+
+	constructor(readonly workflowId: string) {
+		super(`Lock conflict for workflow "${workflowId}": lock is held by another process`);
+	}
+}
