@@ -3,6 +3,7 @@ import { z } from "zod";
 import { defineWorkflow } from "../../src/definition.js";
 import { createEngine } from "../../src/engine/engine.js";
 import { memoryStore } from "../../src/engine/memory-store.js";
+import type { LockAdapter } from "../../src/engine/types.js";
 import { createHandler } from "../../src/http/handler.js";
 import { WorkflowRouter } from "../../src/router.js";
 
@@ -245,5 +246,31 @@ describe("createHandler", () => {
 		const body = await res.json();
 		expect(body.ok).toBe(true);
 		expect(body.workflow.id).toBe("task-1");
+	});
+
+	test("POST returns 409 when lock is held", async () => {
+		const alwaysLockedLock: LockAdapter = {
+			acquire: async () => false,
+			release: async () => {},
+		};
+		const lockedEngine = createEngine({
+			store: memoryStore(),
+			routers: { task: taskRouter },
+			lock: alwaysLockedLock,
+		});
+		const lockedHandler = createHandler({ engine: lockedEngine });
+
+		const res = await lockedHandler(
+			new Request("http://localhost/task/task-1", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ type: "Complete", payload: {} }),
+			}),
+		);
+
+		expect(res.status).toBe(409);
+		const body = await res.json();
+		expect(body.ok).toBe(false);
+		expect(body.error.category).toBe("conflict");
 	});
 });

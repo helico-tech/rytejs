@@ -1,5 +1,6 @@
 import {
 	ConcurrencyConflictError,
+	LockConflictError,
 	RestoreError,
 	RouterNotFoundError,
 	WorkflowAlreadyExistsError,
@@ -32,6 +33,9 @@ function mapEngineError(err: unknown): Response {
 		return errorResponse(409, "conflict", err.message);
 	}
 	if (err instanceof ConcurrencyConflictError) {
+		return errorResponse(409, "conflict", err.message);
+	}
+	if (err instanceof LockConflictError) {
 		return errorResponse(409, "conflict", err.message);
 	}
 	if (err instanceof RestoreError) {
