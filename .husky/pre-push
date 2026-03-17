@@ -1,1 +1,1 @@
-npx pnpm turbo run typecheck test
+npx pnpm turbo run typecheck test --concurrency=2
