@@ -23,6 +23,7 @@ export type { WorkflowSnapshot } from "./snapshot.js";
 export type {
 	CommandNames,
 	CommandPayload,
+	ConfigOf,
 	DispatchResult,
 	ErrorCodes,
 	ErrorData,
