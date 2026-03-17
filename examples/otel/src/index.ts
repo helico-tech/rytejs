@@ -61,15 +61,13 @@ const server = createServer(async (req, res) => {
 	res.end(responseBody);
 });
 
-const PORT = 3000;
+const PORT = 4000;
 
 server.listen(PORT, () => {
 	console.log(`\n  Order workflow server listening on http://localhost:${PORT}`);
 	console.log("  Telemetry exporting to OTel Collector at http://localhost:4318\n");
-	console.log("  Observability UIs:");
-	console.log("    Jaeger:     http://localhost:16686");
-	console.log("    Prometheus: http://localhost:9090");
-	console.log("    Grafana:    http://localhost:3001  (admin/admin)\n");
+	console.log("  Grafana: http://localhost:3000  (admin / admin)");
+	console.log("    → Explore → Tempo for traces, Prometheus for metrics\n");
 	console.log("  Try the full order lifecycle:\n");
 	console.log(`  1. Create:  curl -s -X PUT http://localhost:${PORT}/order/order-1 \\`);
 	console.log(`              -H "Content-Type: application/json" \\`);
