@@ -1608,7 +1608,194 @@ git push
 
 ---
 
-### Task 9: Build, lint, and full verification
+### Task 9: Component integration tests
+
+**Files:**
+- Create: `packages/react/__tests__/integration.test.tsx`
+
+These tests render actual React components (not just hooks) and simulate user interactions via `@testing-library/react` + `@testing-library/user-event`. This validates the full loop: render → user click → dispatch → state transition → UI update.
+
+- [ ] **Step 1: Add `@testing-library/user-event` devDependency**
+
+Run: `pnpm --filter @rytejs/react add -D @testing-library/user-event`
+
+- [ ] **Step 2: Write component integration tests**
+
+Create `packages/react/__tests__/integration.test.tsx`:
+
+```tsx
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createElement } from "react";
+import type { ReactNode } from "react";
+import { describe, expect, test } from "vitest";
+import { createWorkflowContext } from "../src/context.js";
+import { createWorkflowStore } from "../src/store.js";
+import type { UseWorkflowReturn } from "../src/types.js";
+import { createTestRouter, definition, type TodoConfig } from "./helpers.js";
+
+const TodoWorkflow = createWorkflowContext(definition);
+
+/**
+ * Full component that exercises: match(), dispatch, isDispatching, error, selectors
+ */
+function TodoApp({ store }: { store: ReturnType<typeof createWorkflowStore> }) {
+	return createElement(TodoWorkflow.Provider, { store },
+		createElement(TodoView),
+		createElement(StatusBadge),
+	);
+}
+
+function TodoView() {
+	const wf = TodoWorkflow.useWorkflow();
+
+	return wf.match({
+		Pending: (data) =>
+			createElement("div", null,
+				createElement("h1", null, data.title),
+				createElement("button", {
+					onClick: () => wf.dispatch("Start", { assignee: "Alice" }),
+					disabled: wf.isDispatching,
+				}, "Start"),
+				createElement("button", {
+					onClick: () => wf.dispatch("Rename", { title: "Renamed" }),
+				}, "Rename"),
+			),
+		InProgress: (data) =>
+			createElement("div", null,
+				createElement("h1", null, data.title),
+				createElement("p", null, `Assigned to ${data.assignee}`),
+				createElement("button", {
+					onClick: () => wf.dispatch("Complete", {}),
+					disabled: wf.isDispatching,
+				}, "Complete"),
+			),
+		Done: (data) =>
+			createElement("div", null,
+				createElement("h1", null, `${data.title} — Done`),
+				createElement("p", { "data-testid": "completed" }, "Completed"),
+			),
+	});
+}
+
+function StatusBadge() {
+	const state = TodoWorkflow.useWorkflow((w) => w.state);
+	return createElement("span", { "data-testid": "status" }, state);
+}
+
+describe("component integration", () => {
+	test("renders initial state", () => {
+		const router = createTestRouter();
+		const store = createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Buy groceries" },
+		});
+
+		render(createElement(TodoApp, { store }));
+
+		expect(screen.getByText("Buy groceries")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+		expect(screen.getByTestId("status")).toHaveTextContent("Pending");
+	});
+
+	test("dispatch via button click transitions state", async () => {
+		const user = userEvent.setup();
+		const router = createTestRouter();
+		const store = createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Buy groceries" },
+		});
+
+		render(createElement(TodoApp, { store }));
+
+		await user.click(screen.getByRole("button", { name: "Start" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Assigned to Alice")).toBeInTheDocument();
+		});
+		expect(screen.getByTestId("status")).toHaveTextContent("InProgress");
+	});
+
+	test("full workflow path: Pending → InProgress → Done", async () => {
+		const user = userEvent.setup();
+		const router = createTestRouter();
+		const store = createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Buy groceries" },
+		});
+
+		render(createElement(TodoApp, { store }));
+
+		// Pending → InProgress
+		await user.click(screen.getByRole("button", { name: "Start" }));
+		await waitFor(() => {
+			expect(screen.getByTestId("status")).toHaveTextContent("InProgress");
+		});
+
+		// InProgress → Done
+		await user.click(screen.getByRole("button", { name: "Complete" }));
+		await waitFor(() => {
+			expect(screen.getByTestId("status")).toHaveTextContent("Done");
+			expect(screen.getByTestId("completed")).toBeInTheDocument();
+		});
+	});
+
+	test("update within same state (Rename)", async () => {
+		const user = userEvent.setup();
+		const router = createTestRouter();
+		const store = createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Original" },
+		});
+
+		render(createElement(TodoApp, { store }));
+
+		expect(screen.getByText("Original")).toBeInTheDocument();
+		await user.click(screen.getByRole("button", { name: "Rename" }));
+		await waitFor(() => {
+			expect(screen.getByText("Renamed")).toBeInTheDocument();
+		});
+		// Status badge (selector) should still show Pending
+		expect(screen.getByTestId("status")).toHaveTextContent("Pending");
+	});
+
+	test("selector component updates independently", async () => {
+		const user = userEvent.setup();
+		const router = createTestRouter();
+		const store = createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Test" },
+		});
+
+		render(createElement(TodoApp, { store }));
+
+		expect(screen.getByTestId("status")).toHaveTextContent("Pending");
+
+		await user.click(screen.getByRole("button", { name: "Start" }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId("status")).toHaveTextContent("InProgress");
+		});
+	});
+});
+```
+
+- [ ] **Step 3: Run integration tests**
+
+Run: `pnpm --filter @rytejs/react vitest run __tests__/integration.test.tsx`
+Expected: All tests pass
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add packages/react/__tests__/integration.test.tsx packages/react/package.json
+git commit -m "test(react): add component integration tests"
+git push
+```
+
+---
+
+### Task 10: Build, lint, and full verification
 
 **Files:**
 - Modify: `packages/react/src/index.ts` (verify final exports)
@@ -1616,7 +1803,7 @@ git push
 - [ ] **Step 1: Run all react package tests**
 
 Run: `pnpm --filter @rytejs/react vitest run`
-Expected: All tests pass (store, persistence, use-workflow, context, types)
+Expected: All tests pass (store, persistence, use-workflow, context, types, integration)
 
 - [ ] **Step 2: Typecheck**
 
@@ -1648,5 +1835,374 @@ Expected: All packages pass typecheck + test + lint (core: 175 tests, testing: 3
 ```bash
 git add -A packages/react/
 git commit -m "feat(react): finalize @rytejs/react v0.6.0"
+git push
+```
+
+---
+
+## Chunk 5: Example App & Browser Validation
+
+### Task 11: Create order management example app
+
+**Files:**
+- Create: `examples/react-order-dashboard/package.json`
+- Create: `examples/react-order-dashboard/tsconfig.json`
+- Create: `examples/react-order-dashboard/vite.config.ts`
+- Create: `examples/react-order-dashboard/index.html`
+- Create: `examples/react-order-dashboard/src/main.tsx`
+- Create: `examples/react-order-dashboard/src/workflow.ts`
+- Create: `examples/react-order-dashboard/src/App.tsx`
+
+This is a standalone Vite + React app (not in the pnpm workspace) that demonstrates `@rytejs/react` with a multi-state order workflow. It serves as a real-world validation that the package works end-to-end.
+
+**Workflow states:**
+- **Draft** → add items, set customer info
+- **Submitted** → approve or reject (with reason)
+- **Approved** → process payment
+- **Paid** → ship the order
+- **Shipped** → confirm delivery
+- **Rejected** → resubmit (back to Draft)
+
+This exercises: multiple transitions, backward transitions (Reject → Draft), `match()` with 6 branches, selectors, `isDispatching`, error display, and localStorage persistence.
+
+- [ ] **Step 1: Scaffold the example app**
+
+Create `examples/react-order-dashboard/package.json`:
+
+```json
+{
+	"name": "@rytejs/example-react-order-dashboard",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build"
+	},
+	"dependencies": {
+		"@rytejs/core": "workspace:*",
+		"@rytejs/react": "workspace:*",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"zod": "^4.0.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"@vitejs/plugin-react": "^4.0.0",
+		"typescript": "^5.7.0",
+		"vite": "^6.0.0"
+	}
+}
+```
+
+Create `examples/react-order-dashboard/tsconfig.json`:
+
+```json
+{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"lib": ["ES2022", "DOM", "DOM.Iterable"]
+	},
+	"include": ["src"]
+}
+```
+
+Create `examples/react-order-dashboard/vite.config.ts`:
+
+```typescript
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [react()],
+});
+```
+
+Create `examples/react-order-dashboard/index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Order Dashboard — @rytejs/react example</title>
+</head>
+<body>
+	<div id="root"></div>
+	<script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
+```
+
+- [ ] **Step 2: Define the order workflow**
+
+Create `examples/react-order-dashboard/src/workflow.ts`:
+
+```typescript
+import { WorkflowRouter, defineWorkflow } from "@rytejs/core";
+import { createWorkflowContext, createWorkflowStore } from "@rytejs/react";
+import { z } from "zod";
+
+const itemSchema = z.object({
+	name: z.string(),
+	quantity: z.number().int().positive(),
+	price: z.number().positive(),
+});
+
+export type Item = z.infer<typeof itemSchema>;
+
+export const orderDefinition = defineWorkflow("order", {
+	states: {
+		Draft: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+		}),
+		Submitted: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+			submittedAt: z.coerce.date(),
+		}),
+		Approved: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+			approvedBy: z.string(),
+		}),
+		Paid: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+			paidAt: z.coerce.date(),
+			transactionId: z.string(),
+		}),
+		Shipped: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+			trackingNumber: z.string(),
+			shippedAt: z.coerce.date(),
+		}),
+		Delivered: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+			deliveredAt: z.coerce.date(),
+		}),
+		Rejected: z.object({
+			customer: z.string(),
+			items: z.array(itemSchema),
+			reason: z.string(),
+			rejectedAt: z.coerce.date(),
+		}),
+	},
+	commands: {
+		AddItem: z.object({ name: z.string(), quantity: z.number(), price: z.number() }),
+		RemoveItem: z.object({ index: z.number() }),
+		SetCustomer: z.object({ customer: z.string() }),
+		Submit: z.object({}),
+		Approve: z.object({ approvedBy: z.string() }),
+		Reject: z.object({ reason: z.string() }),
+		ProcessPayment: z.object({ transactionId: z.string() }),
+		Ship: z.object({ trackingNumber: z.string() }),
+		ConfirmDelivery: z.object({}),
+		Resubmit: z.object({}),
+	},
+	events: {
+		OrderSubmitted: z.object({ orderId: z.string() }),
+		OrderApproved: z.object({ orderId: z.string(), approvedBy: z.string() }),
+		OrderRejected: z.object({ orderId: z.string(), reason: z.string() }),
+		PaymentProcessed: z.object({ orderId: z.string(), transactionId: z.string() }),
+		OrderShipped: z.object({ orderId: z.string(), trackingNumber: z.string() }),
+		OrderDelivered: z.object({ orderId: z.string() }),
+	},
+	errors: {
+		EmptyOrder: z.object({}),
+		InvalidItem: z.object({ reason: z.string() }),
+	},
+});
+
+const router = new WorkflowRouter(orderDefinition);
+
+router.state("Draft", ({ on }) => {
+	on("AddItem", ({ command, data, update }) => {
+		update({ items: [...data.items, command.payload] });
+	});
+	on("RemoveItem", ({ command, data, update }) => {
+		const items = data.items.filter((_, i) => i !== command.payload.index);
+		update({ items });
+	});
+	on("SetCustomer", ({ command, update }) => {
+		update({ customer: command.payload.customer });
+	});
+	on("Submit", ({ data, transition, emit, error }) => {
+		if (data.items.length === 0) {
+			error({ code: "EmptyOrder", data: {} });
+		}
+		transition("Submitted", {
+			...data,
+			submittedAt: new Date(),
+		});
+		emit({ type: "OrderSubmitted", data: { orderId: "current" } });
+	});
+});
+
+router.state("Submitted", ({ on }) => {
+	on("Approve", ({ command, data, transition, emit }) => {
+		transition("Approved", {
+			customer: data.customer,
+			items: data.items,
+			approvedBy: command.payload.approvedBy,
+		});
+		emit({ type: "OrderApproved", data: { orderId: "current", approvedBy: command.payload.approvedBy } });
+	});
+	on("Reject", ({ command, data, transition, emit }) => {
+		transition("Rejected", {
+			customer: data.customer,
+			items: data.items,
+			reason: command.payload.reason,
+			rejectedAt: new Date(),
+		});
+		emit({ type: "OrderRejected", data: { orderId: "current", reason: command.payload.reason } });
+	});
+});
+
+router.state("Approved", ({ on }) => {
+	on("ProcessPayment", ({ command, data, transition, emit }) => {
+		transition("Paid", {
+			customer: data.customer,
+			items: data.items,
+			paidAt: new Date(),
+			transactionId: command.payload.transactionId,
+		});
+		emit({ type: "PaymentProcessed", data: { orderId: "current", transactionId: command.payload.transactionId } });
+	});
+});
+
+router.state("Paid", ({ on }) => {
+	on("Ship", ({ command, data, transition, emit }) => {
+		transition("Shipped", {
+			customer: data.customer,
+			items: data.items,
+			trackingNumber: command.payload.trackingNumber,
+			shippedAt: new Date(),
+		});
+		emit({ type: "OrderShipped", data: { orderId: "current", trackingNumber: command.payload.trackingNumber } });
+	});
+});
+
+router.state("Shipped", ({ on }) => {
+	on("ConfirmDelivery", ({ data, transition, emit }) => {
+		transition("Delivered", {
+			customer: data.customer,
+			items: data.items,
+			deliveredAt: new Date(),
+		});
+		emit({ type: "OrderDelivered", data: { orderId: "current" } });
+	});
+});
+
+router.state("Rejected", ({ on }) => {
+	on("Resubmit", ({ data, transition }) => {
+		transition("Draft", {
+			customer: data.customer,
+			items: data.items,
+		});
+	});
+});
+
+export { router };
+export const OrderWorkflow = createWorkflowContext(orderDefinition);
+
+export function createOrderStore() {
+	return createWorkflowStore(router, {
+		state: "Draft",
+		data: { customer: "", items: [] },
+	}, {
+		persist: {
+			key: "order-dashboard",
+			storage: localStorage,
+		},
+	});
+}
+```
+
+- [ ] **Step 3: Create the App component**
+
+Create `examples/react-order-dashboard/src/App.tsx`. This should be a visually clear dashboard that shows:
+
+- Current state as a prominent badge
+- State-specific UI via `match()` (forms, action buttons, info displays)
+- Order summary sidebar using selectors (item count, total price)
+- Error display when dispatch fails
+- Loading state via `isDispatching`
+- A step indicator showing the workflow progression
+
+The implementer should design a clean, functional UI. Use inline styles or a simple CSS file — no CSS framework needed. Key requirements:
+
+- Each state must have clearly labeled action buttons with `data-testid` attributes for Playwright validation:
+  - `data-testid="btn-add-item"` — add an item in Draft
+  - `data-testid="btn-submit"` — submit the order
+  - `data-testid="btn-approve"` — approve in Submitted
+  - `data-testid="btn-reject"` — reject in Submitted
+  - `data-testid="btn-pay"` — process payment in Approved
+  - `data-testid="btn-ship"` — ship in Paid
+  - `data-testid="btn-deliver"` — confirm delivery in Shipped
+  - `data-testid="btn-resubmit"` — resubmit in Rejected
+  - `data-testid="current-state"` — shows the current state name
+  - `data-testid="item-count"` — shows item count (selector)
+  - `data-testid="error-message"` — shows dispatch errors
+
+- [ ] **Step 4: Create the entry point**
+
+Create `examples/react-order-dashboard/src/main.tsx`:
+
+```tsx
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./App.js";
+import { OrderWorkflow, createOrderStore } from "./workflow.js";
+
+const store = createOrderStore();
+
+createRoot(document.getElementById("root")!).render(
+	<StrictMode>
+		<OrderWorkflow.Provider store={store}>
+			<App />
+		</OrderWorkflow.Provider>
+	</StrictMode>,
+);
+```
+
+- [ ] **Step 5: Install dependencies and verify it runs**
+
+```bash
+cd examples/react-order-dashboard && pnpm install && pnpm dev
+```
+
+Expected: Vite dev server starts. The app renders in a browser showing the Draft state.
+
+- [ ] **Step 6: Validate with `playwright-cli`**
+
+Use the `playwright-cli` skill to open the running app and verify the full workflow path:
+
+1. Open `http://localhost:5173`
+2. Verify initial state shows "Draft"
+3. Add an item (click add-item button, fill in fields)
+4. Submit the order → verify state changes to "Submitted"
+5. Approve the order → verify "Approved"
+6. Process payment → verify "Paid"
+7. Ship → verify "Shipped"
+8. Confirm delivery → verify "Delivered"
+9. Also test: reject flow (Submitted → Rejected → Resubmit → Draft)
+10. Also test: page refresh with persistence (state survives reload)
+
+- [ ] **Step 7: Commit and push**
+
+```bash
+git add examples/react-order-dashboard/
+git commit -m "feat: add React order dashboard example app"
 git push
 ```
