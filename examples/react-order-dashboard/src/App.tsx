@@ -71,7 +71,7 @@ export function App() {
 	return (
 		<div
 			style={{
-				maxWidth: 800,
+				maxWidth: 700,
 				margin: "40px auto",
 				padding: "0 20px",
 			}}
