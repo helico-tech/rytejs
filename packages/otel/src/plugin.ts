@@ -26,7 +26,7 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 	const instruments = createInstruments(meter);
 	const spanMap = new Map<string, SpanEntry>();
 
-	return definePlugin<WorkflowConfig, unknown>((router) => {
+	return definePlugin<TConfig, TDeps>((router) => {
 		router.on("dispatch:start", (workflow, command) => {
 			const existing = spanMap.get(workflow.id);
 			if (existing) {
@@ -61,5 +61,5 @@ export function createOtelPlugin<TConfig extends WorkflowConfig = WorkflowConfig
 				spanMap.delete(workflow.id);
 			}
 		});
-	}) as Plugin<TConfig, TDeps>;
+	});
 }
