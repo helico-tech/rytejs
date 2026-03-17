@@ -20,7 +20,7 @@ export class ExecutionEngine {
 	constructor(options: EngineOptions) {
 		this.store = options.store;
 		this.routers = options.routers;
-		this.lockTimeout = options.lockTimeout ?? DEFAULT_LOCK_TIMEOUT;
+		this.lockTimeout = DEFAULT_LOCK_TIMEOUT;
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: returns type-erased router from heterogeneous map
@@ -57,7 +57,6 @@ export class ExecutionEngine {
 					await this.store.save({
 						id,
 						snapshot,
-						events: [],
 						expectedVersion: 0,
 					});
 				} catch (err) {
@@ -109,7 +108,6 @@ export class ExecutionEngine {
 				await this.store.save({
 					id,
 					snapshot: newSnapshot,
-					events,
 					expectedVersion: stored.version,
 				});
 
