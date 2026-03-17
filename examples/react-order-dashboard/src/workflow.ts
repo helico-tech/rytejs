@@ -1,6 +1,8 @@
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
+import type { WorkflowStore } from "@rytejs/react";
 import { createWorkflowContext, createWorkflowStore } from "@rytejs/react";
 import { z } from "zod";
+import type { LogEntry } from "./types.js";
 
 // --- Item schema ---
 
@@ -14,7 +16,7 @@ export type Item = z.infer<typeof itemSchema>;
 
 // --- Workflow definition ---
 
-const orderDefinition = defineWorkflow("order", {
+export const orderDefinition = defineWorkflow("order", {
 	states: {
 		Draft: z.object({ customer: z.string(), items: z.array(itemSchema) }),
 		Submitted: z.object({
@@ -219,8 +221,13 @@ export const OrderContext = createWorkflowContext(orderDefinition);
 
 // --- Store factory ---
 
-export function createOrderStore() {
-	return createWorkflowStore(
+export interface OrderStoreOptions {
+	persistKey: string;
+	onLog?: (entry: Omit<LogEntry, "id" | "timestamp">) => void;
+}
+
+export function createOrderStore(options: OrderStoreOptions): WorkflowStore<OrderConfig> {
+	const store = createWorkflowStore(
 		router,
 		{
 			state: "Draft" as const,
@@ -228,9 +235,56 @@ export function createOrderStore() {
 		},
 		{
 			persist: {
-				key: "order-dashboard",
+				key: options.persistKey,
 				storage: localStorage,
 			},
 		},
 	);
+
+	if (!options.onLog) {
+		return store;
+	}
+
+	const onLog = options.onLog;
+	const originalDispatch = store.dispatch;
+
+	// Wrap dispatch to capture before/after snapshots for logging
+	const wrappedDispatch: typeof originalDispatch = async (command, payload) => {
+		const beforeWorkflow = store.getWorkflow();
+		const fromState = beforeWorkflow.state;
+		const start = performance.now();
+
+		const result = await originalDispatch(command, payload);
+
+		const durationMs = performance.now() - start;
+		const afterWorkflow = result.ok ? result.workflow : store.getWorkflow();
+		const afterSnapshot = orderDefinition.snapshot(afterWorkflow);
+
+		onLog({
+			command: command as string,
+			payload,
+			fromState: fromState as string,
+			toState: afterWorkflow.state as string,
+			durationMs,
+			events: result.ok ? result.events.map((e) => e.type as string) : [],
+			error: result.ok
+				? null
+				: {
+						category: result.error.category,
+						message:
+							result.error.category === "domain"
+								? `Domain error: ${result.error.code}`
+								: result.error.message,
+						code: "code" in result.error ? String(result.error.code) : undefined,
+					},
+			snapshot: afterSnapshot,
+		});
+
+		return result;
+	};
+
+	return {
+		...store,
+		dispatch: wrappedDispatch,
+	};
 }
