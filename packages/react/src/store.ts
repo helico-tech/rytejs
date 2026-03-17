@@ -10,6 +10,7 @@ import type {
 	WorkflowDefinition,
 } from "@rytejs/core";
 import { migrate, type WorkflowRouter } from "@rytejs/core";
+import type { TransportError } from "@rytejs/sync";
 import type { WorkflowStore, WorkflowStoreOptions, WorkflowStoreSnapshot } from "./types.js";
 
 export function createWorkflowStore<
@@ -25,11 +26,15 @@ export function createWorkflowStore<
 	},
 	options?: WorkflowStoreOptions<TConfig>,
 ): WorkflowStore<TConfig> {
+	if (options?.sync && !initialConfig.id) {
+		throw new Error("Sync transport requires a workflow id");
+	}
+
 	const definition = router.definition;
 
 	let workflow: Workflow<TConfig> = loadOrCreate(definition, initialConfig, options);
 	let isDispatching = false;
-	let error: PipelineError<TConfig> | null = null;
+	let error: PipelineError<TConfig> | TransportError | null = null;
 	let snapshot: WorkflowStoreSnapshot<TConfig> = { workflow, isDispatching, error };
 
 	const listeners = new Set<() => void>();
@@ -44,10 +49,47 @@ export function createWorkflowStore<
 	const dispatch = async <C extends CommandNames<TConfig>>(
 		command: C,
 		payload: CommandPayload<TConfig, C>,
+		dispatchOptions?: { optimistic?: boolean },
 	): Promise<DispatchResult<TConfig>> => {
 		isDispatching = true;
 		notify();
 
+		// Sync: server-authoritative (default when sync is provided)
+		if (options?.sync && !dispatchOptions?.optimistic) {
+			const commandResult = await options.sync.dispatch(initialConfig.id!, {
+				type: command as string,
+				payload,
+			});
+
+			if (commandResult.ok) {
+				const restored = definition.restore(commandResult.snapshot);
+				if (restored.ok) {
+					workflow = restored.workflow;
+					error = null;
+					isDispatching = false;
+					notify();
+					return {
+						ok: true,
+						workflow: restored.workflow,
+						events: [],
+					} as DispatchResult<TConfig>;
+				}
+			}
+
+			// Error path: transport error, pipeline error, or restore failure
+			error = commandResult.ok
+				? ({
+						category: "transport",
+						code: "PARSE",
+						message: "Failed to restore server snapshot",
+					} as TransportError)
+				: (commandResult.error as PipelineError<TConfig> | TransportError);
+			isDispatching = false;
+			notify();
+			return { ok: false, error } as DispatchResult<TConfig>;
+		}
+
+		// Local dispatch (no sync, or optimistic — optimistic handled in Task 10)
 		const result = await router.dispatch(workflow, { type: command, payload });
 
 		if (result.ok) {
@@ -83,6 +125,7 @@ export function createWorkflowStore<
 			error = null;
 			notify();
 		},
+		cleanup() {},
 	};
 }
 

@@ -1,3 +1,5 @@
+import { composeSyncTransport } from "@rytejs/sync";
+import { mockCommandTransport, mockUpdateTransport } from "@rytejs/sync/testing";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkflowStore } from "../src/store.js";
 import { createTestRouter, definition } from "./helpers.js";
@@ -221,5 +223,93 @@ describe("createWorkflowStore", () => {
 		const d1 = store.dispatch;
 		const d2 = store.dispatch;
 		expect(d1).toBe(d2);
+	});
+});
+
+describe("sync store", () => {
+	const router = createTestRouter();
+
+	test("throws when sync is provided without id", () => {
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({ ok: true, snapshot: {} as never, version: 1 })),
+			updates: mockUpdateTransport(),
+		});
+
+		expect(() =>
+			createWorkflowStore(
+				router,
+				{ state: "Pending", data: { title: "Test" } },
+				{ sync: transport },
+			),
+		).toThrow();
+	});
+
+	test("server-authoritative dispatch routes through transport", async () => {
+		const snapshot = definition.snapshot(
+			definition.createWorkflow("wf-1", {
+				initialState: "Pending",
+				data: { title: "Test" },
+			}),
+		);
+		const handler = vi.fn().mockReturnValue({ ok: true, snapshot, version: 2 });
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(handler),
+			updates: mockUpdateTransport(),
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		await store.dispatch("Start", { assignee: "Alice" });
+
+		expect(handler).toHaveBeenCalledWith("wf-1", {
+			type: "Start",
+			payload: { assignee: "Alice" },
+		});
+	});
+
+	test("server-authoritative dispatch updates workflow from server snapshot", async () => {
+		const transitioned = definition.createWorkflow("wf-1", {
+			initialState: "InProgress",
+			data: { title: "Test", assignee: "Alice" },
+		});
+		const snapshot = definition.snapshot(transitioned);
+
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({ ok: true, snapshot, version: 2 })),
+			updates: mockUpdateTransport(),
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		await store.dispatch("Start", { assignee: "Alice" });
+		expect(store.getWorkflow().state).toBe("InProgress");
+	});
+
+	test("server-authoritative dispatch surfaces transport errors", async () => {
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({
+				ok: false,
+				error: { category: "transport", code: "NETWORK", message: "fail" },
+			})),
+			updates: mockUpdateTransport(),
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		const result = await store.dispatch("Start", { assignee: "Alice" });
+		expect(result.ok).toBe(false);
+		expect(store.getSnapshot().error).toMatchObject({ category: "transport" });
 	});
 });
