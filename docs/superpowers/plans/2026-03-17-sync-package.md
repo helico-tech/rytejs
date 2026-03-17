@@ -2034,3 +2034,348 @@ Expected: All packages pass typecheck + test + lint.
 git add -A
 git commit -m "chore: lint fixes for sync package"
 ```
+
+---
+
+## Task 12: Fullstack Order Dashboard Example
+
+**Files:**
+- Create: `examples/fullstack-order-dashboard/package.json`
+- Create: `examples/fullstack-order-dashboard/server.ts`
+- Create: `examples/fullstack-order-dashboard/vite.config.ts`
+- Create: `examples/fullstack-order-dashboard/tsconfig.json`
+- Create: `examples/fullstack-order-dashboard/tsconfig.server.json`
+- Create: `examples/fullstack-order-dashboard/index.html`
+- Create: `examples/fullstack-order-dashboard/src/workflow.ts` (definition + context only, no router)
+- Create: `examples/fullstack-order-dashboard/src/use-order-manager.ts` (rewritten for server)
+- Copy unchanged: `src/main.tsx`, `src/App.tsx`, `src/Dashboard.tsx`, `src/types.ts`, `src/components/*` (all 13 component files)
+
+This task converts the existing `examples/react-order-dashboard/` into a fullstack app with a Hono server backend. The client uses `@rytejs/sync` to dispatch commands via HTTP and receive updates via SSE. No worker — just React + HTTP server + broadcaster.
+
+**What changes:**
+- `workflow.ts` — keeps definition + context export, moves router + handlers to `server.ts`
+- `use-order-manager.ts` — order CRUD goes through HTTP (not localStorage), per-order stores use sync transport
+- Time travel is dropped (conflicts with server-authoritative state)
+- DevToolsPanel simplified to log-only (no undo/redo)
+
+**What stays identical:**
+- All state view components (DraftView, SubmittedView, ApprovedView, etc.)
+- App.tsx, StepIndicator, OrderSummary, OrderList (UI unchanged)
+
+- [ ] **Step 1: Create `examples/fullstack-order-dashboard/package.json`**
+
+```json
+{
+	"name": "@rytejs/example-fullstack-order-dashboard",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "concurrently \"pnpm dev:server\" \"pnpm dev:client\"",
+		"dev:server": "tsx watch server.ts",
+		"dev:client": "vite",
+		"build": "tsc -b && vite build"
+	},
+	"dependencies": {
+		"@rytejs/core": "workspace:*",
+		"@rytejs/react": "workspace:*",
+		"@rytejs/sync": "workspace:*",
+		"hono": "^4.0.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"zod": "^4.0.0"
+	},
+	"devDependencies": {
+		"@hono/node-server": "^1.0.0",
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"@vitejs/plugin-react": "^4.3.0",
+		"concurrently": "^9.0.0",
+		"tsx": "^4.0.0",
+		"typescript": "^5.7.0",
+		"vite": "^6.0.0"
+	}
+}
+```
+
+- [ ] **Step 2: Create `examples/fullstack-order-dashboard/vite.config.ts`**
+
+```typescript
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [react()],
+	server: {
+		proxy: {
+			"/api": {
+				target: "http://localhost:3001",
+				changeOrigin: true,
+			},
+		},
+	},
+});
+```
+
+- [ ] **Step 3: Create `examples/fullstack-order-dashboard/server.ts`**
+
+The server runs Hono with:
+- `PUT /api/order/:id` — create order via `engine.create()`
+- `POST /api/order/:id` — dispatch command via `broadcaster.execute()`
+- `GET /api/order/:id` — load order via `engine.load()`
+- `GET /api/order/:id/events` — SSE subscription via `broadcaster.subscribe()`
+- `GET /api/orders` — list all order IDs (simple in-memory registry)
+- `DELETE /api/order/:id` — remove order from registry
+
+The server file contains the full workflow definition + router with handlers (copied from the existing example's `workflow.ts`), the engine setup with `memoryAdapter`, and the Hono routes.
+
+```typescript
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
+import { createEngine, memoryAdapter } from "@rytejs/core/engine";
+import { createBroadcaster } from "@rytejs/sync/server";
+import { z } from "zod";
+
+// --- Workflow definition (same schema as client) ---
+
+const itemSchema = z.object({
+	name: z.string(),
+	quantity: z.number().int().positive(),
+	price: z.number().positive(),
+});
+
+const orderDefinition = defineWorkflow("order", {
+	// ... exact same definition as react-order-dashboard/src/workflow.ts ...
+	// (states, commands, events, errors — copy verbatim)
+});
+
+// --- Router with handlers ---
+
+const router = new WorkflowRouter(orderDefinition);
+// ... exact same handlers as react-order-dashboard/src/workflow.ts ...
+// (Draft, Submitted, Approved, Paid, Shipped, Rejected state handlers — copy verbatim)
+
+// --- Engine + Broadcaster ---
+
+const adapter = memoryAdapter({ ttl: 60_000 });
+const engine = createEngine({
+	store: adapter,
+	routers: { order: router },
+	lock: adapter,
+});
+const broadcaster = createBroadcaster({ engine });
+
+// --- In-memory order registry (tracks created order IDs) ---
+
+const orderRegistry = new Map<string, { createdAt: string }>();
+
+// --- Hono routes ---
+
+const app = new Hono();
+
+app.get("/api/orders", (c) => {
+	const orders = Array.from(orderRegistry.entries()).map(([id, meta]) => ({
+		id,
+		createdAt: meta.createdAt,
+	}));
+	return c.json(orders);
+});
+
+app.put("/api/order/:id", async (c) => {
+	const { id } = c.req.param();
+	const body = await c.req.json();
+	try {
+		const result = await engine.create("order", id, {
+			initialState: body.initialState ?? "Draft",
+			data: body.data ?? { customer: "", items: [] },
+		});
+		orderRegistry.set(id, { createdAt: new Date().toISOString() });
+		return c.json({ ok: true, snapshot: result.workflow, version: result.version }, 201);
+	} catch (err) {
+		return c.json({ ok: false, error: { category: "unexpected", message: String(err) } }, 500);
+	}
+});
+
+app.post("/api/order/:id", async (c) => {
+	const { id } = c.req.param();
+	const body = await c.req.json();
+	try {
+		const result = await broadcaster.execute("order", id, {
+			type: body.type,
+			payload: body.payload,
+		});
+		if (!result.result.ok) {
+			return c.json({ ok: false, error: result.result.error }, 422);
+		}
+		const snapshot = router.definition.snapshot(result.result.workflow);
+		return c.json({ ok: true, snapshot, version: result.version });
+	} catch (err) {
+		return c.json({ ok: false, error: { category: "unexpected", message: String(err) } }, 500);
+	}
+});
+
+app.get("/api/order/:id", async (c) => {
+	const { id } = c.req.param();
+	const stored = await engine.load(id);
+	if (!stored) return c.json({ ok: false, error: { category: "not_found" } }, 404);
+	return c.json({ ok: true, snapshot: stored.snapshot, version: stored.version });
+});
+
+app.get("/api/order/:id/events", async (c) => {
+	const { id } = c.req.param();
+	return broadcaster.subscribe("order", id);
+});
+
+app.delete("/api/order/:id", (c) => {
+	const { id } = c.req.param();
+	orderRegistry.delete(id);
+	return c.json({ ok: true });
+});
+
+serve({ fetch: app.fetch, port: 3001 }, () => {
+	console.log("Server running on http://localhost:3001");
+});
+```
+
+The implementer should copy the full definition + handlers from the existing example rather than using `...` placeholders.
+
+- [ ] **Step 4: Create `examples/fullstack-order-dashboard/src/workflow.ts`**
+
+Client-side: definition + context only. No router, no store factory.
+
+```typescript
+import { defineWorkflow } from "@rytejs/core";
+import { createWorkflowContext } from "@rytejs/react";
+import { z } from "zod";
+
+// Same item schema + definition as server (keep in sync)
+const itemSchema = z.object({
+	name: z.string(),
+	quantity: z.number().int().positive(),
+	price: z.number().positive(),
+});
+
+export type Item = z.infer<typeof itemSchema>;
+
+export const orderDefinition = defineWorkflow("order", {
+	// ... exact same definition as server.ts ...
+});
+
+export type OrderConfig = typeof orderDefinition.config;
+
+export const OrderContext = createWorkflowContext(orderDefinition);
+```
+
+- [ ] **Step 5: Rewrite `examples/fullstack-order-dashboard/src/use-order-manager.ts`**
+
+Key changes from the original:
+- Order creation: `PUT /api/order/:id` instead of localStorage
+- Order listing: `GET /api/orders` on mount instead of localStorage
+- Order deletion: `DELETE /api/order/:id`
+- Per-order stores: `createWorkflowStore(router, initialConfig, { sync: transport })` instead of `{ persist: { key, storage: localStorage } }`
+- No time travel (no undo/redo callbacks)
+- Log is simplified: tracks dispatched commands for display, no snapshot-based time travel
+
+The transport is created once and shared across all order stores:
+
+```typescript
+import { composeSyncTransport, httpCommandTransport, sseUpdateTransport } from "@rytejs/sync";
+
+const transport = composeSyncTransport({
+	commands: httpCommandTransport({ url: "/api", router: "order" }),
+	updates: sseUpdateTransport({ url: "/api", router: "order" }),
+});
+```
+
+Wait — transport is scoped to one router, but the URL pattern here is `/api/order/:id` for commands and `/api/order/:id/events` for SSE. The `httpCommandTransport` constructs `{url}/{router}/{workflowId}` → `/api/order/{id}`. The `sseUpdateTransport` constructs `{url}/{router}/{workflowId}/events` → `/api/order/{id}/events`. This matches the server routes.
+
+Each order store is created with:
+
+```typescript
+const store = createWorkflowStore(
+	clientRouter, // needed for type inference — can be a no-handler router
+	{ state: "Draft", data: { customer: "", items: [] }, id: orderId },
+	{ sync: transport },
+);
+```
+
+**Note on client router:** The `createWorkflowStore` requires a `WorkflowRouter` for the definition. For server-authoritative dispatch (no optimistic), the router's handlers are never called — only `router.definition` is used for `restore()`. A handler-less router works:
+
+```typescript
+const clientRouter = new WorkflowRouter(orderDefinition);
+// No .state() calls needed — server handles all commands
+```
+
+Export this from `workflow.ts`.
+
+- [ ] **Step 6: Simplify Dashboard.tsx**
+
+Copy from original but remove time travel props/callbacks. The DevToolsPanel can show the log tab only (remove TimeTravelTab import and tab switcher, or just keep LogTab as the only view).
+
+- [ ] **Step 7: Copy all unchanged component files**
+
+Copy these files verbatim from `examples/react-order-dashboard/src/components/`:
+- DraftView.tsx, SubmittedView.tsx, ApprovedView.tsx, PaidView.tsx
+- ShippedView.tsx, DeliveredView.tsx, RejectedView.tsx
+- OrderList.tsx, OrderSummary.tsx, StepIndicator.tsx
+- LogTab.tsx
+
+Copy `src/App.tsx` and `src/main.tsx` verbatim.
+
+Remove `TimeTravelTab.tsx` (no time travel in fullstack).
+
+- [ ] **Step 8: Create index.html and tsconfig files**
+
+Copy `index.html` from the original example.
+
+`tsconfig.json` — same as original (for Vite/client).
+
+`tsconfig.server.json`:
+```json
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true
+	},
+	"include": ["server.ts"]
+}
+```
+
+- [ ] **Step 9: Install and verify**
+
+```bash
+cd examples/fullstack-order-dashboard
+pnpm install
+```
+
+Build the packages first (sync needs to be built):
+```bash
+pnpm --filter @rytejs/sync build
+pnpm --filter @rytejs/core tsup
+pnpm --filter @rytejs/react build
+```
+
+Then start the example:
+```bash
+cd examples/fullstack-order-dashboard
+pnpm dev
+```
+
+Expected: Server starts on :3001, Vite dev server on :5173, proxy forwards `/api` to server. Open two browser tabs — dispatching a command in one should update the other in real time via SSE.
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add examples/fullstack-order-dashboard/
+git commit -m "feat(examples): add fullstack order dashboard with sync
+
+Demonstrates @rytejs/sync with:
+- Hono server + ExecutionEngine + Broadcaster
+- React client with sync transport (HTTP commands + SSE updates)
+- Multi-client real-time updates
+- Server-authoritative dispatch"
+```
