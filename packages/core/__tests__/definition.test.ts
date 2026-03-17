@@ -83,6 +83,17 @@ describe("defineWorkflow", () => {
 		expect(testDefinition.hasState("Draft")).toBe(true);
 		expect(testDefinition.hasState("nonexistent")).toBe(false);
 	});
+
+	test("hasCommand returns true for known commands", () => {
+		expect(testDefinition.hasCommand("Create")).toBe(true);
+		expect(testDefinition.hasCommand("Publish")).toBe(true);
+		expect(testDefinition.hasCommand("nonexistent")).toBe(false);
+	});
+
+	test("hasEvent returns true for known events", () => {
+		expect(testDefinition.hasEvent("Created")).toBe(true);
+		expect(testDefinition.hasEvent("nonexistent")).toBe(false);
+	});
 });
 
 describe("createWorkflow", () => {

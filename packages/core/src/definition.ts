@@ -64,6 +64,14 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	 */
 	hasState(stateName: string): boolean;
 	/**
+	 * Returns `true` if the given command name exists in the config.
+	 */
+	hasCommand(commandName: string): boolean;
+	/**
+	 * Returns `true` if the given event name exists in the config.
+	 */
+	hasEvent(eventName: string): boolean;
+	/**
 	 * Serializes a workflow instance into a plain, JSON-safe snapshot.
 	 *
 	 * @param workflow - The workflow instance to serialize
@@ -158,6 +166,14 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 
 		hasState(stateName: string): boolean {
 			return stateName in config.states;
+		},
+
+		hasCommand(commandName: string): boolean {
+			return commandName in config.commands;
+		},
+
+		hasEvent(eventName: string): boolean {
+			return eventName in config.events;
 		},
 
 		snapshot(workflow: {
