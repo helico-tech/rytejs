@@ -1,1 +1,7 @@
-// @rytejs/react — React bindings for workflow state management
+export { createWorkflowStore } from "./store.js";
+export type {
+	UseWorkflowReturn,
+	WorkflowStore,
+	WorkflowStoreOptions,
+	WorkflowStoreSnapshot,
+} from "./types.js";
