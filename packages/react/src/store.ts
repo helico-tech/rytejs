@@ -36,6 +36,7 @@ export function createWorkflowStore<
 	let isDispatching = false;
 	let error: PipelineError<TConfig> | TransportError | null = null;
 	let snapshot: WorkflowStoreSnapshot<TConfig> = { workflow, isDispatching, error };
+	let latestServerWorkflow: Workflow<TConfig> | undefined;
 
 	const listeners = new Set<() => void>();
 
@@ -89,7 +90,39 @@ export function createWorkflowStore<
 			return { ok: false, error } as DispatchResult<TConfig>;
 		}
 
-		// Local dispatch (no sync, or optimistic — optimistic handled in Task 10)
+		// Sync: optimistic dispatch
+		if (options?.sync && dispatchOptions?.optimistic) {
+			const rollbackWorkflow = workflow;
+
+			// 1. Dispatch locally for instant UI
+			const localResult = await router.dispatch(workflow, { type: command, payload });
+			if (localResult.ok) {
+				workflow = localResult.workflow;
+				error = null;
+				notify();
+			}
+
+			// 2. Send to server
+			const serverResult = await options.sync.dispatch(initialConfig.id!, {
+				type: command as string,
+				payload,
+			});
+
+			if (!serverResult.ok) {
+				// Rollback
+				workflow = latestServerWorkflow ?? rollbackWorkflow;
+				error = serverResult.error as PipelineError<TConfig> | TransportError;
+				isDispatching = false;
+				notify();
+				return { ok: false, error } as DispatchResult<TConfig>;
+			}
+
+			isDispatching = false;
+			notify();
+			return localResult;
+		}
+
+		// Local dispatch (no sync)
 		const result = await router.dispatch(workflow, { type: command, payload });
 
 		if (result.ok) {
@@ -117,6 +150,7 @@ export function createWorkflowStore<
 			const restored = definition.restore(message.snapshot);
 			if (restored.ok) {
 				workflow = restored.workflow;
+				latestServerWorkflow = restored.workflow;
 				error = null;
 				notify();
 			} else {

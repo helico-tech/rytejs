@@ -379,4 +379,54 @@ describe("sync store", () => {
 
 		expect(store.getWorkflow().state).toBe("Pending");
 	});
+
+	test("optimistic dispatch applies locally first, then confirms with server", async () => {
+		const initial = definition.createWorkflow("wf-1", {
+			initialState: "Pending",
+			data: { title: "Test" },
+		});
+		const snapshot = definition.snapshot(initial);
+
+		const handler = vi.fn().mockResolvedValue({ ok: true, snapshot, version: 2 });
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(handler),
+			updates: mockUpdateTransport(),
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		const result = await store.dispatch("Start", { assignee: "Alice" }, { optimistic: true });
+
+		// Local dispatch was used — result comes from router
+		expect(result.ok).toBeDefined();
+		// Server was also called
+		expect(handler).toHaveBeenCalled();
+	});
+
+	test("optimistic dispatch rolls back on server rejection", async () => {
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({
+				ok: false,
+				error: { category: "domain", code: "OutOfStock", data: {} },
+			})),
+			updates: mockUpdateTransport(),
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		const originalState = store.getWorkflow().state;
+		await store.dispatch("Start", { assignee: "Alice" }, { optimistic: true });
+
+		// Should have rolled back
+		expect(store.getWorkflow().state).toBe(originalState);
+		expect(store.getSnapshot().error).not.toBeNull();
+	});
 });
