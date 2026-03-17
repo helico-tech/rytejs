@@ -5,6 +5,10 @@
  * register its TracerProvider, MeterProvider, and LoggerProvider globally.
  */
 
+// Force JSON encoding — newer @opentelemetry/exporter-*-otlp-http packages
+// default to protobuf, which older grafana/otel-lgtm collectors may reject (400).
+process.env.OTEL_EXPORTER_OTLP_PROTOCOL = "http/json";
+
 import { logs } from "@opentelemetry/api-logs";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
