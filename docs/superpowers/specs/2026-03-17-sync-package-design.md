@@ -206,7 +206,7 @@ interface Broadcaster {
 	subscribe(routerName: string, workflowId: string): Promise<Response>;
 
 	/** Number of active connections for a workflow */
-	connectionCount(workflowId: string): number;
+	connectionCount(routerName: string, workflowId: string): number;
 
 	/** Clean up all connections */
 	close(): void;
@@ -220,9 +220,9 @@ function createBroadcaster(options: BroadcasterOptions): Broadcaster;
 The `ExecutionEngine` has no hook/event system — it's a plain class with `execute()`, `create()`, and `load()`. Rather than adding an observer pattern to the engine, the broadcaster uses a **decorator pattern**: it wraps `engine.execute()`, calls through to the engine, and broadcasts the result to subscribers afterward.
 
 1. `broadcaster.execute()` calls `engine.execute()` under the hood, then broadcasts the new snapshot to all connected SSE streams for that workflow.
-2. Tracks SSE connections per workflow ID (`Map<string, Set<WritableStreamController>>`).
+2. Tracks SSE connections keyed by `routerName:workflowId` composite key (`Map<string, Set<WritableStreamController>>`). This scoping is necessary because the engine's `StoreAdapter` is shared across all routers, so different routers could have workflows with the same ID.
 3. `subscribe()` returns a Web `Response` with `Content-Type: text/event-stream`.
-4. On subscribe, loads current snapshot from engine and sends it as the first SSE event.
+4. On subscribe, loads current snapshot via `engine.load(workflowId)` (note: `load()` takes only the ID since the store is shared across routers) and sends it as the first SSE event.
 5. When a client disconnects (stream closes), automatically removes from the subscriber set.
 
 The HTTP handler should call `broadcaster.execute()` instead of `engine.execute()` for the command endpoint. The broadcaster delegates to the engine and handles broadcasting — no changes needed to `ExecutionEngine` itself.
