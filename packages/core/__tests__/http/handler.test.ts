@@ -64,8 +64,8 @@ describe("createHandler", () => {
 		expect(res.status).toBe(201);
 		const body = await res.json();
 		expect(body.ok).toBe(true);
-		expect(body.workflow.id).toBe("task-1");
-		expect(body.workflow.state).toBe("Todo");
+		expect(body.snapshot.id).toBe("task-1");
+		expect(body.snapshot.state).toBe("Todo");
 		expect(body.version).toBe(1);
 	});
 
@@ -112,7 +112,7 @@ describe("createHandler", () => {
 		expect(res.status).toBe(200);
 		const body = await res.json();
 		expect(body.ok).toBe(true);
-		expect(body.workflow.state).toBe("Done");
+		expect(body.snapshot.state).toBe("Done");
 		expect(body.events).toHaveLength(1);
 		expect(body.events[0].type).toBe("TaskCompleted");
 		expect(body.version).toBe(2);
@@ -179,7 +179,7 @@ describe("createHandler", () => {
 		expect(res.status).toBe(200);
 		const body = await res.json();
 		expect(body.ok).toBe(true);
-		expect(body.workflow.id).toBe("task-1");
+		expect(body.snapshot.id).toBe("task-1");
 		expect(body.version).toBe(1);
 	});
 
@@ -245,7 +245,7 @@ describe("createHandler", () => {
 		expect(res.status).toBe(201);
 		const body = await res.json();
 		expect(body.ok).toBe(true);
-		expect(body.workflow.id).toBe("task-1");
+		expect(body.snapshot.id).toBe("task-1");
 	});
 
 	test("POST returns 409 when lock is held", async () => {
