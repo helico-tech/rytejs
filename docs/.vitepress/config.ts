@@ -4,6 +4,7 @@ export default defineConfig({
 	base: "/rytejs/",
 	title: "Ryte",
 	description: "Type-safe workflow engine for TypeScript",
+	srcExclude: ["superpowers/**"],
 	themeConfig: {
 		logo: "/logo.svg",
 		nav: [
