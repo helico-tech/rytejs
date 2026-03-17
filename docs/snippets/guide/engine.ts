@@ -53,19 +53,19 @@ const pgQueue: QueueAdapter = {
 		// INSERT INTO outbox (workflow_id, router, type, payload)
 		throw new Error(`Not implemented: enqueue(${messages.length} messages)`);
 	},
-	async dequeue(count) {
+	async dequeue(count: number) {
 		// SELECT ... FROM outbox ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED
 		throw new Error(`Not implemented: dequeue(${count})`);
 	},
-	async ack(id) {
+	async ack(id: string) {
 		// DELETE FROM outbox WHERE id = $1
 		throw new Error(`Not implemented: ack(${id})`);
 	},
-	async nack(id, delay) {
+	async nack(id: string, delay?: number) {
 		// UPDATE outbox SET visible_at = now() + $2 WHERE id = $1
 		throw new Error(`Not implemented: nack(${id}, ${delay})`);
 	},
-	async deadLetter(id, reason) {
+	async deadLetter(id: string, reason: string) {
 		// INSERT INTO dead_letters SELECT *, $2 FROM outbox WHERE id = $1
 		throw new Error(`Not implemented: deadLetter(${id}, ${reason})`);
 	},

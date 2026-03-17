@@ -2,6 +2,30 @@
 
 These are copy-pasteable patterns for adding observability to your workflows. They use the hooks and plugin system described in the [Hooks & Plugins](/guide/hooks-and-plugins) guide — no additional packages required.
 
+## @rytejs/otel
+
+For production OpenTelemetry instrumentation, use the official plugin:
+
+```bash
+pnpm add @rytejs/otel
+```
+
+One line to instrument a router with tracing and metrics:
+
+<<< @/snippets/guide/observability-otel.ts#install
+
+This automatically:
+- Creates a span per dispatch (`ryte.dispatch.{commandType}`)
+- Records transitions and events as span events
+- Sets error status with category, code, and source attributes
+- Emits three metrics: `ryte.dispatch.count`, `ryte.dispatch.duration`, `ryte.transition.count`
+
+By default it uses the global OpenTelemetry API. To use a specific tracer or meter:
+
+<<< @/snippets/guide/observability-otel.ts#custom
+
+The patterns below are still useful if you want custom observability without the `@rytejs/otel` dependency.
+
 ## Structured Logging
 
 Captures command type, final state, success/failure, and duration on every dispatch.
