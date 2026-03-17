@@ -167,6 +167,9 @@ export class DomainErrorSignal extends Error {
  * @param depName - The top-level dependency key (e.g. "db", "stripe")
  * @param error - The original error thrown by the dependency
  */
+/** Extracts the WorkflowConfig type from a WorkflowRouter instance. */
+export type ConfigOf<R> = R extends { definition: { config: infer C } } ? C : never;
+
 export class DependencyErrorSignal extends Error {
 	constructor(
 		public readonly depName: string,
