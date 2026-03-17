@@ -6,26 +6,7 @@ These are copy-pasteable patterns for adding observability to your workflows. Th
 
 Captures command type, final state, success/failure, and duration on every dispatch.
 
-```ts
-import { createKey, definePlugin } from "@rytejs/core";
-
-const startTimeKey = createKey<number>("startTime");
-
-const loggingPlugin = definePlugin((router) => {
-	router.on("pipeline:start", ({ set }) => {
-		set(startTimeKey, Date.now());
-	});
-	router.on("pipeline:end", ({ get, command, workflow }, result) => {
-		const duration = Date.now() - get(startTimeKey);
-		console.log(JSON.stringify({
-			command: command.type,
-			state: workflow.state,
-			ok: result.ok,
-			duration,
-		}));
-	});
-});
-```
+<<< @/snippets/guide/observability.ts#logging
 
 Because `pipeline:end` is guaranteed to fire whenever `pipeline:start` fires, the duration is always recorded — even when the handler throws an unexpected error.
 
@@ -33,24 +14,7 @@ Because `pipeline:end` is guaranteed to fire whenever `pipeline:start` fires, th
 
 Creates a span per dispatch, sets its status based on the result, and ends it after the dispatch completes.
 
-```ts
-import { createKey, definePlugin } from "@rytejs/core";
-// import { tracer, SpanStatusCode } from "./your-otel-setup";
-
-const spanKey = createKey<any>("span");
-
-const otelPlugin = definePlugin((router) => {
-	router.on("pipeline:start", ({ command, set }) => {
-		const span = tracer.startSpan(`ryte.dispatch.${command.type}`);
-		set(spanKey, span);
-	});
-	router.on("pipeline:end", ({ get }, result) => {
-		const span = get(spanKey);
-		span.setStatus({ code: result.ok ? SpanStatusCode.OK : SpanStatusCode.ERROR });
-		span.end();
-	});
-});
-```
+<<< @/snippets/guide/observability.ts#otel
 
 Replace the commented import with your actual OpenTelemetry tracer setup. The span name includes the command type, making traces easy to filter by command.
 
@@ -58,28 +22,7 @@ Replace the commented import with your actual OpenTelemetry tracer setup. The sp
 
 Records every state transition and every domain error to an external audit log.
 
-```ts
-import { definePlugin } from "@rytejs/core";
-
-const auditPlugin = definePlugin((router) => {
-	router.on("transition", (from, to, workflow) => {
-		auditLog.record({
-			workflowId: workflow.id,
-			from,
-			to,
-			timestamp: new Date(),
-		});
-	});
-	router.on("error", (error, { workflow, command }) => {
-		auditLog.record({
-			workflowId: workflow.id,
-			error: error.category,
-			command: command.type,
-			timestamp: new Date(),
-		});
-	});
-});
-```
+<<< @/snippets/guide/observability.ts#audit
 
 The `error` hook fires for domain and validation errors — the same errors returned in the result rather than thrown. Unexpected errors (handler throws a non-domain, non-validation error) are not captured here; use `pipeline:end` with `result.ok === false` and `result.error.category === "unexpected"` if you need those. Unexpected errors are captured as `{ category: "unexpected", error, message }` in the result, and `pipeline:end` always fires.
 
@@ -87,22 +30,7 @@ The `error` hook fires for domain and validation errors — the same errors retu
 
 Increments counters for every dispatch and every state transition, tagged with relevant dimensions.
 
-```ts
-import { definePlugin } from "@rytejs/core";
-
-const metricsPlugin = definePlugin((router) => {
-	router.on("pipeline:end", ({ command, workflow }, result) => {
-		metrics.increment("ryte.dispatch.total", {
-			command: command.type,
-			state: workflow.state,
-			ok: String(result.ok),
-		});
-	});
-	router.on("transition", (from, to) => {
-		metrics.increment("ryte.transition.total", { from, to });
-	});
-});
-```
+<<< @/snippets/guide/observability.ts#metrics
 
 Replace `metrics.increment` with whatever client your metrics backend provides (StatsD, Prometheus, Datadog, etc.). The tags give you per-command and per-state breakdown out of the box.
 
@@ -110,15 +38,6 @@ Replace `metrics.increment` with whatever client your metrics backend provides (
 
 All four plugins above are registered the same way:
 
-```ts
-import { WorkflowRouter } from "@rytejs/core";
-
-const router = new WorkflowRouter(definition, deps);
-
-router.use(loggingPlugin);
-router.use(otelPlugin);
-router.use(auditPlugin);
-router.use(metricsPlugin);
-```
+<<< @/snippets/guide/observability.ts#register
 
 See [Hooks & Plugins](/guide/hooks-and-plugins) for the full hook event reference and error isolation behaviour.
