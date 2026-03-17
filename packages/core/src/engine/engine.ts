@@ -1,26 +1,46 @@
 import type { WorkflowSnapshot } from "../snapshot.js";
 import {
 	ConcurrencyConflictError,
+	LockConflictError,
 	RestoreError,
 	RouterNotFoundError,
 	WorkflowAlreadyExistsError,
 	WorkflowNotFoundError,
 } from "./errors.js";
-import { withLock } from "./lock.js";
-import type { EngineOptions, ExecutionResult, StoreAdapter, StoredWorkflow } from "./types.js";
+import { memoryLock } from "./memory-lock.js";
+import type {
+	EmittedEvent,
+	EngineOptions,
+	ExecutionResult,
+	LockAdapter,
+	QueueAdapter,
+	StoreAdapter,
+	StoredWorkflow,
+	TransactionalAdapter,
+} from "./types.js";
 
-const DEFAULT_LOCK_TIMEOUT = 30_000;
+function hasTransaction(obj: unknown): obj is TransactionalAdapter {
+	return (
+		typeof obj === "object" &&
+		obj !== null &&
+		"transaction" in obj &&
+		// biome-ignore lint/suspicious/noExplicitAny: runtime duck-type check for TransactionalAdapter capability
+		typeof (obj as any).transaction === "function"
+	);
+}
 
 export class ExecutionEngine {
 	private readonly store: StoreAdapter;
 	// biome-ignore lint/suspicious/noExplicitAny: heterogeneous router map — each router has a different TConfig
 	private readonly routers: Record<string, import("../router.js").WorkflowRouter<any>>;
-	private readonly lockTimeout: number;
+	private readonly lock: LockAdapter;
+	private readonly queue: QueueAdapter | undefined;
 
 	constructor(options: EngineOptions) {
 		this.store = options.store;
 		this.routers = options.routers;
-		this.lockTimeout = DEFAULT_LOCK_TIMEOUT;
+		this.lock = options.lock ?? memoryLock({ ttl: 30_000 });
+		this.queue = options.queue;
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: returns type-erased router from heterogeneous map
@@ -42,34 +62,35 @@ export class ExecutionEngine {
 		const router = this.getRouter(routerName);
 		const definition = router.definition;
 
-		return withLock(
-			id,
-			async () => {
-				const existing = await this.store.load(id);
-				if (existing) throw new WorkflowAlreadyExistsError(id);
+		const acquired = await this.lock.acquire(id);
+		if (!acquired) throw new LockConflictError(id);
 
-				// as never: type erasure — the engine holds WorkflowConfig base type,
-				// but createWorkflow validates data against Zod schemas at runtime
-				const workflow = definition.createWorkflow(id, init as never);
-				const snapshot = definition.snapshot(workflow);
+		try {
+			const existing = await this.store.load(id);
+			if (existing) throw new WorkflowAlreadyExistsError(id);
 
-				try {
-					await this.store.save({
-						id,
-						snapshot,
-						expectedVersion: 0,
-					});
-				} catch (err) {
-					if (err instanceof ConcurrencyConflictError) {
-						throw new WorkflowAlreadyExistsError(id);
-					}
-					throw err;
+			// as never: type erasure — the engine holds WorkflowConfig base type,
+			// but createWorkflow validates data against Zod schemas at runtime
+			const workflow = definition.createWorkflow(id, init as never);
+			const snapshot = definition.snapshot(workflow);
+
+			try {
+				await this.store.save({
+					id,
+					snapshot,
+					expectedVersion: 0,
+				});
+			} catch (err) {
+				if (err instanceof ConcurrencyConflictError) {
+					throw new WorkflowAlreadyExistsError(id);
 				}
+				throw err;
+			}
 
-				return { workflow: snapshot, version: 1 };
-			},
-			this.lockTimeout,
-		);
+			return { workflow: snapshot, version: 1 };
+		} finally {
+			await this.lock.release(id);
+		}
 	}
 
 	async execute(
@@ -80,41 +101,69 @@ export class ExecutionEngine {
 		const router = this.getRouter(routerName);
 		const definition = router.definition;
 
-		return withLock(
-			id,
-			async () => {
-				const stored = await this.store.load(id);
-				if (!stored) throw new WorkflowNotFoundError(id);
+		const acquired = await this.lock.acquire(id);
+		if (!acquired) throw new LockConflictError(id);
 
-				const restoreResult = definition.restore(stored.snapshot);
-				if (!restoreResult.ok) {
-					throw new RestoreError(id, restoreResult.error);
-				}
+		try {
+			const stored = await this.store.load(id);
+			if (!stored) throw new WorkflowNotFoundError(id);
 
-				// as never: type erasure — the engine holds WorkflowConfig base type,
-				// but dispatch validates commands against Zod schemas at runtime
-				const result = await router.dispatch(restoreResult.workflow, command as never);
+			const restoreResult = definition.restore(stored.snapshot);
+			if (!restoreResult.ok) {
+				throw new RestoreError(id, restoreResult.error);
+			}
 
-				if (!result.ok) {
-					return { result, events: [], version: stored.version };
-				}
+			// as never: type erasure — the engine holds WorkflowConfig base type,
+			// but dispatch validates commands against Zod schemas at runtime
+			const result = await router.dispatch(restoreResult.workflow, command as never);
 
-				const newSnapshot = definition.snapshot(result.workflow);
-				const events = (result.events as Array<{ type: string; data: unknown }>).map((e) => ({
+			if (!result.ok) {
+				return { result, events: [], version: stored.version };
+			}
+
+			const newSnapshot = definition.snapshot(result.workflow);
+			const events: EmittedEvent[] = (result.events as Array<{ type: string; data: unknown }>).map(
+				(e) => ({
 					type: e.type,
 					data: e.data,
-				}));
+				}),
+			);
 
+			const enqueueMessages = events.map((e) => ({
+				workflowId: id,
+				routerName: definition.name,
+				type: e.type,
+				payload: e.data,
+			}));
+
+			// biome-ignore lint/suspicious/noExplicitAny: cast through unknown to check if store and queue are the same object (transactional adapter)
+			const storeAsAny = this.store as any;
+			if (this.queue && storeAsAny === this.queue && hasTransaction(this.store)) {
+				await this.store.transaction(async (tx) => {
+					await tx.store.save({
+						id,
+						snapshot: newSnapshot,
+						expectedVersion: stored.version,
+					});
+					if (enqueueMessages.length > 0) {
+						await tx.queue.enqueue(enqueueMessages);
+					}
+				});
+			} else {
 				await this.store.save({
 					id,
 					snapshot: newSnapshot,
 					expectedVersion: stored.version,
 				});
+				if (this.queue && enqueueMessages.length > 0) {
+					await this.queue.enqueue(enqueueMessages);
+				}
+			}
 
-				return { result, events, version: stored.version + 1 };
-			},
-			this.lockTimeout,
-		);
+			return { result, events, version: stored.version + 1 };
+		} finally {
+			await this.lock.release(id);
+		}
 	}
 }
 
