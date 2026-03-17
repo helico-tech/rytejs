@@ -1,6 +1,4 @@
-import type { WorkflowRouter } from "../router.js";
 import type { WorkflowSnapshot } from "../snapshot.js";
-import type { WorkflowConfig } from "../types.js";
 import {
 	ConcurrencyConflictError,
 	RestoreError,
@@ -15,7 +13,8 @@ const DEFAULT_LOCK_TIMEOUT = 30_000;
 
 export class ExecutionEngine {
 	private readonly store: StoreAdapter;
-	private readonly routers: Record<string, WorkflowRouter<WorkflowConfig>>;
+	// biome-ignore lint/suspicious/noExplicitAny: heterogeneous router map — each router has a different TConfig
+	private readonly routers: Record<string, import("../router.js").WorkflowRouter<any>>;
 	private readonly lockTimeout: number;
 
 	constructor(options: EngineOptions) {
@@ -24,7 +23,8 @@ export class ExecutionEngine {
 		this.lockTimeout = options.lockTimeout ?? DEFAULT_LOCK_TIMEOUT;
 	}
 
-	getRouter(name: string): WorkflowRouter<WorkflowConfig> {
+	// biome-ignore lint/suspicious/noExplicitAny: returns type-erased router from heterogeneous map
+	getRouter(name: string): import("../router.js").WorkflowRouter<any> {
 		const router = this.routers[name];
 		if (!router) throw new RouterNotFoundError(name);
 		return router;
@@ -101,8 +101,8 @@ export class ExecutionEngine {
 				}
 
 				const newSnapshot = definition.snapshot(result.workflow);
-				const events = result.events.map((e) => ({
-					type: e.type as string,
+				const events = (result.events as Array<{ type: string; data: unknown }>).map((e) => ({
+					type: e.type,
 					data: e.data,
 				}));
 

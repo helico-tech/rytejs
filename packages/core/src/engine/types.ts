@@ -26,7 +26,8 @@ export interface StoreAdapter {
 
 export interface EngineOptions {
 	store: StoreAdapter;
-	routers: Record<string, WorkflowRouter<WorkflowConfig>>;
+	// biome-ignore lint/suspicious/noExplicitAny: heterogeneous router map — each router has a different TConfig, type erasure is required
+	routers: Record<string, WorkflowRouter<any>>;
 	lockTimeout?: number;
 }
 
