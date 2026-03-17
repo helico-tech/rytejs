@@ -102,7 +102,7 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	 * @param options - Router configuration options
 	 */
 	constructor(
-		private readonly definition: WorkflowDefinition<TConfig>,
+		public readonly definition: WorkflowDefinition<TConfig>,
 		private readonly deps: TDeps = {} as TDeps,
 		options: RouterOptions = {},
 	) {

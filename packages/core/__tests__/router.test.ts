@@ -46,6 +46,12 @@ const wf = {
 };
 
 describe("WorkflowRouter", () => {
+	test("exposes definition as a public readonly property", () => {
+		const router = new WorkflowRouter(definition);
+		expect(router.definition).toBe(definition);
+		expect(router.definition.name).toBe("test");
+	});
+
 	describe("basic dispatch", () => {
 		test("dispatches command to correct state handler", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
