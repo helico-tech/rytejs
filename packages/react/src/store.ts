@@ -110,6 +110,26 @@ export function createWorkflowStore<
 		return result;
 	};
 
+	// Sync subscription wiring
+	let syncSubscription: { unsubscribe(): void } | undefined;
+	if (options?.sync) {
+		syncSubscription = options.sync.subscribe(initialConfig.id!, (message) => {
+			const restored = definition.restore(message.snapshot);
+			if (restored.ok) {
+				workflow = restored.workflow;
+				error = null;
+				notify();
+			} else {
+				error = {
+					category: "transport",
+					code: "PARSE",
+					message: "Failed to restore snapshot from server",
+				} as TransportError;
+				notify();
+			}
+		});
+	}
+
 	return {
 		getWorkflow: () => workflow,
 		getSnapshot: () => snapshot,
@@ -125,7 +145,9 @@ export function createWorkflowStore<
 			error = null;
 			notify();
 		},
-		cleanup() {},
+		cleanup() {
+			syncSubscription?.unsubscribe();
+		},
 	};
 }
 

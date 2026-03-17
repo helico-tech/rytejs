@@ -312,4 +312,71 @@ describe("sync store", () => {
 		expect(result.ok).toBe(false);
 		expect(store.getSnapshot().error).toMatchObject({ category: "transport" });
 	});
+
+	test("subscribes to updates on store creation with sync", () => {
+		const updates = mockUpdateTransport();
+		const subscribeSpy = vi.spyOn(updates, "subscribe");
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({ ok: true, snapshot: {} as never, version: 1 })),
+			updates,
+		});
+
+		createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		expect(subscribeSpy).toHaveBeenCalledWith("wf-1", expect.any(Function));
+	});
+
+	test("incoming update applies to store via setWorkflow", () => {
+		const updates = mockUpdateTransport();
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({ ok: true, snapshot: {} as never, version: 1 })),
+			updates,
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		const transitioned = definition.createWorkflow("wf-1", {
+			initialState: "InProgress",
+			data: { title: "Test", assignee: "Alice" },
+		});
+		const snapshot = definition.snapshot(transitioned);
+		updates.push("wf-1", { snapshot, version: 2 });
+
+		expect(store.getWorkflow().state).toBe("InProgress");
+	});
+
+	test("cleanup unsubscribes from updates", () => {
+		const updates = mockUpdateTransport();
+		const transport = composeSyncTransport({
+			commands: mockCommandTransport(() => ({ ok: true, snapshot: {} as never, version: 1 })),
+			updates,
+		});
+
+		const store = createWorkflowStore(
+			router,
+			{ state: "Pending", data: { title: "Test" }, id: "wf-1" },
+			{ sync: transport },
+		);
+
+		store.cleanup();
+
+		const transitioned = definition.createWorkflow("wf-1", {
+			initialState: "InProgress",
+			data: { title: "Test", assignee: "Alice" },
+		});
+		updates.push("wf-1", {
+			snapshot: definition.snapshot(transitioned),
+			version: 2,
+		});
+
+		expect(store.getWorkflow().state).toBe("Pending");
+	});
 });
