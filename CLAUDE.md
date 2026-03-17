@@ -17,6 +17,7 @@ pnpm --filter @rytejs/core vitest run     # 149 tests
 pnpm --filter @rytejs/testing vitest run  # 29 tests
 pnpm --filter @rytejs/core tsc --noEmit   # typecheck
 pnpm --filter @rytejs/core tsup           # build dist (REQUIRED before testing package tests)
+pnpm --filter @rytejs/docs typecheck     # typecheck doc snippets
 
 # Lint
 pnpm biome check .                        # check
@@ -58,6 +59,9 @@ pnpm biome check --fix .                  # autofix
 - **Never reference removed features**: `inspect()`, `targets`, `@rytejs/viz`, `DefinitionInfo`, `RouterGraph`, `TransitionInfo`
 - When documenting `PipelineError` categories, include ALL FIVE: `"validation"`, `"domain"`, `"router"`, `"unexpected"`, `"dependency"`
 - `ValidationError.source` includes `"restore"` (from `definition.restore()`, not from `dispatch()`)
+- New code examples go in `docs/snippets/` as compilable TypeScript with `#region` markers, referenced from markdown via `<<< @/snippets/...#region` — not inline
+- Partial fragments that can't compile standalone (e.g., `errors: { ... }`) stay inline in markdown
+- Snippet files use tab indentation per project style
 
 ## Testing
 
@@ -82,6 +86,7 @@ tests/e2e/              # E2E tests (NOT in workspace, installs from npm)
 - After adding features: update relevant guide in `docs/guide/`, add to sidebar in `docs/.vitepress/config.ts`
 - After changing public types: verify `@rytejs/testing` still compiles (rebuild core first)
 - TypeScript overloads with `StateNames<TConfig>[]` in signatures need `string[]` instead — TS can't infer literal arrays without `as const`
+- After changing core exports or types: run `pnpm --filter @rytejs/docs typecheck` to verify doc snippets
 
 ## Common Mistakes to Avoid
 
