@@ -55,9 +55,9 @@ function parsePath(url: string, basePath: string): { name: string; id: string } 
 	}
 
 	const segments = pathname.split("/").filter(Boolean);
-	if (segments.length !== 2) return null;
+	if (segments.length < 2 || !segments[0] || !segments[1]) return null;
 
-	return { name: segments[0], id: segments[1] };
+	return { name: segments[0], id: segments.slice(1).join("/") };
 }
 
 export function createHandler(
