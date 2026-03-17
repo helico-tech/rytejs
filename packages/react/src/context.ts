@@ -7,7 +7,7 @@ import { useWorkflow } from "./use-workflow.js";
 export function createWorkflowContext<TConfig extends WorkflowConfig>(
 	_definition: WorkflowDefinition<TConfig>,
 ): {
-	Provider: (props: { store: WorkflowStore<TConfig>; children: ReactNode }) => ReactNode;
+	Provider: (props: { store: WorkflowStore<TConfig>; children?: ReactNode }) => ReactNode;
 	useWorkflow: {
 		(): UseWorkflowReturn<TConfig>;
 		<R>(selector: (workflow: Workflow<TConfig>) => R, equalityFn?: (a: R, b: R) => boolean): R;
@@ -20,7 +20,7 @@ export function createWorkflowContext<TConfig extends WorkflowConfig>(
 		children,
 	}: {
 		store: WorkflowStore<TConfig>;
-		children: ReactNode;
+		children?: ReactNode;
 	}): ReactNode {
 		return createElement(StoreContext.Provider, { value: store }, children);
 	}
