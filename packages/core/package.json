@@ -9,6 +9,21 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js",
 			"require": "./dist/index.cjs"
+		},
+		"./engine": {
+			"types": "./dist/engine/index.d.ts",
+			"import": "./dist/engine/index.js",
+			"require": "./dist/engine/index.cjs"
+		},
+		"./reactor": {
+			"types": "./dist/reactor/index.d.ts",
+			"import": "./dist/reactor/index.js",
+			"require": "./dist/reactor/index.cjs"
+		},
+		"./http": {
+			"types": "./dist/http/index.d.ts",
+			"import": "./dist/http/index.js",
+			"require": "./dist/http/index.cjs"
 		}
 	},
 	"main": "./dist/index.cjs",
