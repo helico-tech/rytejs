@@ -61,10 +61,10 @@ export function useWorkflow<TConfig extends WorkflowConfig, R>(
 		return next;
 	}, [store]);
 
-	const getSnapshot = selector ? selectorSnapshot : store.getSnapshot;
+	// biome-ignore lint/suspicious/noExplicitAny: return type varies by overload; TS can't narrow union of getSnapshot functions
+	const getSnapshot: () => any = selector ? selectorSnapshot : store.getSnapshot;
 
-	// biome-ignore lint/suspicious/noExplicitAny: return type varies by overload (snapshot vs selected value)
-	const result: any = useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+	const result: unknown = useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 
 	if (!selector) {
 		return createReturn(result as WorkflowStoreSnapshot<TConfig>, store.dispatch);
