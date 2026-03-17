@@ -5,3 +5,4 @@ export type {
 	WorkflowStoreOptions,
 	WorkflowStoreSnapshot,
 } from "./types.js";
+export { useWorkflow } from "./use-workflow.js";

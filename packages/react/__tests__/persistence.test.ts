@@ -1,6 +1,6 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { createWorkflowStore } from "../src/store.js";
-import { createTestRouter, definition } from "./helpers.js";
+import { createTestRouter } from "./helpers.js";
 
 function createMockStorage(): Storage {
 	const data = new Map<string, string>();
@@ -34,6 +34,7 @@ describe("persistence", () => {
 
 		const stored = storage.getItem("test-workflow");
 		expect(stored).not.toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by expect above
 		const parsed = JSON.parse(stored!);
 		expect(parsed.state).toBe("InProgress");
 	});
