@@ -6,6 +6,7 @@
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
 import { createOtelPlugin } from "@rytejs/otel";
 import { z } from "zod";
+import { logger } from "./logger.js";
 
 // ---------------------------------------------------------------------------
 // 1. Workflow definition
@@ -170,9 +171,31 @@ orderRouter
 	});
 
 // ---------------------------------------------------------------------------
-// 3. Lifecycle hooks — purely observational logging
+// 3. Lifecycle hooks — structured logging via pino + OTel
 // ---------------------------------------------------------------------------
 
+orderRouter.on("dispatch:start", (workflow, command) => {
+	logger.info(
+		{ workflowId: workflow.id, state: workflow.state, command: command.type },
+		"dispatch started",
+	);
+});
+
 orderRouter.on("transition", (from, to, workflow) => {
-	console.log(`[order] ${workflow.id}: ${from} -> ${to}`);
+	logger.info({ workflowId: workflow.id, from, to }, "state transition");
+});
+
+orderRouter.on("dispatch:end", (workflow, command, result) => {
+	if (result.ok) {
+		logger.info({ workflowId: workflow.id, command: command.type }, "dispatch succeeded");
+	} else {
+		logger.warn(
+			{ workflowId: workflow.id, command: command.type, error: result.error },
+			"dispatch failed",
+		);
+	}
+});
+
+orderRouter.on("error", (error, _ctx) => {
+	logger.error({ error }, "pipeline error");
 });

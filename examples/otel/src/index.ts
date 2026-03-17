@@ -10,6 +10,7 @@ import "./telemetry.js";
 import { createServer } from "node:http";
 import { createEngine, memoryStore } from "@rytejs/core/engine";
 import { createHandler } from "@rytejs/core/http";
+import { logger } from "./logger.js";
 import { orderRouter } from "./workflow.js";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,8 @@ const handler = createHandler({ engine });
 // ---------------------------------------------------------------------------
 
 const server = createServer(async (req, res) => {
+	logger.info({ method: req.method, url: req.url }, "incoming request");
+
 	const url = `http://${req.headers.host}${req.url}`;
 	const headers = new Headers();
 	for (const [key, value] of Object.entries(req.headers)) {
@@ -59,6 +62,8 @@ const server = createServer(async (req, res) => {
 		"Content-Type": response.headers.get("Content-Type") ?? "application/json",
 	});
 	res.end(responseBody);
+
+	logger.info({ method: req.method, url: req.url, status: response.status }, "response sent");
 });
 
 const PORT = 4000;
