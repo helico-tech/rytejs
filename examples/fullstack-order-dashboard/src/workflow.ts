@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // --- Item schema ---
 
-const itemSchema = z.object({
+export const itemSchema = z.object({
 	name: z.string(),
 	quantity: z.number().int().positive(),
 	price: z.number().positive(),
@@ -12,7 +12,7 @@ const itemSchema = z.object({
 
 export type Item = z.infer<typeof itemSchema>;
 
-// --- Workflow definition (same schema as server — keep in sync) ---
+// --- Workflow definition (shared between server and client) ---
 
 export const orderDefinition = defineWorkflow("order", {
 	states: {
