@@ -1253,10 +1253,10 @@ export abstract class WorkflowDO extends DurableObject {
 		const workflowId = request.headers.get("X-Workflow-Id") ?? "";
 
 		try {
-			if (request.method === "PUT" && path === "/create") {
+			if (request.method === "PUT" && (path === "/create" || path === "/")) {
 				return await this.handleCreate(routerName, workflowId, request);
 			}
-			if (request.method === "POST" && path === "/dispatch") {
+			if (request.method === "POST" && (path === "/dispatch" || path === "/")) {
 				return await this.handleDispatch(routerName, workflowId, request);
 			}
 			if (request.method === "GET" && path === "/events") {
@@ -1265,7 +1265,7 @@ export abstract class WorkflowDO extends DurableObject {
 			if (request.method === "GET" && path === "/websocket") {
 				return this.handleWebSocket(request);
 			}
-			if (request.method === "GET" && path === "/snapshot") {
+			if (request.method === "GET" && (path === "/snapshot" || path === "/")) {
 				return await this.handleSnapshot(workflowId);
 			}
 
@@ -1653,16 +1653,32 @@ git push
 
 ---
 
-## Task 8: Cloudflare Order Dashboard Example
+## Task 8: Cloudflare Order Dashboard Example (Fullstack Deployable)
 
-Port the fullstack order dashboard to Cloudflare Workers. Reuses the same shared workflow definition and React client, but replaces the Node.js Hono server with a Worker + Durable Object.
+Port the fullstack order dashboard to Cloudflare Workers as a deployable fullstack app. React client served via Workers Static Assets, API routes forwarded to Durable Objects via `routeToDO`.
+
+**Strategy:** Most React client files are copied directly from `examples/fullstack-order-dashboard/`. Only two files need changes: `use-order-manager.ts` (switch SSE → WebSocket transport) and `workflow.ts` (same, used by both client and worker). The worker replaces the Node.js Hono server.
+
+**How it works:**
+- `routeToDO` parses `/:routerName/:workflowId/*` from the URL
+- The existing `httpCommandTransport` sends `POST /api/order/:id` → Worker strips `/api` → `routeToDO` gets `/order/:id` → DO receives `POST /` → dispatches command
+- Similarly: `PUT` → create, `GET /` → snapshot, `GET /events` → SSE, `GET /websocket` → WebSocket
+- The WorkflowDO handles both root paths (`/`) and explicit paths (`/create`, `/dispatch`, `/snapshot`) so existing transports work unchanged
 
 **Files:**
-- Create: `examples/cloudflare-order-dashboard/worker.ts`
-- Create: `examples/cloudflare-order-dashboard/src/workflow.ts`
-- Create: `examples/cloudflare-order-dashboard/wrangler.toml`
 - Create: `examples/cloudflare-order-dashboard/package.json`
 - Create: `examples/cloudflare-order-dashboard/tsconfig.json`
+- Create: `examples/cloudflare-order-dashboard/wrangler.toml`
+- Create: `examples/cloudflare-order-dashboard/vite.config.ts`
+- Create: `examples/cloudflare-order-dashboard/index.html`
+- Create: `examples/cloudflare-order-dashboard/worker.ts`
+- Create: `examples/cloudflare-order-dashboard/src/workflow.ts`
+- Create: `examples/cloudflare-order-dashboard/src/use-order-manager.ts` (modified: WS transport)
+- Copy: `examples/cloudflare-order-dashboard/src/main.tsx` (from fullstack example)
+- Copy: `examples/cloudflare-order-dashboard/src/App.tsx` (from fullstack example)
+- Copy: `examples/cloudflare-order-dashboard/src/Dashboard.tsx` (from fullstack example)
+- Copy: `examples/cloudflare-order-dashboard/src/types.ts` (from fullstack example)
+- Copy: `examples/cloudflare-order-dashboard/src/components/*` (all views from fullstack example)
 
 **Key reference:** `examples/fullstack-order-dashboard/` — the existing example to port from.
 
@@ -1676,18 +1692,29 @@ File: `examples/cloudflare-order-dashboard/package.json`
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "wrangler dev",
-		"deploy": "wrangler deploy"
+		"dev": "concurrently \"pnpm dev:worker\" \"pnpm dev:client\"",
+		"dev:worker": "wrangler dev",
+		"dev:client": "vite",
+		"build": "vite build",
+		"deploy": "vite build && wrangler deploy"
 	},
 	"dependencies": {
 		"@rytejs/cloudflare": "workspace:*",
 		"@rytejs/core": "workspace:*",
+		"@rytejs/react": "workspace:*",
 		"@rytejs/sync": "workspace:*",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.0.0",
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"@vitejs/plugin-react": "^4.3.0",
+		"concurrently": "^9.0.0",
 		"typescript": "^5.7.0",
+		"vite": "^6.0.0",
 		"wrangler": "^4.0.0"
 	}
 }
@@ -1700,15 +1727,18 @@ File: `examples/cloudflare-order-dashboard/tsconfig.json`
 ```json
 {
 	"compilerOptions": {
-		"target": "ESNext",
+		"target": "ES2020",
 		"module": "ESNext",
+		"lib": ["ES2020", "DOM", "DOM.Iterable"],
 		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"declaration": true,
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"types": ["@cloudflare/workers-types"]
 	},
-	"include": ["*.ts", "src/**/*.ts"]
+	"include": ["*.ts", "src/**/*.ts", "src/**/*.tsx"]
 }
 ```
 
@@ -1716,10 +1746,15 @@ File: `examples/cloudflare-order-dashboard/tsconfig.json`
 
 File: `examples/cloudflare-order-dashboard/wrangler.toml`
 
+Workers Static Assets serves the Vite build, Worker handles API routes.
+
 ```toml
 name = "ryte-order-dashboard"
 main = "worker.ts"
 compatibility_date = "2025-04-01"
+
+[assets]
+directory = "dist"
 
 [[durable_objects.bindings]]
 name = "WORKFLOW_DO"
@@ -1730,14 +1765,77 @@ tag = "v1"
 new_sqlite_classes = ["OrderDO"]
 ```
 
-- [ ] **Step 4: Create shared workflow definition**
+- [ ] **Step 4: Create vite.config.ts**
+
+File: `examples/cloudflare-order-dashboard/vite.config.ts`
+
+Dev server proxies `/api` to wrangler dev (port 8787).
+
+```typescript
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [react()],
+	build: {
+		outDir: "dist",
+	},
+	server: {
+		proxy: {
+			"/api": {
+				target: "http://localhost:8787",
+				changeOrigin: true,
+				ws: true,
+			},
+		},
+	},
+});
+```
+
+- [ ] **Step 5: Create index.html**
+
+File: `examples/cloudflare-order-dashboard/index.html`
+
+```html
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Cloudflare Order Dashboard — @rytejs/cloudflare Example</title>
+		<style>
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				font-family:
+					-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+					sans-serif;
+				background: #f5f5f5;
+				color: #333;
+				line-height: 1.5;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/src/main.tsx"></script>
+	</body>
+</html>
+```
+
+- [ ] **Step 6: Create shared workflow definition**
 
 File: `examples/cloudflare-order-dashboard/src/workflow.ts`
 
-Copy from `examples/fullstack-order-dashboard/src/workflow.ts` but remove the React imports (server-only for this example):
+Same as the fullstack example — includes client router and React context for the frontend.
 
 ```typescript
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
+import { createWorkflowContext } from "@rytejs/react";
 import { z } from "zod";
 
 export const itemSchema = z.object({
@@ -1819,11 +1917,55 @@ export const orderDefinition = defineWorkflow("order", {
 });
 
 export type OrderConfig = typeof orderDefinition.config;
+
+// Client-side router — no handlers needed for server-authoritative dispatch.
+export const clientRouter = new WorkflowRouter(orderDefinition);
+
+export const OrderContext = createWorkflowContext(orderDefinition);
 ```
 
-- [ ] **Step 5: Create worker entry with router handlers and DO class**
+- [ ] **Step 7: Create use-order-manager.ts with WebSocket transport**
+
+File: `examples/cloudflare-order-dashboard/src/use-order-manager.ts`
+
+Copy from `examples/fullstack-order-dashboard/src/use-order-manager.ts` with ONE change: replace `sseUpdateTransport` with `wsUpdateTransport`.
+
+```diff
+-import { composeSyncTransport, httpCommandTransport, sseUpdateTransport } from "@rytejs/sync";
++import { composeSyncTransport, httpCommandTransport, wsUpdateTransport } from "@rytejs/sync";
+
+ const transport = composeSyncTransport({
+ 	commands: httpCommandTransport({ url: "/api", router: "order" }),
+-	updates: sseUpdateTransport({ url: "/api", router: "order" }),
++	updates: wsUpdateTransport({ url: "/api", router: "order" }),
+ });
+```
+
+The rest of the file is identical to the fullstack example. Copy it and apply the diff above.
+
+- [ ] **Step 8: Copy remaining client files from fullstack example**
+
+Copy these files **verbatim** from `examples/fullstack-order-dashboard/`:
+
+```bash
+# Copy client source files
+cp examples/fullstack-order-dashboard/src/main.tsx examples/cloudflare-order-dashboard/src/main.tsx
+cp examples/fullstack-order-dashboard/src/App.tsx examples/cloudflare-order-dashboard/src/App.tsx
+cp examples/fullstack-order-dashboard/src/Dashboard.tsx examples/cloudflare-order-dashboard/src/Dashboard.tsx
+cp examples/fullstack-order-dashboard/src/types.ts examples/cloudflare-order-dashboard/src/types.ts
+
+# Copy all component files
+mkdir -p examples/cloudflare-order-dashboard/src/components
+cp examples/fullstack-order-dashboard/src/components/*.tsx examples/cloudflare-order-dashboard/src/components/
+```
+
+These files need zero modifications — they use `OrderContext` from `./workflow.js` which we've already created.
+
+- [ ] **Step 9: Create worker.ts with router handlers and OrderDO**
 
 File: `examples/cloudflare-order-dashboard/worker.ts`
+
+The Worker strips the `/api` prefix and forwards to `routeToDO`. The `OrderDO` extends `WorkflowDO` with the server-side router (with handlers).
 
 ```typescript
 import { WorkflowRouter } from "@rytejs/core";
@@ -1831,7 +1973,7 @@ import { WorkflowDO, routeToDO } from "@rytejs/cloudflare";
 import { orderDefinition } from "./src/workflow.js";
 import type { Item } from "./src/workflow.js";
 
-// --- Router with handlers ---
+// --- Router with handlers (server-side only) ---
 
 const router = new WorkflowRouter(orderDefinition);
 
@@ -1959,34 +2101,65 @@ export class OrderDO extends WorkflowDO {
 
 // --- Worker entry ---
 
+interface Env {
+	WORKFLOW_DO: DurableObjectNamespace;
+	ASSETS: Fetcher;
+}
+
 export default {
-	async fetch(request: Request, env: { WORKFLOW_DO: DurableObjectNamespace }) {
-		return routeToDO(request, env as never, "WORKFLOW_DO");
+	async fetch(request: Request, env: Env) {
+		const url = new URL(request.url);
+
+		// API routes → strip /api prefix, forward to DO
+		if (url.pathname.startsWith("/api/order/")) {
+			const stripped = url.pathname.slice(4); // "/api/order/..." → "/order/..."
+			const newUrl = new URL(stripped + url.search, url.origin);
+			const apiRequest = new Request(newUrl.toString(), request);
+			return routeToDO(apiRequest, env as never, "WORKFLOW_DO");
+		}
+
+		// Static assets (React build)
+		return env.ASSETS.fetch(request);
 	},
 };
 ```
 
-- [ ] **Step 6: Install dependencies**
+- [ ] **Step 10: Install dependencies**
 
 Run: `cd /home/ralph/ryte && pnpm install`
 Expected: dependencies linked
 
-- [ ] **Step 7: Build @rytejs/cloudflare (needed for example)**
+- [ ] **Step 11: Build packages (needed for example)**
 
-Run: `pnpm --filter @rytejs/cloudflare build`
-Expected: dist/ created
+Run: `pnpm --filter @rytejs/core build && pnpm --filter @rytejs/sync build && pnpm --filter @rytejs/cloudflare build`
+Expected: all dist/ created
 
-- [ ] **Step 8: Verify wrangler can type-check the worker**
+- [ ] **Step 12: Build React client**
 
-Run: `cd examples/cloudflare-order-dashboard && npx tsc --noEmit`
-Expected: No type errors
+Run: `cd examples/cloudflare-order-dashboard && npx vite build`
+Expected: `dist/` directory created with index.html + JS/CSS assets
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
 git add examples/cloudflare-order-dashboard/
-git commit -m "feat(examples): add Cloudflare order dashboard example"
+git commit -m "feat(examples): add deployable Cloudflare order dashboard with React client"
 git push
+```
+
+**To run locally (dev):**
+```bash
+cd examples/cloudflare-order-dashboard
+pnpm dev
+# Opens Vite on :5173 (React) + wrangler on :8787 (API)
+# Vite proxies /api/* to wrangler
+```
+
+**To deploy:**
+```bash
+cd examples/cloudflare-order-dashboard
+pnpm deploy
+# Builds React → dist/, then deploys Worker + static assets to Cloudflare
 ```
 
 ---
