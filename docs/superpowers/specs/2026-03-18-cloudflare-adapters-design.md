@@ -12,7 +12,7 @@ New package `@rytejs/cloudflare` that maps ryte's adapter interfaces to Cloudfla
 
 Additionally, a new `wsUpdateTransport` in `@rytejs/sync` provides a client-side WebSocket transport (runtime-agnostic, not Cloudflare-specific).
 
-All Cloudflare features used are on the **free tier**: Workers, Durable Objects (SQLite backend), KV (if needed later).
+All Cloudflare features used are available on the **Workers Free plan**: Workers, Durable Objects with SQLite backend (free since April 2025, 5 GB storage limit), KV (if needed later).
 
 ## Architecture
 
@@ -76,16 +76,31 @@ Internally, `WorkflowDO` extends `DurableObject` and composes:
 - `cloudflareBroadcaster(this.ctx)` → broadcast manager
 - `ExecutionEngine` wired with the above adapters
 
+The `routers` array is converted to a `Record<string, WorkflowRouter>` using `router.definition.name` as the key, which is what `EngineOptions.routers` expects. If two routers share the same definition name, the constructor throws an error.
+
 The DO's `fetch()` method handles internal routing:
 
 | Method | Path | Behavior |
 |--------|------|----------|
+| PUT | `/create` | Create new workflow via `engine.create()`, return `ExecutionResult` |
 | POST | `/dispatch` | Execute command via engine, broadcast result, return `ExecutionResult` |
 | GET | `/events` | SSE subscription — returns `text/event-stream` Response |
 | GET | `/websocket` | WebSocket upgrade — accepts and registers connection |
 | GET | `/snapshot` | Returns current snapshot + version |
 
-The routerName and workflowId are not in the DO's URL paths — they're already resolved by `routeToDO` before the request reaches the DO. The DO receives the command type + payload in the POST body along with the routerName.
+The routerName and workflowId are not in the DO's URL paths — they're already resolved by `routeToDO` before the request reaches the DO. The DO receives the routerName via an `X-Router-Name` header set by `routeToDO`.
+
+**Error handling:** The DO returns structured error responses matching the `CommandResult` shape (`{ ok: false, error: { category, message } }`) with appropriate HTTP status codes:
+
+| Error | Status Code |
+|-------|-------------|
+| `WorkflowNotFoundError` | 404 |
+| `WorkflowAlreadyExistsError` | 409 |
+| `ConcurrencyConflictError` | 409 |
+| Validation errors | 422 |
+| Domain / unexpected errors | 500 |
+
+This ensures `httpCommandTransport` on the client can parse responses without modification.
 
 ### routeToDO Helper
 
@@ -99,7 +114,7 @@ function routeToDO(
 
 Parses URL pattern `/:routerName/:workflowId/*` from the request path. Generates a deterministic DO ID via `env[binding].idFromName(`${routerName}:${workflowId}`)`, gets the stub, and forwards the request with the remaining path.
 
-Example: `POST /order/order-123/dispatch` → DO with ID `order:order-123` receives `POST /dispatch` with routerName `order` in a header or body field.
+Example: `POST /order/order-123/dispatch` → DO with ID `order:order-123` receives `POST /dispatch` with `X-Router-Name: order` header.
 
 ### cloudflareStore (StoreAdapter)
 
@@ -118,7 +133,7 @@ CREATE TABLE IF NOT EXISTS workflows (
 ```
 
 - `load(id)` — SELECT by ID, parse JSON snapshot, return `{ snapshot, version }` or `null`
-- `save({ id, snapshot, version, expectedVersion })` — UPDATE with `WHERE version = expectedVersion`. Zero rows affected → `ConcurrencyConflictError`. New workflows → INSERT with version 1.
+- `save({ id, snapshot, expectedVersion })` — UPDATE with `SET version = expectedVersion + 1 WHERE version = expectedVersion`. Zero rows affected → `ConcurrencyConflictError`. New workflows → INSERT with version 1. The store computes `version = expectedVersion + 1` internally, consistent with `memoryStore`.
 
 SQLite is synchronous within the DO, so no transaction wrapper is needed.
 
@@ -133,13 +148,18 @@ No-op implementation. `acquire()` returns `true`, `release()` is a no-op. The DO
 ### cloudflareBroadcaster
 
 ```typescript
+import type { UpdateMessage } from "@rytejs/sync"
+
 function cloudflareBroadcaster(ctx: DurableObjectState): {
   handleWebSocket(request: Request): Response
   handleSSE(): Response
-  broadcast(update: { snapshot: WorkflowSnapshot; version: number }): void
+  broadcast(update: UpdateMessage): void
   connectionCount(): number
+  close(): void
 }
 ```
+
+This is a **lower-level primitive**, not an implementation of the `Broadcaster` interface from `@rytejs/sync/server`. The sync package's `Broadcaster` couples engine execution with broadcasting (`execute()` does both), while `cloudflareBroadcaster` only manages connections and broadcast — the `WorkflowDO` class orchestrates the engine + broadcast flow itself. This separation is intentional: it keeps the adapter composable for users who build their own DO.
 
 Manages two connection types simultaneously:
 
@@ -153,6 +173,8 @@ Manages two connection types simultaneously:
 - Creates `ReadableStream`, holds controller in a `Set`
 - Broadcasts by writing `data: ${JSON.stringify(update)}\n\n` to each controller
 - Cleanup via stream `cancel` signal
+
+**`close()`** — closes all SSE controllers and WebSocket connections. Called when the DO is being evicted or explicitly shut down.
 
 **Broadcast flow:**
 1. Command arrives at DO via `POST /dispatch`
@@ -230,7 +252,7 @@ new_sqlite_classes = ["OrderDO"]
 ## Dependencies
 
 `packages/cloudflare/package.json`:
-- `peerDependencies`: `@rytejs/core` (for engine, router, types)
+- `peerDependencies`: `@rytejs/core` (for engine, router, types), `@rytejs/sync` (for `UpdateMessage` type used by broadcaster)
 - `devDependencies`: `@cloudflare/workers-types` (for DO types, DurableObjectState, etc.)
 
 `packages/sync/` — no new dependencies for `wsUpdateTransport` (WebSocket is a global API).
