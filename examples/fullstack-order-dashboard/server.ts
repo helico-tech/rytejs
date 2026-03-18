@@ -1,6 +1,13 @@
 import { serve } from "@hono/node-server";
 import { defineGenericPlugin, WorkflowRouter } from "@rytejs/core";
-import { createEngine, memoryAdapter } from "@rytejs/core/engine";
+import {
+	ConcurrencyConflictError,
+	createEngine,
+	LockConflictError,
+	memoryAdapter,
+	WorkflowAlreadyExistsError,
+	WorkflowNotFoundError,
+} from "@rytejs/core/engine";
 import { createBroadcaster } from "@rytejs/sync/server";
 import { Hono } from "hono";
 import type { Item } from "./src/workflow.js";
@@ -216,6 +223,14 @@ app.put("/api/order/:id", async (c) => {
 		console.log(`    ${green("created")} version=${result.version}`);
 		return c.json({ ok: true, snapshot: result.workflow, version: result.version }, 201);
 	} catch (err) {
+		if (err instanceof WorkflowAlreadyExistsError) {
+			console.log(`    ${yellow("conflict")} order already exists`);
+			return c.json({ ok: false, error: { category: "conflict", message: err.message } }, 409);
+		}
+		if (err instanceof LockConflictError) {
+			console.log(`    ${yellow("locked")} another request is processing this order`);
+			return c.json({ ok: false, error: { category: "locked", message: err.message } }, 409);
+		}
 		console.log(`    ${red("error")} ${String(err)}`);
 		return c.json({ ok: false, error: { category: "unexpected", message: String(err) } }, 500);
 	}
@@ -241,6 +256,18 @@ app.post("/api/order/:id", async (c) => {
 		console.log(`    ${green("dispatched")} version=${result.version}`);
 		return c.json({ ok: true, snapshot, version: result.version });
 	} catch (err) {
+		if (err instanceof LockConflictError) {
+			console.log(`    ${yellow("locked")} another request is processing this order`);
+			return c.json({ ok: false, error: { category: "locked", message: err.message } }, 409);
+		}
+		if (err instanceof ConcurrencyConflictError) {
+			console.log(`    ${yellow("version conflict")} order was modified by another request`);
+			return c.json({ ok: false, error: { category: "conflict", message: err.message } }, 409);
+		}
+		if (err instanceof WorkflowNotFoundError) {
+			console.log(`    ${red("not found")}`);
+			return c.json({ ok: false, error: { category: "not_found", message: err.message } }, 404);
+		}
 		console.log(`    ${red("error")} ${String(err)}`);
 		return c.json({ ok: false, error: { category: "unexpected", message: String(err) } }, 500);
 	}

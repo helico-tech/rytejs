@@ -18,6 +18,7 @@ const buttonBase: React.CSSProperties = {
 
 export function DraftView({ data }: DraftViewProps) {
 	const { dispatch, isDispatching } = OrderContext.useWorkflow();
+	const [customer, setCustomer] = useState(data.customer);
 	const [itemName, setItemName] = useState("");
 	const [itemQty, setItemQty] = useState("1");
 	const [itemPrice, setItemPrice] = useState("");
@@ -35,8 +36,10 @@ export function DraftView({ data }: DraftViewProps) {
 		setItemPrice("");
 	};
 
-	const handleSetCustomer = (value: string) => {
-		dispatch("SetCustomer", { customer: value });
+	const handleCustomerBlur = () => {
+		if (customer !== data.customer) {
+			dispatch("SetCustomer", { customer });
+		}
 	};
 
 	const total = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -60,8 +63,9 @@ export function DraftView({ data }: DraftViewProps) {
 				<input
 					id="customer-name"
 					type="text"
-					value={data.customer}
-					onChange={(e) => handleSetCustomer(e.target.value)}
+					value={customer}
+					onChange={(e) => setCustomer(e.target.value)}
+					onBlur={handleCustomerBlur}
 					placeholder="Enter customer name..."
 					style={{
 						width: "100%",
