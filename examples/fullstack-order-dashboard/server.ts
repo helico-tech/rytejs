@@ -1,12 +1,12 @@
 import { serve } from "@hono/node-server";
-import { WorkflowRouter } from "@rytejs/core";
+import { defineGenericPlugin, WorkflowRouter } from "@rytejs/core";
 import { createEngine, memoryAdapter } from "@rytejs/core/engine";
 import { createBroadcaster } from "@rytejs/sync/server";
 import { Hono } from "hono";
 import type { Item } from "./src/workflow.js";
 import { orderDefinition } from "./src/workflow.js";
 
-// --- Debug logging helpers ---
+// --- Debug logging plugin ---
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
@@ -15,51 +15,50 @@ const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 
-// --- Fake delay (200-1000ms) ---
+const debugPlugin = defineGenericPlugin((router) => {
+	router.on("dispatch:start", (workflow, command) => {
+		console.log(
+			`\n${dim(new Date().toISOString())} ${bold(">>>")} ${cyan(command.type)} on ${yellow(workflow.id)} ${dim(`[${workflow.state}]`)}`,
+		);
+		console.log(dim(`    payload: ${JSON.stringify(command.payload)}`));
+	});
 
-const randomDelay = () =>
-	new Promise<void>((resolve) => {
+	router.on("transition", (from, to, workflow) => {
+		console.log(`    ${yellow(from)} ${dim("->")} ${green(to)} ${dim(`(${workflow.id})`)}`);
+	});
+
+	router.on("event", (event) => {
+		console.log(`    ${dim("event:")} ${cyan(event.type)} ${dim(JSON.stringify(event.data))}`);
+	});
+
+	router.on("error", (error) => {
+		console.log(
+			`    ${red("error:")} [${error.category}] ${error.category === "domain" ? error.code : (error.message ?? "")}`,
+		);
+	});
+
+	router.on("dispatch:end", (_workflow, command, result) => {
+		const status = result.ok ? green("OK") : red("FAIL");
+		console.log(`${dim(new Date().toISOString())} ${bold("<<<")} ${cyan(command.type)} ${status}`);
+	});
+});
+
+// --- Delay plugin (200-1000ms) ---
+
+const delayPlugin = defineGenericPlugin((router) => {
+	router.use(async (_ctx, next) => {
 		const ms = 200 + Math.floor(Math.random() * 800);
 		console.log(dim(`    ~ simulated delay: ${ms}ms`));
-		setTimeout(resolve, ms);
+		await new Promise<void>((resolve) => setTimeout(resolve, ms));
+		await next();
 	});
+});
 
 // --- Router with handlers (server-only) ---
 
 const router = new WorkflowRouter(orderDefinition);
-
-// Debug hooks — log every dispatch lifecycle event
-router.on("dispatch:start", (workflow, command) => {
-	console.log(
-		`\n${dim(new Date().toISOString())} ${bold(">>>")} ${cyan(command.type)} on ${yellow(workflow.id)} ${dim(`[${workflow.state}]`)}`,
-	);
-	console.log(dim(`    payload: ${JSON.stringify(command.payload)}`));
-});
-
-router.on("transition", (from, to, workflow) => {
-	console.log(`    ${yellow(from)} ${dim("->")} ${green(to)} ${dim(`(${workflow.id})`)}`);
-});
-
-router.on("event", (event) => {
-	console.log(`    ${dim("event:")} ${cyan(event.type)} ${dim(JSON.stringify(event.data))}`);
-});
-
-router.on("error", (error) => {
-	console.log(
-		`    ${red("error:")} [${error.category}] ${error.category === "domain" ? (error as { code: string }).code : (error.message ?? "")}`,
-	);
-});
-
-router.on("dispatch:end", (_workflow, command, result) => {
-	const status = result.ok ? green("OK") : red("FAIL");
-	console.log(`${dim(new Date().toISOString())} ${bold("<<<")} ${cyan(command.type)} ${status}`);
-});
-
-// Delay middleware — simulates slow database/network
-router.use(async (_ctx, next) => {
-	await randomDelay();
-	await next();
-});
+router.use(debugPlugin);
+router.use(delayPlugin);
 
 router.state("Draft", ({ on }) => {
 	on("AddItem", ({ data, command, update }) => {
