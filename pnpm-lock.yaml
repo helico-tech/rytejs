@@ -262,6 +262,27 @@ importers:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@25.5.0)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/cloudflare:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.0.0
+        version: 4.20260317.1
+      '@rytejs/core':
+        specifier: workspace:^
+        version: link:../core
+      '@rytejs/sync':
+        specifier: workspace:^
+        version: link:../sync
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.5.0)(jsdom@26.1.0)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/core:
     devDependencies:
       tsup:
@@ -620,6 +641,9 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@cloudflare/workers-types@4.20260317.1':
+    resolution: {integrity: sha512-+G4eVwyCpm8Au1ex8vQBCuA9wnwqetz4tPNRoB/53qvktERWBRMQnrtvC1k584yRE3emMThtuY0gWshvSJ++PQ==}
 
   '@csstools/color-helpers@5.1.0':
     resolution: {integrity: sha512-S11EXWJyy0Mz5SYvRmY8nJYTFFd1LCNV+7cXyAgQtOOuzb4EsgfqDufL+9esx72/eLhsRdGZwaldu/h+E4t4BA==}
@@ -3700,6 +3724,8 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.4.7':
     optional: true
+
+  '@cloudflare/workers-types@4.20260317.1': {}
 
   '@csstools/color-helpers@5.1.0': {}
 
