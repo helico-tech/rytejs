@@ -1,3 +1,4 @@
+import { DurableObject } from "cloudflare:workers";
 import type { WorkflowRouter } from "@rytejs/core";
 import {
 	ConcurrencyConflictError,
