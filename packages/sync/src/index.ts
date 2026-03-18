@@ -1,6 +1,7 @@
 export { composeSyncTransport } from "./compose.js";
 export { type HttpCommandOptions, httpCommandTransport } from "./transports/http-command.js";
 export { type SseUpdateOptions, sseUpdateTransport } from "./transports/sse-update.js";
+export { type WsUpdateOptions, wsUpdateTransport } from "./transports/ws-update.js";
 export type {
 	CommandResult,
 	CommandTransport,
