@@ -1,0 +1,14 @@
+name = "ryte-order-dashboard"
+main = "worker.ts"
+compatibility_date = "2025-04-01"
+
+[assets]
+directory = "dist"
+
+[[durable_objects.bindings]]
+name = "WORKFLOW_DO"
+class_name = "OrderDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OrderDO"]
