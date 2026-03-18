@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import { defineWorkflow } from "../src/definition.js";
-import { definePlugin, isPlugin } from "../src/plugin.js";
+import { defineGenericPlugin, definePlugin, isPlugin } from "../src/plugin.js";
 import { WorkflowRouter } from "../src/router.js";
 
 const definition = defineWorkflow("plugin-test", {
@@ -103,6 +103,56 @@ describe("router.use() with plugins", () => {
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
 		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
 		expect(log).toEqual(["global", "handler"]);
+	});
+
+	test("generic plugin works with any router without explicit type params", async () => {
+		const log: string[] = [];
+		const genericLogger = defineGenericPlugin((router) => {
+			router.on("pipeline:start", () => {
+				log.push("generic:start");
+			});
+			router.on("pipeline:end", () => {
+				log.push("generic:end");
+			});
+		});
+
+		expect(isPlugin(genericLogger)).toBe(true);
+
+		const router = new WorkflowRouter(definition);
+		router.use(genericLogger);
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				ctx.transition("Published", { title: ctx.command.payload.title });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(log).toEqual(["generic:start", "generic:end"]);
+	});
+
+	test("generic plugin can add middleware", async () => {
+		const log: string[] = [];
+		const delayPlugin = defineGenericPlugin((router) => {
+			router.use(async (_ctx, next) => {
+				log.push("before");
+				await next();
+				log.push("after");
+			});
+		});
+
+		const router = new WorkflowRouter(definition);
+		router.use(delayPlugin);
+		router.state("Draft", (state) => {
+			state.on("Publish", (ctx) => {
+				log.push("handler");
+				ctx.transition("Published", { title: ctx.command.payload.title });
+			});
+		});
+
+		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
+		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		expect(log).toEqual(["before", "handler", "after"]);
 	});
 
 	test("use() still works with composable routers", async () => {

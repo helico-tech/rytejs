@@ -14,8 +14,8 @@ export type {
 	MigrationPipeline,
 } from "./migration.js";
 export { defineMigrations, MigrationError, migrate } from "./migration.js";
-export type { Plugin } from "./plugin.js";
-export { definePlugin, isPlugin } from "./plugin.js";
+export type { GenericPlugin, Plugin } from "./plugin.js";
+export { defineGenericPlugin, definePlugin, isPlugin } from "./plugin.js";
 export type { ReadonlyContext } from "./readonly-context.js";
 export type { RouterOptions } from "./router.js";
 export { WorkflowRouter } from "./router.js";

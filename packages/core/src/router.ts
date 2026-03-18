@@ -2,7 +2,7 @@ import { compose } from "./compose.js";
 import { type Context, createContext } from "./context.js";
 import type { WorkflowDefinition } from "./definition.js";
 import { HOOK_EVENTS, HookRegistry } from "./hooks.js";
-import type { Plugin } from "./plugin.js";
+import type { GenericPlugin, Plugin } from "./plugin.js";
 import { isPlugin } from "./plugin.js";
 import type { ReadonlyContext } from "./readonly-context.js";
 import type {
@@ -118,12 +118,14 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		arg:
 			| ((ctx: Context<TConfig, TDeps>, next: () => Promise<void>) => Promise<void>)
 			| WorkflowRouter<TConfig, TDeps>
-			| Plugin<TConfig, TDeps>,
+			| Plugin<TConfig, TDeps>
+			| GenericPlugin,
 	): this {
 		if (arg instanceof WorkflowRouter) {
 			this.merge(arg);
 		} else if (isPlugin(arg)) {
-			(arg as (router: WorkflowRouter<TConfig, TDeps>) => void)(this);
+			// biome-ignore lint/suspicious/noExplicitAny: plugin may be GenericPlugin (Plugin<any,any>) or Plugin<TConfig,TDeps> — both are called with this router at runtime
+			(arg as any)(this);
 		} else {
 			this.globalMiddleware.push(arg as AnyMiddleware);
 		}

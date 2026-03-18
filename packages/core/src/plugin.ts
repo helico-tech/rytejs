@@ -28,6 +28,31 @@ export function definePlugin<TConfig extends WorkflowConfig, TDeps>(
  * @param value - The value to check
  * @returns `true` if the value is a {@link Plugin}
  */
+/** A plugin that works with any router, regardless of config or deps. */
+// biome-ignore lint/suspicious/noExplicitAny: intentional — GenericPlugin opts out of config-specific types
+export type GenericPlugin = Plugin<any, any>;
+
+/**
+ * Creates a plugin that works with any router without requiring explicit type parameters.
+ * Use this for cross-cutting concerns (logging, tracing, delay) that don't reference
+ * specific states, commands, or events.
+ *
+ * @param fn - A function that configures a router (adds hooks, middleware)
+ * @returns A branded {@link GenericPlugin} function
+ */
+export function defineGenericPlugin(
+	// biome-ignore lint/suspicious/noExplicitAny: intentional — generic plugins receive untyped router
+	fn: (router: WorkflowRouter<any, any>) => void,
+): GenericPlugin {
+	return definePlugin(fn);
+}
+
+/**
+ * Checks whether a value is a branded Ryte plugin.
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is a {@link Plugin}
+ */
 export function isPlugin(value: unknown): value is Plugin<WorkflowConfig, unknown> {
 	return typeof value === "function" && PLUGIN_SYMBOL in value;
 }
