@@ -50,25 +50,27 @@ const execResult = await execute("order", "order-123", {
 
 ```typescript
 function createExecutor(
-	...args: Array<WorkflowRouter<any> | ExecutorMiddleware>
-): { execute: Executor; create: Creator };
+	...args: Array<WorkflowRouter<WorkflowConfig> | ExecutorMiddleware>
+): { execute: ExecuteFn; create: CreateFn };
 
-type Executor = (
+type ExecuteFn = (
 	routerName: string,
 	id: string,
 	command: { type: string; payload: unknown },
 ) => Promise<ExecutionResult>;
 
-type Creator = (
+type CreateFn = (
 	routerName: string,
 	id: string,
 	init: { initialState: string; data: unknown },
 ) => Promise<ExecutionResult>;
 ```
 
-`createExecutor` partitions its arguments: `WorkflowRouter` instances go in a router map, everything else is middleware. Both `execute` and `create` run through the same middleware pipeline. The difference is the core handler (innermost function):
+`createExecutor` partitions its arguments at runtime: `WorkflowRouter` instances (detected via `instanceof`) go in a router map keyed by `router.definition.name`, everything else is middleware. If two routers share a `definition.name`, the later one wins. If `routerName` does not match any registered router, the executor returns `{ ok: false, error: { category: "router_not_found", routerName } }`.
 
-- **execute**: loads stored workflow, calls `router.dispatch()`, produces new snapshot + events
+Both `execute` and `create` run through the same middleware pipeline. The difference is the core handler (innermost function):
+
+- **execute**: loads stored workflow, calls `definition.restore()` to rehydrate from JSON, calls `router.dispatch()`, produces new snapshot + events
 - **create**: calls `definition.createWorkflow()`, produces initial snapshot, no events
 
 ### ExecutionResult
@@ -90,21 +92,22 @@ type ExecutorError =
 	| { category: "not_found"; id: string }
 	| { category: "conflict"; id: string; expectedVersion: number; actualVersion: number }
 	| { category: "already_exists"; id: string }
-	| { category: "restore"; id: string; issues: unknown[] };
+	| { category: "restore"; id: string; issues: unknown[] }
+	| { category: "router_not_found"; routerName: string };
 ```
+
+Error flow: the core handler calls `router.dispatch()` which returns `DispatchResult`. If `result.ok` is false, the core handler maps `result.error` (a `PipelineError` with categories `validation`, `domain`, `router`, `unexpected`, `dependency`) onto `ctx.result` and does not set `ctx.snapshot`. The executor reads `ctx.result` and surfaces the `PipelineError` in `ExecutionResult`. This means all five `PipelineError` categories flow through to consumers via the `ExecutionResult.error` union, discriminated by `category` as usual.
 
 ### ExecutorContext
 
-The context that flows through engine middleware:
+The context that flows through executor middleware. Uses a discriminated union on `operation` — consistent with how `DispatchResult` discriminates on `ok` and `PipelineError` discriminates on `category`.
 
 ```typescript
-interface ExecutorContext {
-	// Immutable — always available
-	readonly operation: "create" | "execute";
+type ExecutorContext = ExecuteContext | CreateContext;
+
+interface ExecutorContextBase {
 	readonly id: string;
 	readonly routerName: string;
-	readonly command: { type: string; payload: unknown } | null; // null for create
-	readonly init: { initialState: string; data: unknown } | null; // null for execute
 
 	// Mutable — populated by middleware
 	stored: StoredWorkflow | null;
@@ -113,7 +116,19 @@ interface ExecutorContext {
 	version: number;
 	events: Array<{ type: string; data: unknown }>;
 }
+
+interface ExecuteContext extends ExecutorContextBase {
+	readonly operation: "execute";
+	readonly command: { type: string; payload: unknown };
+}
+
+interface CreateContext extends ExecutorContextBase {
+	readonly operation: "create";
+	readonly init: { initialState: string; data: unknown };
+}
 ```
+
+Middleware that only cares about common fields (id, snapshot, version) uses `ExecutorContext`. Middleware that needs to branch can narrow via `ctx.operation`.
 
 ### ExecutorMiddleware
 
@@ -140,16 +155,21 @@ function withStore(store: StoreAdapter): ExecutorMiddleware {
 			if (!stored) { /* set not_found error, return */ }
 			ctx.stored = stored;
 		} else {
+			// Early check — the real uniqueness guarantee is expectedVersion: 0 on save.
+			// This load is just for a better error message on the common case.
 			const existing = await store.load(ctx.id);
 			if (existing) { /* set already_exists error, return */ }
 		}
 
 		await next();
 
-		if (ctx.result?.ok || ctx.operation === "create") {
+		// Guard: only save if the core handler produced a snapshot.
+		// Handles both successful dispatches and successful creates.
+		// Skips save if dispatch failed or create threw (snapshot stays null).
+		if (ctx.snapshot) {
 			await store.save({
 				id: ctx.id,
-				snapshot: ctx.snapshot!,
+				snapshot: ctx.snapshot,
 				expectedVersion: ctx.stored?.version ?? 0,
 				events: ctx.events,
 			});
@@ -191,6 +211,8 @@ function createSubscriberRegistry(): SubscriberRegistry;
 ```
 
 In-memory map of workflow ID → set of callbacks. Transport server-side handlers add/remove subscribers.
+
+`BroadcastMessage` is a single shared type used by both the subscriber registry and the transport interface — defined once in `core/src/executor/types.ts` and re-exported from the transport types module.
 
 ## Store Adapter Changes
 
@@ -300,15 +322,19 @@ Long polling fallback for environments without WebSocket or SSE support.
 - `subscribe()` polls `fetch(url)` on interval, compares version to detect changes
 - Default interval: 5 seconds
 
+### Client `expectedVersion` Flow
+
+The client sends `expectedVersion` with every dispatch. The server-side transport handler compares it against the loaded `stored.version` before calling `router.dispatch()`. If they don't match, the server returns a `CONFLICT` transport error immediately — the client is out of date and must reload via the broadcast subscription. This check happens in the server-side transport handler (not in executor middleware), because it is a transport-level concern: the executor's `withStore` uses the server-side version for its own `save()` call, but the client version check is about rejecting stale commands early.
+
 ### Server-Side Transport Helpers
 
-Runtime-agnostic functions using standard Web APIs (`Request`/`Response`):
+Functions using standard Web APIs (`Request`/`Response`). **Note on WebSocket upgrades:** the `WebSocket` upgrade mechanism varies across runtimes (Cloudflare uses `WebSocketPair`, Deno uses `Deno.upgradeWebSocket`). The `handleWebSocket` helper targets the Cloudflare/standard `WebSocketPair` API. For other runtimes, users may need a thin adapter over their runtime's upgrade mechanism.
 
 ```typescript
 function handleWebSocket(
 	req: Request,
 	subscribers: SubscriberRegistry,
-	execute: Executor,
+	execute: ExecuteFn,
 ): Response;
 
 function handleSSE(
@@ -332,8 +358,8 @@ Thin fetch handler over the executor. Maps HTTP methods to executor operations.
 
 ```typescript
 function createFetch(
-	execute: Executor,
-	create: Creator,
+	execute: ExecuteFn,
+	create: CreateFn,
 	store: StoreAdapter,
 ): (request: Request) => Promise<Response>;
 ```
@@ -345,9 +371,12 @@ Routes:
 
 Error mapping:
 - `not_found` → 404
+- `router_not_found` → 404
 - `conflict` → 409
 - `already_exists` → 409
 - `validation` → 400
+- `domain` → 422
+- `router` → 400
 - `restore` → 500
 - `unexpected` → 500
 - `dependency` → 503
@@ -407,8 +436,8 @@ Router, definition, dispatch, middleware, hooks, plugins, snapshots, migrations,
 
 ```typescript
 export class OrderDO {
-	private execute: Executor;
-	private create: Creator;
+	private execute: ExecuteFn;
+	private create: CreateFn;
 	private subscribers = createSubscriberRegistry();
 
 	constructor(state: DurableObjectState) {
