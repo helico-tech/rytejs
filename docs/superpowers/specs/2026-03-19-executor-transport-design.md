@@ -68,10 +68,10 @@ type CreateFn = (
 
 `createExecutor` partitions its arguments at runtime: `WorkflowRouter` instances (detected via `instanceof`) go in a router map keyed by `router.definition.name`, everything else is middleware. If two routers share a `definition.name`, the later one wins. If `routerName` does not match any registered router, the executor returns `{ ok: false, error: { category: "router_not_found", routerName } }`.
 
-Both `execute` and `create` run through the same middleware pipeline. The difference is the core handler (innermost function):
+Both `execute` and `create` run through the same middleware pipeline. The **core handler** is appended as the last element of the composed pipeline (the terminal middleware, analogous to `routeEntry.handler` in the router's `compose` call). User middleware wraps it in the onion model. The core handler's behavior depends on the operation:
 
-- **execute**: loads stored workflow, calls `definition.restore()` to rehydrate from JSON, calls `router.dispatch()`, produces new snapshot + events
-- **create**: calls `definition.createWorkflow()`, produces initial snapshot, no events
+- **execute**: calls `definition.restore()` on `ctx.stored.snapshot` to rehydrate from JSON, calls `router.dispatch()`, sets `ctx.result`, `ctx.snapshot` (via `definition.snapshot()`), and `ctx.events`
+- **create**: calls `definition.createWorkflow()`, sets `ctx.snapshot` (via `definition.snapshot()`). If `createWorkflow` throws (invalid state name or data fails Zod validation), the error is caught and mapped to `{ category: "validation" }` on `ctx.result`. No events are emitted for creates.
 
 ### ExecutionResult
 
@@ -108,6 +108,7 @@ type ExecutorContext = ExecuteContext | CreateContext;
 interface ExecutorContextBase {
 	readonly id: string;
 	readonly routerName: string;
+	readonly expectedVersion?: number; // optional — set by transport handlers for early conflict detection
 
 	// Mutable — populated by middleware
 	stored: StoredWorkflow | null;
@@ -167,13 +168,24 @@ function withStore(store: StoreAdapter): ExecutorMiddleware {
 		// Handles both successful dispatches and successful creates.
 		// Skips save if dispatch failed or create threw (snapshot stays null).
 		if (ctx.snapshot) {
-			await store.save({
-				id: ctx.id,
-				snapshot: ctx.snapshot,
-				expectedVersion: ctx.stored?.version ?? 0,
-				events: ctx.events,
-			});
-			ctx.version = (ctx.stored?.version ?? 0) + 1;
+			try {
+				await store.save({
+					id: ctx.id,
+					snapshot: ctx.snapshot,
+					expectedVersion: ctx.stored?.version ?? 0,
+					events: ctx.events,
+				});
+				ctx.version = (ctx.stored?.version ?? 0) + 1;
+			} catch (err) {
+				// ConcurrencyConflictError from store → map to ExecutorError
+				if (err instanceof ConcurrencyConflictError) {
+					ctx.result = null;
+					ctx.snapshot = null;
+					// Set conflict error — will be surfaced in ExecutionResult
+					throw new ExecutorConflictError(ctx.id, ctx.stored?.version ?? 0);
+				}
+				throw err; // unexpected store errors propagate
+			}
 		}
 	};
 }
@@ -188,7 +200,10 @@ function withBroadcast(subscribers: SubscriberRegistry): ExecutorMiddleware {
 	return async (ctx, next) => {
 		await next();
 
-		if (ctx.snapshot && ctx.version > 0) {
+		// Guard on ctx.snapshot — this is the reliable signal that
+		// execution succeeded and a save happened. Works regardless
+		// of middleware ordering (does not depend on ctx.version).
+		if (ctx.snapshot) {
 			subscribers.notify(ctx.id, {
 				snapshot: ctx.snapshot,
 				version: ctx.version,
@@ -198,6 +213,8 @@ function withBroadcast(subscribers: SubscriberRegistry): ExecutorMiddleware {
 	};
 }
 ```
+
+**Middleware ordering:** `withStore` must come before `withBroadcast` in the `createExecutor` arguments so that `ctx.version` is populated before broadcast fires. If `withBroadcast` runs without `withStore`, `ctx.version` will be `0` in the broadcast message — the snapshot is still correct, but the version is meaningless. This ordering is documented and intuitive (you store before you broadcast).
 
 ### SubscriberRegistry
 
@@ -229,7 +246,9 @@ interface SaveOptions {
 
 A Postgres store saves both in one transaction. A memory store can ignore the events field. A separate process polls the outbox for durable event processing — that is a user concern, not a core concern.
 
-### StoredWorkflow and StoreAdapter — unchanged
+### StoredWorkflow and StoreAdapter
+
+`StoredWorkflow` and `StoreAdapter` interfaces are unchanged. The `SaveOptions` extension above is backward-compatible — the `events` field is optional, so existing store implementations continue to work without modification. The built-in `memoryStore()` will be updated to accept (and ignore) the events field.
 
 ```typescript
 interface StoredWorkflow {
@@ -324,7 +343,16 @@ Long polling fallback for environments without WebSocket or SSE support.
 
 ### Client `expectedVersion` Flow
 
-The client sends `expectedVersion` with every dispatch. The server-side transport handler compares it against the loaded `stored.version` before calling `router.dispatch()`. If they don't match, the server returns a `CONFLICT` transport error immediately — the client is out of date and must reload via the broadcast subscription. This check happens in the server-side transport handler (not in executor middleware), because it is a transport-level concern: the executor's `withStore` uses the server-side version for its own `save()` call, but the client version check is about rejecting stale commands early.
+The client sends `expectedVersion` with every dispatch. The server-side transport handler receives this value and passes it to the executor via an optional `expectedVersion` field on `ExecutorContextBase`. The `withStore` middleware checks this: if `expectedVersion` is set and doesn't match `stored.version`, it returns a `conflict` error immediately without calling `next()`. This avoids a double-load: the store loads once inside `withStore`, and the version check happens there too.
+
+```typescript
+interface ExecutorContextBase {
+	// ... existing fields ...
+	readonly expectedVersion?: number; // set by transport handler, checked by withStore
+}
+```
+
+If `expectedVersion` is not set (e.g., called directly without a transport), `withStore` skips the check — the optimistic version on `save()` is still the safety net.
 
 ### Server-Side Transport Helpers
 
@@ -411,6 +439,7 @@ When `transport` is absent: works locally like today, no changes.
 - `QueueAdapter` interface + `memoryQueue()` — events are data in the result, user processes them
 - `TransactionalAdapter` interface — outbox pattern via `SaveOptions.events` replaces it
 - `createHandler()` — replaced by `createFetch`
+- Engine error classes (`LockConflictError`, `WorkflowNotFoundError`, `WorkflowAlreadyExistsError`, `RouterNotFoundError`, `RestoreError`) — replaced by `ExecutorError` discriminated union categories. `ConcurrencyConflictError` is retained (thrown by store adapters, caught by `withStore`).
 
 ## What Gets Added
 
