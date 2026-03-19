@@ -50,7 +50,6 @@ export default defineConfig({
 					text: "Packages",
 					items: [
 						{ text: "Engine", link: "/guide/engine" },
-						{ text: "Worker", link: "/guide/worker" },
 						{ text: "React", link: "/guide/react" },
 					],
 				},

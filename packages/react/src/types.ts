@@ -10,13 +10,10 @@ import type {
 	WorkflowConfig,
 	WorkflowOf,
 } from "@rytejs/core";
-import type { SyncTransport, TransportError } from "@rytejs/sync";
-
 export interface WorkflowStoreSnapshot<TConfig extends WorkflowConfig> {
 	readonly workflow: Workflow<TConfig>;
 	readonly isDispatching: boolean;
-	readonly error: PipelineError<TConfig> | TransportError | null;
-	readonly connectionStatus?: "connected" | "reconnecting" | "disconnected";
+	readonly error: PipelineError<TConfig> | null;
 }
 
 export interface WorkflowStore<TConfig extends WorkflowConfig> {
@@ -26,7 +23,6 @@ export interface WorkflowStore<TConfig extends WorkflowConfig> {
 	dispatch<C extends CommandNames<TConfig>>(
 		command: C,
 		payload: CommandPayload<TConfig, C>,
-		options?: { optimistic?: boolean },
 	): Promise<DispatchResult<TConfig>>;
 	setWorkflow(workflow: Workflow<TConfig>): void;
 	cleanup(): void;
@@ -38,7 +34,6 @@ export interface WorkflowStoreOptions<TConfig extends WorkflowConfig> {
 		storage: Storage;
 		migrations?: MigrationPipeline<TConfig>;
 	};
-	sync?: SyncTransport;
 }
 
 export interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
@@ -46,12 +41,10 @@ export interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
 	readonly state: StateNames<TConfig>;
 	readonly data: StateData<TConfig, StateNames<TConfig>>;
 	readonly isDispatching: boolean;
-	readonly error: PipelineError<TConfig> | TransportError | null;
-	readonly connectionStatus?: "connected" | "reconnecting" | "disconnected";
+	readonly error: PipelineError<TConfig> | null;
 	dispatch<C extends CommandNames<TConfig>>(
 		command: C,
 		payload: CommandPayload<TConfig, C>,
-		options?: { optimistic?: boolean },
 	): Promise<DispatchResult<TConfig>>;
 	match<R>(
 		matchers: {
