@@ -25,6 +25,8 @@
 
 **Note on WebSocket:** The `handleWebSocket` server helper and `wsTransport` client require WebSocket upgrade which varies across runtimes. The plan implements SSE and polling first (fully testable with standard APIs), and stubs the WS transport interface. A real WS implementation requires a runtime-specific test setup (e.g., Cloudflare Workers miniflare or a real server) and is better as a follow-up.
 
+**Already done (from executor core plan):** `createFetch` HTTP handler is implemented at `packages/core/src/http/http.ts` with tests. Not in scope here.
+
 ## File Structure
 
 ```
@@ -89,7 +91,7 @@ pnpm --filter @rytejs/react run test
 pnpm --filter @rytejs/otel run test
 
 # Typecheck
-cd /home/ralph/ryte/packages/core && npx tsc --noEmit
+pnpm --filter @rytejs/core run typecheck
 
 # Lint
 pnpm biome check --fix packages/core/
@@ -194,7 +196,7 @@ export function createMockServer<TConfig extends WorkflowConfig>(
 
 - [ ] **Step 2: Verify it typechecks**
 
-Run: `cd /home/ralph/ryte/packages/core && npx tsc --noEmit`
+Run: `pnpm --filter @rytejs/core run typecheck`
 
 - [ ] **Step 3: Commit**
 
@@ -348,6 +350,8 @@ git commit -m "feat(transport): add handleSSE server-side helper"
 - Modify: `packages/core/__tests__/transport/server.test.ts`
 
 The polling server helper returns the current stored workflow state. Clients poll this endpoint to detect changes.
+
+**Spec deviation:** The spec has `handlePolling(req, subscribers)` but polling reads current state, not subscribes to changes — `StoreAdapter` is the correct parameter, not `SubscriberRegistry`. The spec should be updated to match.
 
 - [ ] **Step 1: Write failing tests** (append to server.test.ts)
 
@@ -954,39 +958,22 @@ transport?: Transport;
 
 - [ ] **Step 2: Write failing tests**
 
-Create `packages/react/__tests__/transport-store.test.ts`:
+Create `packages/react/__tests__/transport-store.test.ts`.
+
+The React test helpers at `packages/react/__tests__/helpers.ts` export `definition` (a "todo" workflow with Pending/InProgress/Done states, Start/Complete/Rename commands) and `createTestRouter()`. Read that file first — the tests below use these exact exports.
 
 ```typescript
 import { describe, expect, test, vi } from "vitest";
-import type { Transport, TransportResult, TransportSubscription, BroadcastMessage } from "@rytejs/core/transport";
+import type { BroadcastMessage } from "@rytejs/core/transport";
 import { createWorkflowStore } from "../src/store.js";
 import { createTestRouter, definition } from "./helpers.js";
 
-function createMockTransport(overrides?: Partial<Transport>): Transport {
-	return {
-		dispatch: overrides?.dispatch ?? vi.fn(async () => ({
-			ok: true as const,
-			snapshot: definition.snapshot(definition.createWorkflow("test", {
-				initialState: "Pending",
-				data: { title: "Test" },
-			})),
-			version: 1,
-			events: [],
-		})),
-		subscribe: overrides?.subscribe ?? vi.fn((_id, _cb) => ({ unsubscribe: vi.fn() })),
-	};
-}
-
-function createTestRouter() {
-	// Reuse the existing helper's router
-}
-
 describe("transport store", () => {
 	test("dispatch goes through transport when provided", async () => {
-		// Create the mock transport that returns a successful result
+		const router = createTestRouter();
 		const dispatchFn = vi.fn(async () => ({
 			ok: true as const,
-			snapshot: definition.snapshot(definition.createWorkflow("order-1", {
+			snapshot: definition.snapshot(definition.createWorkflow("todo-1", {
 				initialState: "InProgress",
 				data: { title: "Test", assignee: "Alice" },
 			})),
@@ -994,49 +981,83 @@ describe("transport store", () => {
 			events: [],
 		}));
 
-		const transport = createMockTransport({ dispatch: dispatchFn });
+		const transport = {
+			dispatch: dispatchFn,
+			subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
+		};
 
 		const store = createWorkflowStore(router, {
 			state: "Pending",
 			data: { title: "Test" },
-			id: "order-1",
+			id: "todo-1",
 		}, { transport });
 
 		await store.dispatch("Start", { assignee: "Alice" });
 
 		expect(dispatchFn).toHaveBeenCalledWith(
-			"order-1",
+			"todo-1",
 			{ type: "Start", payload: { assignee: "Alice" } },
 			expect.any(Number),
 		);
 	});
 
-	test("subscribes to transport on creation", () => {
-		const subscribeFn = vi.fn((_id: string, _cb: (msg: BroadcastMessage) => void) => ({
-			unsubscribe: vi.fn(),
-		}));
-
-		const transport = createMockTransport({ subscribe: subscribeFn });
-
-		createWorkflowStore(router, {
-			state: "Pending",
-			data: { title: "Test" },
-			id: "order-1",
-		}, { transport });
-
-		expect(subscribeFn).toHaveBeenCalledWith("order-1", expect.any(Function));
-	});
-
-	test("cleanup unsubscribes from transport", () => {
-		const unsubscribe = vi.fn();
-		const transport = createMockTransport({
-			subscribe: vi.fn(() => ({ unsubscribe })),
+	test("transport dispatch updates workflow from server snapshot", async () => {
+		const router = createTestRouter();
+		const serverWorkflow = definition.createWorkflow("todo-1", {
+			initialState: "InProgress",
+			data: { title: "Test", assignee: "Alice" },
 		});
+		const transport = {
+			dispatch: vi.fn(async () => ({
+				ok: true as const,
+				snapshot: definition.snapshot(serverWorkflow),
+				version: 2,
+				events: [],
+			})),
+			subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
+		};
 
 		const store = createWorkflowStore(router, {
 			state: "Pending",
 			data: { title: "Test" },
-			id: "order-1",
+			id: "todo-1",
+		}, { transport });
+
+		await store.dispatch("Start", { assignee: "Alice" });
+
+		expect(store.getWorkflow().state).toBe("InProgress");
+	});
+
+	test("subscribes to transport on creation", () => {
+		const router = createTestRouter();
+		const subscribeFn = vi.fn(() => ({ unsubscribe: vi.fn() }));
+
+		const transport = {
+			dispatch: vi.fn(async () => ({ ok: true as const, snapshot: {} as never, version: 1, events: [] })),
+			subscribe: subscribeFn,
+		};
+
+		createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Test" },
+			id: "todo-1",
+		}, { transport });
+
+		expect(subscribeFn).toHaveBeenCalledWith("todo-1", expect.any(Function));
+	});
+
+	test("cleanup unsubscribes from transport", () => {
+		const router = createTestRouter();
+		const unsubscribe = vi.fn();
+		const transport = {
+			dispatch: vi.fn(async () => ({ ok: true as const, snapshot: {} as never, version: 1, events: [] })),
+			subscribe: vi.fn(() => ({ unsubscribe })),
+		};
+
+		const store = createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Test" },
+			id: "todo-1",
 		}, { transport });
 
 		store.cleanup();
@@ -1044,25 +1065,27 @@ describe("transport store", () => {
 	});
 
 	test("incoming broadcast updates workflow", () => {
+		const router = createTestRouter();
 		let broadcastCallback: ((msg: BroadcastMessage) => void) | null = null;
 
-		const transport = createMockTransport({
-			subscribe: vi.fn((_id, cb) => {
+		const transport = {
+			dispatch: vi.fn(async () => ({ ok: true as const, snapshot: {} as never, version: 1, events: [] })),
+			subscribe: vi.fn((_id: string, cb: (msg: BroadcastMessage) => void) => {
 				broadcastCallback = cb;
 				return { unsubscribe: vi.fn() };
 			}),
-		});
+		};
 
 		const store = createWorkflowStore(router, {
 			state: "Pending",
 			data: { title: "Test" },
-			id: "order-1",
+			id: "todo-1",
 		}, { transport });
 
 		expect(broadcastCallback).not.toBeNull();
 
 		// Simulate incoming broadcast
-		const newWorkflow = definition.createWorkflow("order-1", {
+		const newWorkflow = definition.createWorkflow("todo-1", {
 			initialState: "InProgress",
 			data: { title: "Test", assignee: "Bob" },
 		});
@@ -1076,6 +1099,7 @@ describe("transport store", () => {
 	});
 
 	test("without transport, dispatch works locally", async () => {
+		const router = createTestRouter();
 		const store = createWorkflowStore(router, {
 			state: "Pending",
 			data: { title: "Test" },
@@ -1084,28 +1108,100 @@ describe("transport store", () => {
 		const result = await store.dispatch("Start", { assignee: "Alice" });
 		expect(result.ok).toBe(true);
 	});
+
+	test("transport requires id", () => {
+		const router = createTestRouter();
+		const transport = {
+			dispatch: vi.fn(async () => ({ ok: true as const, snapshot: {} as never, version: 1, events: [] })),
+			subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
+		};
+
+		expect(() => createWorkflowStore(router, {
+			state: "Pending",
+			data: { title: "Test" },
+			// no id
+		}, { transport })).toThrow();
+	});
 });
 ```
 
-NOTE: This test file uses the test helpers from `packages/react/__tests__/helpers.ts`. Read that file first to understand the `router` and `definition` exports available. Adjust imports accordingly.
-
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 3: Run test to verify it fails**
 
 Run: `pnpm --filter @rytejs/react vitest run __tests__/transport-store.test.ts`
 
-- [ ] **Step 3: Modify store.ts to support transport**
+- [ ] **Step 4: Modify store.ts to support transport**
 
-Read `packages/react/src/store.ts` first. The changes are:
+Read `packages/react/src/store.ts` first. Make these changes:
 
-1. Import `Transport` type
-2. If `options?.transport` and `initialConfig.id`:
-   - `dispatch()` calls `transport.dispatch(id, { type, payload }, currentVersion)` instead of `router.dispatch()`
-   - On success: restore the returned snapshot as the new workflow
-   - On failure: set error from transport result
-3. On creation: call `transport.subscribe(id, callback)` where callback restores broadcast snapshots and notifies
-4. `cleanup()`: call subscription's `unsubscribe()`
+1. Add import at top:
+```typescript
+import type { Transport, BroadcastMessage } from "@rytejs/core/transport";
+```
 
-The store needs to track a `version` field (initially 0, updated from transport results and broadcasts).
+2. After `const definition = router.definition;` add transport guard:
+```typescript
+if (options?.transport && !initialConfig.id) {
+	throw new Error("Transport requires a workflow id");
+}
+```
+
+3. Add a `version` variable:
+```typescript
+let version = 0;
+```
+
+4. In the `dispatch` function, add transport path before the local dispatch:
+```typescript
+// Transport: server-authoritative dispatch
+if (options?.transport) {
+	const transportResult = await options.transport.dispatch(
+		initialConfig.id!,
+		{ type: command as string, payload },
+		version,
+	);
+
+	if (transportResult.ok) {
+		const restored = definition.restore(transportResult.snapshot);
+		if (restored.ok) {
+			workflow = restored.workflow;
+			version = transportResult.version;
+			error = null;
+			isDispatching = false;
+			notify();
+			return { ok: true, workflow: restored.workflow, events: [] } as DispatchResult<TConfig>;
+		}
+	}
+
+	// Error path
+	error = (transportResult.ok ? null : transportResult.error) as PipelineError<TConfig> | null;
+	isDispatching = false;
+	notify();
+	return { ok: false, error: error ?? { category: "unexpected", error: new Error("Transport error"), message: "Transport error" } } as DispatchResult<TConfig>;
+}
+```
+
+5. Add transport subscription after the return block, before the final `return { getWorkflow, ... }`:
+```typescript
+let transportSubscription: { unsubscribe(): void } | undefined;
+if (options?.transport && initialConfig.id) {
+	transportSubscription = options.transport.subscribe(initialConfig.id, (message: BroadcastMessage) => {
+		const restored = definition.restore(message.snapshot);
+		if (restored.ok) {
+			workflow = restored.workflow;
+			version = message.version;
+			error = null;
+			notify();
+		}
+	});
+}
+```
+
+6. Update `cleanup()`:
+```typescript
+cleanup() {
+	transportSubscription?.unsubscribe();
+},
+```
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1138,7 +1234,7 @@ git commit -m "feat(react): add transport support to createWorkflowStore"
 ```typescript
 import { describe, expect, test, vi, beforeEach } from "vitest";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { createOtelExecutorPlugin } from "../executor.js";
 
 // Setup in-memory tracing
@@ -1203,7 +1299,7 @@ export function createOtelExecutorPlugin(options?: OtelExecutorPluginOptions) {
 
 		executor.on("execute:start", (ctx) => {
 			const opName = ctx.operation === "execute"
-				? `ryte.execute.${(ctx as { command: { type: string } }).command.type}`
+				? `ryte.execute.${ctx.command.type}`
 				: "ryte.create";
 
 			const span = tracer.startSpan(opName);
@@ -1211,7 +1307,7 @@ export function createOtelExecutorPlugin(options?: OtelExecutorPluginOptions) {
 			span.setAttribute("ryte.operation", ctx.operation);
 
 			if (ctx.operation === "execute") {
-				span.setAttribute("ryte.command.type", (ctx as { command: { type: string } }).command.type);
+				span.setAttribute("ryte.command.type", ctx.command.type);
 			}
 
 			spanMap.set(ctx.id, span);
