@@ -16,8 +16,3 @@ export interface StoreAdapter {
 	load(id: string): Promise<StoredWorkflow | null>;
 	save(options: SaveOptions): Promise<void>;
 }
-
-export interface EmittedEvent {
-	type: string;
-	data: unknown;
-}
