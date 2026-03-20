@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
+import { memoryStore } from "../../src/engine/memory-store.js";
 import type { BroadcastMessage } from "../../src/executor/types.js";
 import { createSubscriberRegistry } from "../../src/executor/with-broadcast.js";
+import { handlePolling } from "../../src/transport/server/polling.js";
 import { handleSSE } from "../../src/transport/server/sse.js";
 
 describe("handleSSE", () => {
@@ -65,5 +67,41 @@ describe("handleSSE", () => {
 
 		// The SSE handler subscribed to my-workflow-123, not other-id
 		expect(messages).toHaveLength(0);
+	});
+});
+
+describe("handlePolling", () => {
+	test("returns stored workflow snapshot and version", async () => {
+		const store = memoryStore();
+		// Seed a workflow
+		await store.save({
+			id: "order-1",
+			snapshot: {
+				id: "order-1",
+				definitionName: "order",
+				state: "Draft",
+				data: {},
+				createdAt: "",
+				updatedAt: "",
+				modelVersion: 1,
+			} as never,
+			expectedVersion: 0,
+		});
+
+		const req = new Request("http://localhost/order-1");
+		const res = await handlePolling(req, store);
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.snapshot.id).toBe("order-1");
+		expect(body.version).toBe(1);
+	});
+
+	test("returns 404 for missing workflow", async () => {
+		const store = memoryStore();
+		const req = new Request("http://localhost/missing");
+		const res = await handlePolling(req, store);
+
+		expect(res.status).toBe(404);
 	});
 });
