@@ -174,7 +174,7 @@ The `engine/` directory is a leftover from the Engine → Executor rename. It ho
 - `memoryStore()` factory
 - `ConcurrencyConflictError`
 - `store/` directory (renamed from `engine/`)
-- Executor tests (written from scratch — no executor tests currently exist)
+- Executor tests (rewritten — existing tests in `__tests__/executor/` cover the current plugin/withStore/withBroadcast/hooks API and will be replaced to match the simplified API)
 - `executor.md` guide (rewritten)
 - `@rytejs/core/reactor` entry point (unaffected)
 
