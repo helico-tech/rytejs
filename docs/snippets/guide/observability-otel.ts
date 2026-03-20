@@ -1,6 +1,6 @@
 import { WorkflowRouter } from "@rytejs/core";
 import { WorkflowExecutor } from "@rytejs/core/executor";
-import { createOtelExecutorPlugin, createOtelPlugin } from "@rytejs/otel";
+import { createOtelExecutorMiddleware, createOtelPlugin } from "@rytejs/otel";
 import { taskRouter, taskWorkflow } from "../fixtures.js";
 
 // #region install
@@ -25,12 +25,11 @@ customRouter.use(
 
 // #region executor-plugin
 const executor = new WorkflowExecutor(taskRouter);
-executor.use(createOtelExecutorPlugin());
+executor.use(createOtelExecutorMiddleware());
 
 // Traces executor operations:
 // - ryte.execute.{commandType} spans for execute()
-// - ryte.create spans for create()
-// - Attributes: ryte.workflow.id, ryte.operation, ryte.command.type
+// - Attributes: ryte.workflow.id, ryte.command.type
 // #endregion executor-plugin
 
 // #region full-stack-tracing
@@ -40,7 +39,7 @@ tracedRouter.use(createOtelPlugin());
 
 // Executor-level: operation spans wrapping the router dispatch
 const tracedExecutor = new WorkflowExecutor(tracedRouter);
-tracedExecutor.use(createOtelExecutorPlugin());
+tracedExecutor.use(createOtelExecutorMiddleware());
 
 // End-to-end: executor span → router dispatch span → handler
 // #endregion full-stack-tracing

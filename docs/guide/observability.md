@@ -28,7 +28,7 @@ The patterns below are still useful if you want custom observability without the
 
 ## Executor Tracing
 
-`createOtelExecutorPlugin` traces executor operations — `create()` and `execute()` calls — with span attributes for workflow ID, operation type, and command type:
+`createOtelExecutorMiddleware` traces executor operations with span attributes for workflow ID and command type:
 
 <<< @/snippets/guide/observability-otel.ts#executor-plugin
 
