@@ -9,7 +9,7 @@ export interface ExecutorContextBase {
 	readonly expectedVersion?: number;
 
 	stored: StoredWorkflow | null;
-	result: DispatchResult<WorkflowConfig> | null;
+	result: DispatchResult<WorkflowConfig> | { ok: false; error: ExecutorError } | null;
 	snapshot: WorkflowSnapshot | null;
 	version: number;
 	events: Array<{ type: string; data: unknown }>;
