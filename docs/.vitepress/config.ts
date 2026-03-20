@@ -49,8 +49,18 @@ export default defineConfig({
 				{
 					text: "Packages",
 					items: [
-						{ text: "Engine", link: "/guide/engine" },
+						{ text: "Executor", link: "/guide/executor" },
 						{ text: "React", link: "/guide/react" },
+					],
+				},
+				{
+					text: "Infrastructure",
+					items: [
+						{ text: "Persistence", link: "/guide/persistence" },
+						{ text: "HTTP API", link: "/guide/http-api" },
+						{ text: "Real-time", link: "/guide/real-time" },
+						{ text: "Transports", link: "/guide/transports" },
+						{ text: "Putting It Together", link: "/guide/putting-it-together" },
 					],
 				},
 			],
