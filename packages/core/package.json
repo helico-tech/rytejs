@@ -34,6 +34,11 @@
 			"types": "./dist/transport/index.d.ts",
 			"import": "./dist/transport/index.js",
 			"require": "./dist/transport/index.cjs"
+		},
+		"./transport/server": {
+			"types": "./dist/transport/server/index.d.ts",
+			"import": "./dist/transport/server/index.js",
+			"require": "./dist/transport/server/index.cjs"
 		}
 	},
 	"main": "./dist/index.cjs",

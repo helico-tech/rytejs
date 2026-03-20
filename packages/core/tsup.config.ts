@@ -8,6 +8,7 @@ export default defineConfig({
 		"src/http/index.ts",
 		"src/executor/index.ts",
 		"src/transport/index.ts",
+		"src/transport/server/index.ts",
 	],
 	format: ["cjs", "esm"],
 	dts: true,
