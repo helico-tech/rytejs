@@ -1,32 +1,17 @@
 # Executor
 
-The [Integrations guide](/guide/integrations) shows how to wire Ryte into any runtime with five steps: receive, load, dispatch, persist, publish. The `WorkflowExecutor` encapsulates that entire loop behind `create()` and `execute()` calls, with pluggable middleware for storage, broadcasting, and more.
-
-::: tip Progressive Walkthrough
-For a step-by-step guide to building a full server-side stack, see the [Infrastructure](/guide/persistence) section.
-:::
-
-## Why Use the Executor
-
-| Manual integration | `WorkflowExecutor` |
-| --- | --- |
-| You implement load/save/lock/enqueue | `withStore` middleware handles it |
-| You handle concurrency conflicts | Optimistic locking built-in |
-| You wire up every endpoint | `createFetch()` gives you a standard HTTP API |
-| Full control over every step | Composable middleware pipeline |
-
-Use the executor when you want a batteries-included runtime. Use manual integration when you need full control over the execution loop.
+The `WorkflowExecutor` is the IO shell around the pure router: **load → dispatch → save**. It takes a router and a store, runs your middleware pipeline, and handles concurrency.
 
 ## Store Interface
 
-The engine delegates persistence to the `StoreAdapter` interface:
+The executor delegates persistence to the `StoreAdapter` interface:
 
 | Method | Responsibility |
 | --- | --- |
 | `load(id)` | Load a workflow snapshot by ID |
 | `save(options)` | Persist a snapshot with optimistic concurrency |
 
-`save()` takes an `expectedVersion` for optimistic concurrency control -- throw `ConcurrencyConflictError` if the stored version doesn't match.
+`save()` takes an `expectedVersion` for optimistic concurrency control — throw `ConcurrencyConflictError` if the stored version doesn't match.
 
 <<< @/snippets/guide/executor.ts#adapters
 
@@ -38,36 +23,32 @@ For testing and prototyping, use the built-in memory store:
 
 ## Creating an Executor
 
-Create a `WorkflowExecutor` and add the `withStore` middleware:
+Pass a router and a store to the constructor:
 
 <<< @/snippets/guide/executor.ts#create-executor
 
-## Creating Workflows
-
-`executor.create()` validates the initial data against Zod schemas, checks for duplicates, and persists the snapshot:
-
-<<< @/snippets/guide/executor.ts#create-workflow
-
 ## Executing Commands
 
-`executor.execute()` loads, restores, dispatches, saves, and returns events in one call:
+`executor.execute()` loads the workflow, runs the middleware pipeline, dispatches the command, saves the result, and returns:
 
 <<< @/snippets/guide/executor.ts#execute
 
-## HTTP Handler
+## Optimistic Locking
 
-`createFetch()` returns a `(Request) => Promise<Response>` function compatible with any Web Standard API server:
+Pass `expectedVersion` to reject stale writes early:
 
-<<< @/snippets/guide/executor.ts#http-handler
+<<< @/snippets/guide/executor.ts#expected-version
 
-| Method | Path | Action |
-| --- | --- | --- |
-| `PUT` | `/:name/:id` | Create workflow |
-| `POST` | `/:name/:id` | Execute command |
-| `GET` | `/:name/:id` | Load workflow |
+## Middleware
+
+Middleware runs after the workflow is loaded but before the save. Use it for auth, logging, rate limiting, or any cross-cutting concern that needs access to the stored workflow:
+
+<<< @/snippets/guide/executor.ts#middleware
+
+Middleware executes in Koa-style onion order — the first middleware added wraps the rest.
 
 ## Error Handling
 
-Store adapters throw `ConcurrencyConflictError` for optimistic locking failures. Dispatch errors (domain, validation, router) are returned inside the `ExecutionResult`, not thrown.
+Dispatch errors (domain, validation, router) are returned inside `ExecutionResult`, never thrown. Store adapters throw `ConcurrencyConflictError` for optimistic locking failures at the database level:
 
 <<< @/snippets/guide/executor.ts#error-handling

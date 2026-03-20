@@ -13,8 +13,7 @@ import type {
 	WorkflowOf,
 } from "@rytejs/core";
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
-import type { Transport } from "@rytejs/core/transport";
-import { sseTransport } from "@rytejs/core/transport";
+import type { Transport } from "@rytejs/react";
 import { z } from "zod";
 
 // ── Declare @rytejs/react types (not a docs dependency) ─────────────────────
@@ -312,7 +311,16 @@ const persistedStore = createWorkflowStore(
 // ── #transport-store ──────────────────────────────────────────────────────
 
 // #region transport-store
-const transportInstance = sseTransport("http://localhost:3000/task");
+const exampleTransport: Transport = {
+	async dispatch(id, command, expectedVersion) {
+		// Implement server dispatch — e.g., fetch("POST", `/api/workflows/${id}`, ...)
+		throw new Error(`Not implemented: dispatch(${id})`);
+	},
+	subscribe(id, callback) {
+		// Implement server subscription — e.g., EventSource, WebSocket
+		return { unsubscribe() {} };
+	},
+};
 
 const transportStore = createWorkflowStore(
 	router,
@@ -321,7 +329,7 @@ const transportStore = createWorkflowStore(
 		data: { title: "Write docs", priority: 0 },
 		id: "task-1", // Required when using transport
 	},
-	{ transport: transportInstance },
+	{ transport: exampleTransport },
 );
 
 // Dispatch goes through the server instead of locally

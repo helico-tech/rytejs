@@ -93,7 +93,7 @@ See [Migrations](/guide/migrations) for details on defining migration pipelines.
 
 ## Transport
 
-Pass a `transport` option to `createWorkflowStore` to dispatch commands through a server instead of locally. The server becomes the authority — dispatches go through the executor pipeline, and broadcasts push updates back to the client.
+Pass a `transport` option to `createWorkflowStore` to dispatch commands through a server instead of locally. Implement the `Transport` interface (exported from `@rytejs/react`) to connect to your server — dispatches go through the executor pipeline, and broadcasts push updates back to the client.
 
 <<< @/snippets/guide/react.ts#transport-store
 
@@ -115,4 +115,3 @@ Call `cleanup()` to unsubscribe from the transport when the store is no longer n
 - [Serialization](/guide/serialization) -- understand snapshots and restore
 - [Migrations](/guide/migrations) -- evolve stored workflow data over time
 - [Testing](/guide/testing) -- test workflows with `@rytejs/testing`
-- [Transports](/guide/transports) -- connect to a server with SSE or polling

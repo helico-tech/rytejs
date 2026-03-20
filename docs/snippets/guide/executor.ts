@@ -1,13 +1,10 @@
-import type { SaveOptions, StoreAdapter, StoredWorkflow } from "@rytejs/core/engine";
-import { ConcurrencyConflictError, memoryStore } from "@rytejs/core/engine";
-import { WorkflowExecutor, withStore } from "@rytejs/core/executor";
-import { createFetch } from "@rytejs/core/http";
-import { taskRouter } from "../fixtures.js";
-
-// ── #adapters ────────────────────────────────────────────────────────────────
+import type { ExecutorMiddleware } from "@rytejs/core/executor";
+import { WorkflowExecutor } from "@rytejs/core/executor";
+import type { SaveOptions, StoreAdapter, StoredWorkflow } from "@rytejs/core/store";
+import { ConcurrencyConflictError, memoryStore } from "@rytejs/core/store";
+import { taskRouter, taskWorkflow } from "../fixtures.js";
 
 // #region adapters
-// StoreAdapter — persist workflow snapshots
 const pgStore: StoreAdapter = {
 	async load(id: string): Promise<StoredWorkflow | null> {
 		// SELECT snapshot, version FROM workflows WHERE id = $1
@@ -22,35 +19,13 @@ const pgStore: StoreAdapter = {
 };
 // #endregion adapters
 
-// ── #memory-store ───────────────────────────────────────────────────────────
-
 // #region memory-store
 const store = memoryStore();
 // #endregion memory-store
 
-// ── #create-executor ────────────────────────────────────────────────────────
-
 // #region create-executor
-const executor = new WorkflowExecutor(taskRouter).use(withStore(store));
+const executor = new WorkflowExecutor(taskRouter, store);
 // #endregion create-executor
-
-// ── #create-workflow ────────────────────────────────────────────────────────
-
-// #region create-workflow
-(async () => {
-	const result = await executor.create("task-1", {
-		initialState: "Todo",
-		data: { title: "Write docs", priority: 0 },
-	});
-
-	if (result.ok) {
-		console.log(result.snapshot); // WorkflowSnapshot
-		console.log(result.version); // 1
-	}
-})();
-// #endregion create-workflow
-
-// ── #execute ────────────────────────────────────────────────────────────────
 
 // #region execute
 (async () => {
@@ -69,35 +44,47 @@ const executor = new WorkflowExecutor(taskRouter).use(withStore(store));
 })();
 // #endregion execute
 
-// ── #http-handler ───────────────────────────────────────────────────────────
+// #region expected-version
+(async () => {
+	const result = await executor.execute(
+		"task-1",
+		{ type: "Start", payload: { assignee: "alice" } },
+		{ expectedVersion: 1 },
+	);
 
-// #region http-handler
-const fetch = createFetch({ task: executor }, store);
+	if (!result.ok && result.error.category === "conflict") {
+		console.log("Stale version — reload and retry");
+	}
+})();
+// #endregion expected-version
 
-// Use with any Web Standard API compatible server:
-// Bun:    Bun.serve({ fetch })
-// Deno:   Deno.serve(fetch)
-// Node:   see @hono/node-server or similar adapter
+// #region middleware
+const authMiddleware: ExecutorMiddleware = async (ctx, next) => {
+	// Middleware sees the loaded workflow — check permissions
+	const ownerField = (ctx.stored.snapshot.data as { owner?: string }).owner;
+	if (ownerField !== "current-user") {
+		ctx.result = {
+			ok: false as const,
+			error: { category: "not_found" as const, id: ctx.id },
+		};
+		return; // short-circuit — don't call next()
+	}
+	await next();
+};
 
-// PUT  /task/order-1    — create workflow
-// POST /task/order-1    — execute command
-// GET  /task/order-1    — load workflow
-// #endregion http-handler
-
-// ── #error-handling ─────────────────────────────────────────────────────────
+executor.use(authMiddleware);
+// #endregion middleware
 
 // #region error-handling
 (async () => {
 	try {
-		const store = pgStore;
-		await store.save({
+		await pgStore.save({
 			id: "task-1",
-			snapshot: {} as Parameters<typeof store.save>[0]["snapshot"],
+			snapshot: {} as Parameters<typeof pgStore.save>[0]["snapshot"],
 			expectedVersion: 1,
 		});
 	} catch (err) {
 		if (err instanceof ConcurrencyConflictError) {
-			// Workflow was modified between load and save (optimistic locking)
 			console.log("Conflict:", err.workflowId, err.expectedVersion, err.actualVersion);
 		}
 	}
@@ -105,4 +92,3 @@ const fetch = createFetch({ task: executor }, store);
 // #endregion error-handling
 
 void pgStore;
-void fetch;

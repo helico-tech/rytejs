@@ -1,5 +1,6 @@
 import { WorkflowRouter } from "@rytejs/core";
 import { WorkflowExecutor } from "@rytejs/core/executor";
+import { memoryStore } from "@rytejs/core/store";
 import { createOtelExecutorMiddleware, createOtelPlugin } from "@rytejs/otel";
 import { taskRouter, taskWorkflow } from "../fixtures.js";
 
@@ -24,7 +25,8 @@ customRouter.use(
 // #endregion custom
 
 // #region executor-plugin
-const executor = new WorkflowExecutor(taskRouter);
+const store = memoryStore();
+const executor = new WorkflowExecutor(taskRouter, store);
 executor.use(createOtelExecutorMiddleware());
 
 // Traces executor operations:
@@ -38,7 +40,8 @@ const tracedRouter = new WorkflowRouter(taskWorkflow);
 tracedRouter.use(createOtelPlugin());
 
 // Executor-level: operation spans wrapping the router dispatch
-const tracedExecutor = new WorkflowExecutor(tracedRouter);
+const tracedStore = memoryStore();
+const tracedExecutor = new WorkflowExecutor(tracedRouter, tracedStore);
 tracedExecutor.use(createOtelExecutorMiddleware());
 
 // End-to-end: executor span → router dispatch span → handler
