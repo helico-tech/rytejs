@@ -1,6 +1,6 @@
-import type { BroadcastMessage } from "@rytejs/core/transport";
 import { describe, expect, test, vi } from "vitest";
 import { createWorkflowStore } from "../src/store.js";
+import type { BroadcastMessage } from "../src/transport.js";
 import { createTestRouter, definition } from "./helpers.js";
 
 describe("transport store", () => {

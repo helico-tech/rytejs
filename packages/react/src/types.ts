@@ -10,7 +10,7 @@ import type {
 	WorkflowConfig,
 	WorkflowOf,
 } from "@rytejs/core";
-import type { Transport } from "@rytejs/core/transport";
+import type { Transport } from "./transport.js";
 export interface WorkflowStoreSnapshot<TConfig extends WorkflowConfig> {
 	readonly workflow: Workflow<TConfig>;
 	readonly isDispatching: boolean;

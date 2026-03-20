@@ -10,7 +10,7 @@ import type {
 	WorkflowDefinition,
 } from "@rytejs/core";
 import { migrate, type WorkflowRouter } from "@rytejs/core";
-import type { BroadcastMessage } from "@rytejs/core/transport";
+import type { BroadcastMessage, TransportError } from "./transport.js";
 import type { WorkflowStore, WorkflowStoreOptions, WorkflowStoreSnapshot } from "./types.js";
 
 export function createWorkflowStore<
@@ -76,7 +76,16 @@ export function createWorkflowStore<
 			}
 
 			// Error path
-			error = (transportResult.ok ? null : transportResult.error) as PipelineError<TConfig> | null;
+			const transportError: TransportError | null = transportResult.ok
+				? null
+				: transportResult.error;
+			error = transportError
+				? ({
+						category: "unexpected",
+						error: new Error(transportError.message),
+						message: transportError.message,
+					} as PipelineError<TConfig>)
+				: null;
 			isDispatching = false;
 			notify();
 			return {
