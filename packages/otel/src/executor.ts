@@ -1,5 +1,5 @@
 import { type Span, SpanStatusCode, trace } from "@opentelemetry/api";
-import { defineExecutorPlugin, type ExecutorContext } from "@rytejs/core/executor";
+import type { ExecutorContext, ExecutorMiddleware } from "@rytejs/core/executor";
 import {
 	ATTR_COMMAND_TYPE,
 	ATTR_ERROR_CATEGORY,
@@ -8,40 +8,28 @@ import {
 	SCOPE_NAME,
 } from "./conventions.js";
 
-export interface OtelExecutorPluginOptions {
+export interface OtelExecutorMiddlewareOptions {
 	tracerName?: string;
 }
 
-export function createOtelExecutorPlugin(options?: OtelExecutorPluginOptions) {
+export function createOtelExecutorMiddleware(
+	options?: OtelExecutorMiddlewareOptions,
+): ExecutorMiddleware {
 	const tracerName = options?.tracerName ?? SCOPE_NAME;
-	const spanMap = new Map<string, Span>();
 
-	return defineExecutorPlugin((executor) => {
+	return async (ctx: ExecutorContext, next: () => Promise<void>) => {
 		const tracer = trace.getTracer(tracerName);
+		const spanName = `ryte.execute.${ctx.command.type}`;
 
-		executor.on("execute:start", (ctx: ExecutorContext) => {
-			const opName =
-				ctx.operation === "execute" ? `ryte.execute.${ctx.command.type}` : "ryte.create";
+		const span = tracer.startSpan(spanName);
+		span.setAttribute(ATTR_WORKFLOW_ID, ctx.id);
+		span.setAttribute(ATTR_COMMAND_TYPE, ctx.command.type);
 
-			const span = tracer.startSpan(opName);
-			span.setAttribute(ATTR_WORKFLOW_ID, ctx.id);
-			span.setAttribute("ryte.operation", ctx.operation);
-
-			if (ctx.operation === "execute") {
-				span.setAttribute(ATTR_COMMAND_TYPE, ctx.command.type);
-			}
-
-			spanMap.set(ctx.id, span);
-		});
-
-		executor.on("execute:end", (ctx: ExecutorContext) => {
-			const span = spanMap.get(ctx.id);
-			if (!span) return;
-			spanMap.delete(ctx.id);
+		try {
+			await next();
 
 			if (ctx.snapshot) {
 				span.setAttribute(ATTR_RESULT, "ok");
-				span.setAttribute("ryte.version", ctx.version);
 				span.setStatus({ code: SpanStatusCode.OK });
 			} else if (ctx.result && !ctx.result.ok) {
 				span.setAttribute(ATTR_RESULT, "error");
@@ -51,8 +39,15 @@ export function createOtelExecutorPlugin(options?: OtelExecutorPluginOptions) {
 					message: ctx.result.error.category,
 				});
 			}
-
+		} catch (err) {
+			span.setAttribute(ATTR_RESULT, "error");
+			span.setStatus({
+				code: SpanStatusCode.ERROR,
+				message: err instanceof Error ? err.message : String(err),
+			});
+			throw err;
+		} finally {
 			span.end();
-		});
-	});
+		}
+	};
 }
