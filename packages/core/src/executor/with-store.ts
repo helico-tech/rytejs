@@ -1,5 +1,5 @@
-import { ConcurrencyConflictError } from "../engine/errors.js";
-import type { StoreAdapter } from "../engine/types.js";
+import { ConcurrencyConflictError } from "../store/errors.js";
+import type { StoreAdapter } from "../store/types.js";
 import type { ExecutorMiddleware } from "./types.js";
 
 export function withStore(store: StoreAdapter): ExecutorMiddleware {

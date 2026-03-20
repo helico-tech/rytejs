@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { memoryStore } from "../../src/engine/memory-store.js";
 import { WorkflowExecutor } from "../../src/executor/executor.js";
 import type { BroadcastMessage } from "../../src/executor/types.js";
 import { createSubscriberRegistry, withBroadcast } from "../../src/executor/with-broadcast.js";
 import { withStore } from "../../src/executor/with-store.js";
+import { memoryStore } from "../../src/store/memory-store.js";
 import { createTestRouter } from "./helpers.js";
 
 describe("createSubscriberRegistry", () => {

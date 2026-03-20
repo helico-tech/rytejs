@@ -1,5 +1,5 @@
-import type { StoredWorkflow } from "../engine/types.js";
 import type { WorkflowSnapshot } from "../snapshot.js";
+import type { StoredWorkflow } from "../store/types.js";
 import type { DispatchResult, PipelineError, WorkflowConfig } from "../types.js";
 
 // ── Context ──

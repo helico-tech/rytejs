@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { ConcurrencyConflictError } from "../../src/engine/errors.js";
-import { memoryStore } from "../../src/engine/memory-store.js";
+import { ConcurrencyConflictError } from "../../src/store/errors.js";
+import { memoryStore } from "../../src/store/memory-store.js";
 
 const makeSnapshot = (id: string, state = "Draft") => ({
 	id,

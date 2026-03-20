@@ -1,10 +1,10 @@
-import { memoryStore } from "../../src/engine/memory-store.js";
-import type { StoreAdapter } from "../../src/engine/types.js";
 import { WorkflowExecutor } from "../../src/executor/executor.js";
 import type { SubscriberRegistry } from "../../src/executor/types.js";
 import { createSubscriberRegistry, withBroadcast } from "../../src/executor/with-broadcast.js";
 import { withStore } from "../../src/executor/with-store.js";
 import type { WorkflowRouter } from "../../src/router.js";
+import { memoryStore } from "../../src/store/memory-store.js";
+import type { StoreAdapter } from "../../src/store/types.js";
 import type { WorkflowConfig } from "../../src/types.js";
 
 export interface MockServer {

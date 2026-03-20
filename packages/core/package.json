@@ -10,10 +10,10 @@
 			"import": "./dist/index.js",
 			"require": "./dist/index.cjs"
 		},
-		"./engine": {
-			"types": "./dist/engine/index.d.ts",
-			"import": "./dist/engine/index.js",
-			"require": "./dist/engine/index.cjs"
+		"./store": {
+			"types": "./dist/store/index.d.ts",
+			"import": "./dist/store/index.js",
+			"require": "./dist/store/index.cjs"
 		},
 		"./reactor": {
 			"types": "./dist/reactor/index.d.ts",

@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { memoryStore } from "../../src/engine/memory-store.js";
-import type { StoreAdapter } from "../../src/engine/types.js";
 import { WorkflowExecutor } from "../../src/executor/executor.js";
 import { withStore } from "../../src/executor/with-store.js";
+import { memoryStore } from "../../src/store/memory-store.js";
+import type { StoreAdapter } from "../../src/store/types.js";
 import { createTestRouter } from "./helpers.js";
 
 describe("withStore", () => {

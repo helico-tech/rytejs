@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { memoryStore } from "../../src/engine/memory-store.js";
 import type { BroadcastMessage } from "../../src/executor/types.js";
 import { createSubscriberRegistry } from "../../src/executor/with-broadcast.js";
+import { memoryStore } from "../../src/store/memory-store.js";
 import { handlePolling } from "../../src/transport/server/polling.js";
 import { handleSSE } from "../../src/transport/server/sse.js";
 

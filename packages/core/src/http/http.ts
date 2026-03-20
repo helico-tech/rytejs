@@ -1,6 +1,6 @@
-import type { StoreAdapter } from "../engine/types.js";
 import type { WorkflowExecutor } from "../executor/executor.js";
 import type { ExecutionResult } from "../executor/types.js";
+import type { StoreAdapter } from "../store/types.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: executor map holds different configs
 type ExecutorMap = Record<string, WorkflowExecutor<any>>;

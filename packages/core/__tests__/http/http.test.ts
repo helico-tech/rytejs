@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { memoryStore } from "../../src/engine/memory-store.js";
 import { WorkflowExecutor } from "../../src/executor/executor.js";
 import { withStore } from "../../src/executor/with-store.js";
 import { createFetch } from "../../src/http/http.js";
+import { memoryStore } from "../../src/store/memory-store.js";
 import { createTestRouter } from "../executor/helpers.js";
 
 function makeRequest(method: string, path: string, body?: unknown): Request {

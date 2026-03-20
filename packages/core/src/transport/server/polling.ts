@@ -1,4 +1,4 @@
-import type { StoreAdapter } from "../../engine/types.js";
+import type { StoreAdapter } from "../../store/types.js";
 
 export async function handlePolling(req: Request, store: StoreAdapter): Promise<Response> {
 	const url = new URL(req.url);

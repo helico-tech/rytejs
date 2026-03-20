@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
-import { ConcurrencyConflictError } from "../../src/engine/errors.js";
-import type { SaveOptions, StoreAdapter, StoredWorkflow } from "../../src/engine/types.js";
+import { ConcurrencyConflictError } from "../../src/store/errors.js";
+import type { SaveOptions, StoreAdapter, StoredWorkflow } from "../../src/store/types.js";
 
 export interface SqliteStoreResult {
 	store: StoreAdapter;
