@@ -1,140 +1,132 @@
 import { compose } from "../compose.js";
-import { HookRegistry } from "../hooks.js";
 import type { WorkflowRouter } from "../router.js";
 import type { WorkflowSnapshot } from "../snapshot.js";
+import { ConcurrencyConflictError } from "../store/errors.js";
+import type { StoreAdapter } from "../store/types.js";
 import type { WorkflowConfig } from "../types.js";
-import { type ExecutorPlugin, isExecutorPlugin } from "./plugin.js";
-import type {
-	CreateContext,
-	ExecuteContext,
-	ExecutionResult,
-	ExecutorContext,
-	ExecutorMiddleware,
-} from "./types.js";
-
-type ExecutorHookEvent = "execute:start" | "execute:end";
+import type { ExecutionResult, ExecutorContext, ExecutorMiddleware } from "./types.js";
 
 export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 	private readonly middleware: ExecutorMiddleware[] = [];
-	private readonly hookRegistry = new HookRegistry();
-	private readonly onHookError: (error: unknown) => void;
 
 	constructor(
 		public readonly router: WorkflowRouter<TConfig>,
-		options?: { onHookError?: (error: unknown) => void },
-	) {
-		this.onHookError = options?.onHookError ?? console.error;
-	}
+		private readonly store: StoreAdapter,
+	) {}
 
-	use(arg: ExecutorMiddleware | ExecutorPlugin): this {
-		if (isExecutorPlugin(arg)) {
-			// biome-ignore lint/suspicious/noExplicitAny: plugin accepts any executor config
-			(arg as any)(this);
-		} else {
-			this.middleware.push(arg);
-		}
+	use(middleware: ExecutorMiddleware): this {
+		this.middleware.push(middleware);
 		return this;
 	}
 
-	on(event: ExecutorHookEvent, callback: (ctx: ExecutorContext) => void | Promise<void>): this {
-		// biome-ignore lint/complexity/noBannedTypes: HookRegistry uses Function internally
-		this.hookRegistry.add(event, callback as Function);
-		return this;
-	}
-
-	async create(
+	async execute(
 		id: string,
-		init: { initialState: string; data: unknown },
+		command: { type: string; payload: unknown },
+		options?: { expectedVersion?: number },
 	): Promise<ExecutionResult> {
-		const ctx: CreateContext = {
-			operation: "create",
-			id,
-			init,
-			stored: null,
-			result: null,
-			snapshot: null,
-			version: 0,
-			events: [],
-		};
-		return this.run(ctx);
-	}
+		// 1. Load
+		const stored = await this.store.load(id);
+		if (!stored) {
+			return { ok: false, error: { category: "not_found", id } };
+		}
 
-	async execute(id: string, command: { type: string; payload: unknown }): Promise<ExecutionResult> {
-		const ctx: ExecuteContext = {
-			operation: "execute",
+		// 2. Optimistic version check
+		if (options?.expectedVersion !== undefined && options.expectedVersion !== stored.version) {
+			return {
+				ok: false,
+				error: {
+					category: "conflict",
+					id,
+					expectedVersion: options.expectedVersion,
+					actualVersion: stored.version,
+				},
+			};
+		}
+
+		// 3. Build context
+		const ctx: ExecutorContext = {
 			id,
 			command,
-			stored: null,
+			stored,
 			result: null,
 			snapshot: null,
-			version: 0,
 			events: [],
 		};
-		return this.run(ctx);
-	}
 
-	private async run(ctx: ExecutorContext): Promise<ExecutionResult> {
-		await this.hookRegistry.emit("execute:start", this.onHookError, ctx);
-
+		// 4. Run pipeline
 		try {
-			const chain = [...this.middleware, this.coreHandler()];
+			const chain = [...this.middleware, this.dispatchHandler()];
 			await compose(chain)(ctx);
 		} catch (err) {
-			ctx.result = {
-				ok: false as const,
+			return {
+				ok: false,
 				error: {
-					category: "unexpected" as const,
+					category: "unexpected",
 					error: err,
 					message: err instanceof Error ? err.message : String(err),
 				},
 			};
-			ctx.snapshot = null;
 		}
 
-		await this.hookRegistry.emit("execute:end", this.onHookError, ctx);
+		// 5. Save if dispatch succeeded
+		if (ctx.snapshot) {
+			try {
+				await this.store.save({
+					id,
+					snapshot: ctx.snapshot,
+					expectedVersion: stored.version,
+					events: ctx.events,
+				});
+			} catch (err) {
+				if (err instanceof ConcurrencyConflictError) {
+					return {
+						ok: false,
+						error: {
+							category: "conflict",
+							id,
+							expectedVersion: stored.version,
+							actualVersion: err.actualVersion,
+						},
+					};
+				}
+				return {
+					ok: false,
+					error: {
+						category: "unexpected",
+						error: err,
+						message: err instanceof Error ? err.message : String(err),
+					},
+				};
+			}
 
-		return this.toResult(ctx);
+			return {
+				ok: true,
+				snapshot: ctx.snapshot,
+				version: stored.version + 1,
+				events: ctx.events,
+			};
+		}
+
+		// 6. Dispatch failed — return the error
+		if (ctx.result && !ctx.result.ok) {
+			return { ok: false, error: ctx.result.error };
+		}
+
+		return {
+			ok: false,
+			error: {
+				category: "unexpected",
+				error: new Error("Pipeline completed without setting snapshot or error"),
+				message: "Pipeline completed without setting snapshot or error",
+			},
+		};
 	}
 
-	private coreHandler(): ExecutorMiddleware {
+	private dispatchHandler(): ExecutorMiddleware {
 		const definition = this.router.definition;
 		const router = this.router;
 
 		return async (ctx, _next) => {
-			if (ctx.operation === "create") {
-				try {
-					// as never: type erasure — executor holds WorkflowConfig base type,
-					// but createWorkflow validates data against Zod schemas at runtime
-					const workflow = definition.createWorkflow(ctx.id, {
-						initialState: ctx.init.initialState,
-						data: ctx.init.data,
-					} as never);
-					// biome-ignore lint/suspicious/noExplicitAny: type erasure — TConfig narrows WorkflowSnapshot but ctx.snapshot is unparameterized
-					ctx.snapshot = definition.snapshot(workflow) as any as WorkflowSnapshot;
-					ctx.events = [];
-				} catch (err) {
-					ctx.result = {
-						ok: false as const,
-						error: {
-							category: "validation" as const,
-							source: "command" as const,
-							issues: [],
-							message: err instanceof Error ? err.message : String(err),
-						},
-					};
-				}
-				return;
-			}
-
-			// execute
-			if (!ctx.stored) {
-				ctx.result = {
-					ok: false as const,
-					error: { category: "not_found" as const, id: ctx.id },
-				};
-				return;
-			}
-
 			const restoreResult = definition.restore(ctx.stored.snapshot);
 			if (!restoreResult.ok) {
 				ctx.result = {
@@ -163,29 +155,6 @@ export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 					data: e.data,
 				}));
 			}
-		};
-	}
-
-	private toResult(ctx: ExecutorContext): ExecutionResult {
-		if (ctx.snapshot) {
-			return {
-				ok: true,
-				snapshot: ctx.snapshot,
-				version: ctx.version,
-				events: ctx.events,
-			};
-		}
-
-		if (ctx.result && !ctx.result.ok) {
-			return { ok: false, error: ctx.result.error };
-		}
-
-		return {
-			ok: false,
-			error: {
-				category: "unexpected",
-				error: new Error("Executor pipeline completed without setting snapshot or error"),
-			},
 		};
 	}
 }
