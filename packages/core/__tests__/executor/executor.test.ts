@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { WorkflowExecutor } from "../../src/executor/executor.js";
+import type { ExecutorContext } from "../../src/executor/types.js";
 import { createTestRouter, definition } from "./helpers.js";
 
 describe("WorkflowExecutor", () => {
@@ -126,6 +127,126 @@ describe("WorkflowExecutor", () => {
 				payload: {},
 			});
 			expect(result.ok).toBe(false);
+		});
+	});
+
+	describe("hooks", () => {
+		test("execute:start fires before pipeline", async () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+			const order: string[] = [];
+
+			executor.on("execute:start", () => {
+				order.push("hook:start");
+			});
+			executor.use(async (_ctx, next) => {
+				order.push("middleware");
+				await next();
+			});
+
+			await executor.create("order-1", { initialState: "Draft", data: { items: [] } });
+
+			expect(order).toEqual(["hook:start", "middleware"]);
+		});
+
+		test("execute:end fires after pipeline", async () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+			const order: string[] = [];
+
+			executor.use(async (_ctx, next) => {
+				order.push("middleware");
+				await next();
+			});
+			executor.on("execute:end", () => {
+				order.push("hook:end");
+			});
+
+			await executor.create("order-1", { initialState: "Draft", data: { items: [] } });
+
+			expect(order).toEqual(["middleware", "hook:end"]);
+		});
+
+		test("execute:end fires even on error", async () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+			let endFired = false;
+
+			executor.use(async () => {
+				throw new Error("boom");
+			});
+			executor.on("execute:end", () => {
+				endFired = true;
+			});
+
+			await executor.create("order-1", { initialState: "Draft", data: { items: [] } });
+
+			expect(endFired).toBe(true);
+		});
+
+		test("execute:end receives final context state", async () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+			let capturedCtx: ExecutorContext | null = null;
+
+			executor.on("execute:end", (ctx) => {
+				capturedCtx = ctx;
+			});
+
+			await executor.create("order-1", { initialState: "Draft", data: { items: ["a"] } });
+
+			expect(capturedCtx).not.toBeNull();
+			expect(capturedCtx?.snapshot).not.toBeNull();
+			expect(capturedCtx?.snapshot?.state).toBe("Draft");
+		});
+	});
+
+	describe("middleware pipeline", () => {
+		test("middleware executes in onion order", async () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+			const order: string[] = [];
+
+			executor.use(async (_ctx, next) => {
+				order.push("A:before");
+				await next();
+				order.push("A:after");
+			});
+			executor.use(async (_ctx, next) => {
+				order.push("B:before");
+				await next();
+				order.push("B:after");
+			});
+
+			await executor.create("order-1", { initialState: "Draft", data: { items: [] } });
+
+			expect(order).toEqual(["A:before", "B:before", "B:after", "A:after"]);
+		});
+
+		test("middleware can short-circuit by not calling next", async () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+
+			executor.use(async (ctx, _next) => {
+				ctx.result = { ok: false, error: { category: "not_found", id: ctx.id } } as never;
+			});
+
+			const result = await executor.create("order-1", {
+				initialState: "Draft",
+				data: { items: [] },
+			});
+
+			expect(result.ok).toBe(false);
+		});
+
+		test("use() returns this for chaining", () => {
+			const router = createTestRouter();
+			const executor = new WorkflowExecutor(router);
+
+			const returned = executor.use(async (_ctx, next) => {
+				await next();
+			});
+			expect(returned).toBe(executor);
 		});
 	});
 });
