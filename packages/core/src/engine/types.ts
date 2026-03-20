@@ -11,6 +11,7 @@ export interface SaveOptions {
 	id: string;
 	snapshot: WorkflowSnapshot;
 	expectedVersion: number;
+	events?: Array<{ type: string; data: unknown }>;
 }
 
 export interface StoreAdapter {
