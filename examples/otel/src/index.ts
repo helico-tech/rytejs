@@ -8,63 +8,101 @@
 import "./telemetry.js";
 
 import { createServer } from "node:http";
-import { createEngine, memoryStore } from "@rytejs/core/engine";
-import { createHandler } from "@rytejs/core/http";
+import { WorkflowExecutor } from "@rytejs/core/executor";
+import { memoryStore } from "@rytejs/core/store";
+import { createOtelExecutorMiddleware } from "@rytejs/otel";
 import { logger } from "./logger.js";
-import { orderRouter } from "./workflow.js";
+import { orderRouter, orderWorkflow } from "./workflow.js";
 
 // ---------------------------------------------------------------------------
-// Engine + HTTP handler
+// Store + Executor
 // ---------------------------------------------------------------------------
 
-const engine = createEngine({
-	store: memoryStore(),
-	routers: { order: orderRouter },
-});
-
-const handler = createHandler({ engine });
+const store = memoryStore();
+const executor = new WorkflowExecutor(orderRouter, store);
+executor.use(createOtelExecutorMiddleware());
 
 // ---------------------------------------------------------------------------
-// Node.js HTTP server (Request/Response adapter)
+// Node.js HTTP server
 // ---------------------------------------------------------------------------
 
 const server = createServer(async (req, res) => {
 	logger.info({ method: req.method, url: req.url }, "incoming request");
 
-	const url = `http://${req.headers.host}${req.url}`;
-	const headers = new Headers();
-	for (const [key, value] of Object.entries(req.headers)) {
-		if (typeof value === "string") headers.set(key, value);
+	const url = new URL(`http://${req.headers.host}${req.url}`);
+	const match = url.pathname.match(/^\/order\/([^/]+)$/);
+
+	if (!match) {
+		res.writeHead(404, { "Content-Type": "application/json" });
+		res.end(JSON.stringify({ error: "Not found" }));
+		return;
 	}
 
-	const hasBody = req.method !== "GET" && req.method !== "HEAD";
-	let body: string | undefined;
-	if (hasBody) {
-		body = await new Promise<string>((resolve) => {
-			let data = "";
-			req.on("data", (chunk: Buffer) => {
-				data += chunk.toString();
+	const id = match[1];
+
+	try {
+		if (req.method === "GET") {
+			const stored = await store.load(id);
+			if (!stored) {
+				res.writeHead(404, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: "Workflow not found" }));
+				return;
+			}
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(stored.snapshot));
+			return;
+		}
+
+		const body = await readBody(req);
+		const parsed = JSON.parse(body);
+
+		if (req.method === "PUT") {
+			const workflow = orderWorkflow.createWorkflow(id, {
+				initialState: parsed.initialState,
+				data: parsed.data,
 			});
-			req.on("end", () => resolve(data));
-		});
+			const snapshot = orderWorkflow.snapshot(workflow);
+			await store.save({ id, snapshot, expectedVersion: 0 });
+			res.writeHead(201, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(snapshot));
+			logger.info({ id }, "workflow created");
+			return;
+		}
+
+		if (req.method === "POST") {
+			const result = await executor.execute(id, {
+				type: parsed.type,
+				payload: parsed.payload,
+			});
+
+			if (result.ok) {
+				res.writeHead(200, { "Content-Type": "application/json" });
+				res.end(JSON.stringify(result.snapshot));
+			} else {
+				res.writeHead(422, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: result.error }));
+			}
+			return;
+		}
+
+		res.writeHead(405, { "Content-Type": "application/json" });
+		res.end(JSON.stringify({ error: "Method not allowed" }));
+	} catch (err) {
+		logger.error({ err }, "request error");
+		res.writeHead(500, { "Content-Type": "application/json" });
+		res.end(JSON.stringify({ error: "Internal server error" }));
 	}
-
-	const request = new Request(url, {
-		method: req.method,
-		headers,
-		body: hasBody ? body : undefined,
-	});
-
-	const response = await handler(request);
-	const responseBody = await response.text();
-
-	res.writeHead(response.status, {
-		"Content-Type": response.headers.get("Content-Type") ?? "application/json",
-	});
-	res.end(responseBody);
-
-	logger.info({ method: req.method, url: req.url, status: response.status }, "response sent");
 });
+
+function readBody(req: import("node:http").IncomingMessage): Promise<string> {
+	return new Promise((resolve) => {
+		let data = "";
+		req.on("data", (chunk: Buffer) => {
+			data += chunk.toString();
+		});
+		req.on("end", () => resolve(data));
+	});
+}
 
 const PORT = 4000;
 

@@ -1,6 +1,6 @@
 # OpenTelemetry Example
 
-Demonstrates `@rytejs/core/http` and `@rytejs/otel` working together with a full OpenTelemetry observability stack. Every workflow command dispatch is automatically traced and metered by the OTEL plugin.
+Demonstrates `@rytejs/core/executor` and `@rytejs/otel` working together with a full OpenTelemetry observability stack. Every workflow command dispatch is automatically traced and metered by the OTEL middleware.
 
 ## Stack
 
