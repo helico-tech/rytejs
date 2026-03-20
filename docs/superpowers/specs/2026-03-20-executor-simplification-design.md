@@ -107,9 +107,16 @@ interface SaveOptions {
 
 `memoryStore()` and `ConcurrencyConflictError` remain as shipped utilities.
 
-### Directory Rename: `engine/` → `store/`
+### Notes on Type Changes
 
-The `engine/` directory is a leftover from the Engine → Executor rename. It holds `StoreAdapter`, `memoryStore`, and `ConcurrencyConflictError` — all store concepts. Rename to `store/` for clarity.
+- **`version` not on context** — version is computed internally during save (`stored.version + 1`) and returned in `ExecutionResult`. Middleware does not need to read or write it.
+- **`expectedVersion` not on context** — the version check happens before middleware runs (step 2). If it fails, middleware never executes. Middleware that needs the stored version can read `ctx.stored.version`.
+- **`message` added to `unexpected` error** — the existing code already sets `message` at runtime but the type didn't declare it. This corrects the type to match runtime behavior.
+- **`EmittedEvent` removed** — exported from `engine/` but not imported anywhere in source. Dead type.
+
+### Entry Point Rename: `@rytejs/core/engine` → `@rytejs/core/store`
+
+The `engine/` directory is a leftover from the Engine → Executor rename. It holds `StoreAdapter`, `memoryStore`, and `ConcurrencyConflictError` — all store concepts. Rename the internal directory to `store/` and the entry point from `@rytejs/core/engine` to `@rytejs/core/store`. This is a **breaking change** for the published entry point — bump accordingly.
 
 ## What Gets Deleted
 
@@ -120,10 +127,6 @@ The `engine/` directory is a leftover from the Engine → Executor rename. It ho
 | `executor/plugin.ts` | Plugin system removed |
 | `executor/with-store.ts` | Store baked into executor |
 | `executor/with-broadcast.ts` | Broadcast is userland |
-| `executor/__tests__/plugin.test.ts` | Plugin system removed |
-| `executor/__tests__/with-store.test.ts` | Store baked into executor |
-| `executor/__tests__/with-broadcast.test.ts` | Broadcast is userland |
-| `executor/__tests__/outbox.test.ts` | Outbox pattern is userland |
 | `http/` directory | Opinionated HTTP layer removed |
 | `transport/` directory | Client transports removed |
 
@@ -133,12 +136,16 @@ The `engine/` directory is a leftover from the Engine → Executor rename. It ho
 - `@rytejs/core/transport`
 - `@rytejs/core/transport/server`
 
+### Entry point renamed in package.json
+
+- `@rytejs/core/engine` → `@rytejs/core/store` (breaking change)
+
 ### Exports removed from `@rytejs/core/executor`
 
 - `ExecutorPlugin`, `defineExecutorPlugin`, `isExecutorPlugin`
 - `withStore`, `withBroadcast`, `createSubscriberRegistry`
 - `SubscriberRegistry`, `BroadcastMessage`
-- `CreateContext`, `ExecuteContext` (replaced by single `ExecutorContext`)
+- `CreateContext`, `ExecuteContext`, `ExecutorContextBase` (replaced by single `ExecutorContext`)
 
 ### Documentation changes
 
@@ -152,7 +159,12 @@ The `engine/` directory is a leftover from the Engine → Executor rename. It ho
 | Delete | `docs/guide/real-time.md` |
 | Delete | `docs/guide/transports.md` |
 | Delete | `docs/guide/putting-it-together.md` |
-| Delete | Related snippet files in `docs/snippets/` |
+| Delete | `docs/snippets/guide/persistence.ts` |
+| Delete | `docs/snippets/guide/http-api.ts` |
+| Delete | `docs/snippets/guide/real-time.ts` |
+| Delete | `docs/snippets/guide/transports.ts` |
+| Delete | `docs/snippets/guide/putting-it-together.ts` |
+| Rewrite | `docs/snippets/guide/executor.ts` — new API, no withStore/engine imports |
 
 ## What Stays
 
@@ -162,8 +174,9 @@ The `engine/` directory is a leftover from the Engine → Executor rename. It ho
 - `memoryStore()` factory
 - `ConcurrencyConflictError`
 - `store/` directory (renamed from `engine/`)
-- Executor tests (rewritten for new API)
+- Executor tests (written from scratch — no executor tests currently exist)
 - `executor.md` guide (rewritten)
+- `@rytejs/core/reactor` entry point (unaffected)
 
 ## Decisions Log
 
@@ -178,3 +191,7 @@ The `engine/` directory is a leftover from the Engine → Executor rename. It ho
 | Save after middleware | Executor owns persistence; middleware doesn't need to worry about it |
 | Transport/HTTP/broadcast deleted | Client code and opinionated HTTP layer don't belong in a workflow engine package |
 | `engine/` renamed to `store/` | Contents are store concepts, not engine concepts; old name was a rename artifact |
+| `expectedVersion` is an `execute()` param, not on context | Version check is pre-middleware; moves from context-level concern to first-class API parameter |
+| `version` not on context | Computed internally during save; middleware doesn't need it |
+| `EmittedEvent` removed | Dead type — exported but never imported |
+| `@rytejs/core/engine` → `@rytejs/core/store` | Breaking change — entry point renamed to match directory contents |
