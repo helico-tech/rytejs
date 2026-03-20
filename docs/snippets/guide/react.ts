@@ -13,6 +13,8 @@ import type {
 	WorkflowOf,
 } from "@rytejs/core";
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
+import type { Transport } from "@rytejs/core/transport";
+import { sseTransport } from "@rytejs/core/transport";
 import { z } from "zod";
 
 // ── Declare @rytejs/react types (not a docs dependency) ─────────────────────
@@ -59,6 +61,7 @@ interface WorkflowStore<TConfig extends WorkflowConfig> {
 		payload: CommandPayload<TConfig, C>,
 	): Promise<DispatchResult<TConfig>>;
 	setWorkflow(workflow: Workflow<TConfig>): void;
+	cleanup(): void;
 }
 
 interface WorkflowStoreSnapshot<TConfig extends WorkflowConfig> {
@@ -73,6 +76,7 @@ interface WorkflowStoreOptions<TConfig extends WorkflowConfig> {
 		storage: Storage;
 		migrations?: MigrationPipeline<TConfig>;
 	};
+	transport?: Transport;
 }
 
 interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
@@ -305,6 +309,34 @@ const persistedStore = createWorkflowStore(
 // instead of using the initial config.
 // #endregion persistence
 
+// ── #transport-store ──────────────────────────────────────────────────────
+
+// #region transport-store
+const transportInstance = sseTransport("http://localhost:3000/task");
+
+const transportStore = createWorkflowStore(
+	router,
+	{
+		state: "Todo",
+		data: { title: "Write docs", priority: 0 },
+		id: "task-1", // Required when using transport
+	},
+	{ transport: transportInstance },
+);
+
+// Dispatch goes through the server instead of locally
+await transportStore.dispatch("Start", { assignee: "alice" });
+
+// Incoming broadcasts update the store automatically
+// #endregion transport-store
+
+// ── #transport-cleanup ──────────────────────────────────────────────────
+
+// #region transport-cleanup
+// Unsubscribe from transport when done (e.g., React component unmount)
+transportStore.cleanup();
+// #endregion transport-cleanup
+
 void unsubscribe;
 void label;
 void badge;
@@ -313,3 +345,4 @@ void TaskContext;
 void persistedStore;
 void wfHook;
 void useWorkflow;
+void transportStore;

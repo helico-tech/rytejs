@@ -91,9 +91,28 @@ const store = createWorkflowStore(
 
 See [Migrations](/guide/migrations) for details on defining migration pipelines.
 
+## Transport
+
+Pass a `transport` option to `createWorkflowStore` to dispatch commands through a server instead of locally. The server becomes the authority — dispatches go through the executor pipeline, and broadcasts push updates back to the client.
+
+<<< @/snippets/guide/react.ts#transport-store
+
+Transport mode requires an `id` on the initial config — the server needs to know which workflow to dispatch against.
+
+### Real-time Updates
+
+When using a transport, the store automatically subscribes to server broadcasts. Incoming updates replace the local workflow state and trigger re-renders.
+
+### Cleanup
+
+Call `cleanup()` to unsubscribe from the transport when the store is no longer needed:
+
+<<< @/snippets/guide/react.ts#transport-cleanup
+
 ## Next Steps
 
 - [Error Handling](/guide/error-handling) -- handle dispatch failures in the UI
 - [Serialization](/guide/serialization) -- understand snapshots and restore
 - [Migrations](/guide/migrations) -- evolve stored workflow data over time
 - [Testing](/guide/testing) -- test workflows with `@rytejs/testing`
+- [Transports](/guide/transports) -- connect to a server with SSE or polling
