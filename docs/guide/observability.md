@@ -26,6 +26,20 @@ By default it uses the global OpenTelemetry API. To use a specific tracer or met
 
 The patterns below are still useful if you want custom observability without the `@rytejs/otel` dependency.
 
+## Executor Tracing
+
+`createOtelExecutorPlugin` traces executor operations — `create()` and `execute()` calls — with span attributes for workflow ID, operation type, and command type:
+
+<<< @/snippets/guide/observability-otel.ts#executor-plugin
+
+Import from `@rytejs/otel` (the root export, no subpath).
+
+### Full Stack Tracing
+
+Combine the router plugin with the executor plugin for end-to-end traces. The executor span wraps the router dispatch span:
+
+<<< @/snippets/guide/observability-otel.ts#full-stack-tracing
+
 ## Structured Logging
 
 Captures command type, final state, success/failure, and duration on every dispatch.
