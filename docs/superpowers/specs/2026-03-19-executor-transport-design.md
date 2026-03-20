@@ -9,66 +9,106 @@ Ryte workflows are pure — state in, state out. But to use them in production y
 ```
 Workflow (pure)           Executor (IO)                Client (IO)
 ──────────────────        ─────────────────────        ─────────────────
-definition                withStore(store)             Transport
-router.dispatch()         withBroadcast(subscribers)   ├─ wsTransport
-  state in → state out    createExecutor(...)          ├─ sseTransport
-  no side effects         all side effects             └─ pollingTransport
+definition                WorkflowExecutor             Transport
+router.dispatch()         ├─ withStore(store)          ├─ wsTransport
+  state in → state out    ├─ withBroadcast(subs)       ├─ sseTransport
+  no side effects         └─ custom middleware         └─ pollingTransport
 ```
 
-The boundary is Clean Architecture: workflows are the functional core, the executor is the imperative shell. This was already the project's intent — handlers are pure, IO happens before and after dispatch. The executor is the thing that does the before and after.
+The boundary is Clean Architecture: workflows are the functional core (pure domain), the executor is the imperative shell (IO). Handlers are pure — IO happens before and after dispatch. The executor is the thing that does the before and after.
 
 ## Executor
 
 ### What it is
 
-A composed middleware pipeline that wraps `router.dispatch()` with infrastructure concerns. Not a class — a function that returns functions.
+A middleware pipeline that wraps `router.dispatch()` with infrastructure concerns. Mirrors the `WorkflowRouter` pattern — constructor takes the core thing, `use()` adds capabilities.
 
 ### API
 
 ```typescript
-const { execute, create } = createExecutor(
-	orderRouter,
-	invoiceRouter,
-	withStore(memoryStore()),
-	withBroadcast(subscribers),
-);
+const executor = new WorkflowExecutor(orderRouter);
+executor.use(withStore(memoryStore()));
+executor.use(withBroadcast(subscribers));
 
 // Create a workflow — runs through middleware pipeline
-const createResult = await create("order", "order-123", {
+const created = await executor.create("order-123", {
 	initialState: "Draft",
 	data: { items: [] },
 });
 
 // Execute a command — runs through middleware pipeline
-const execResult = await execute("order", "order-123", {
+const result = await executor.execute("order-123", {
 	type: "PlaceOrder",
 	payload: { items: [{ sku: "A", qty: 1 }] },
 });
 ```
 
-### `createExecutor` signature
+Each executor is bound to one router. Multi-router setups use multiple executors:
 
 ```typescript
-function createExecutor(
-	...args: Array<WorkflowRouter<WorkflowConfig> | ExecutorMiddleware>
-): { execute: ExecuteFn; create: CreateFn };
-
-type ExecuteFn = (
-	routerName: string,
-	id: string,
-	command: { type: string; payload: unknown },
-) => Promise<ExecutionResult>;
-
-type CreateFn = (
-	routerName: string,
-	id: string,
-	init: { initialState: string; data: unknown },
-) => Promise<ExecutionResult>;
+const orders = new WorkflowExecutor(orderRouter);
+const invoices = new WorkflowExecutor(invoiceRouter);
+orders.use(withStore(store));
+invoices.use(withStore(store));
 ```
 
-`createExecutor` partitions its arguments at runtime: `WorkflowRouter` instances (detected via `instanceof`) go in a router map keyed by `router.definition.name`, everything else is middleware. If two routers share a `definition.name`, the later one wins. If `routerName` does not match any registered router, the executor returns `{ ok: false, error: { category: "router_not_found", routerName } }`.
+### `WorkflowExecutor` class
 
-Both `execute` and `create` run through the same middleware pipeline. The **core handler** is appended as the last element of the composed pipeline (the terminal middleware, analogous to `routeEntry.handler` in the router's `compose` call). User middleware wraps it in the onion model. The core handler's behavior depends on the operation:
+```typescript
+class WorkflowExecutor<TConfig extends WorkflowConfig> {
+	constructor(router: WorkflowRouter<TConfig>);
+
+	use(middleware: ExecutorMiddleware): this;
+	use(plugin: ExecutorPlugin): this;
+
+	on(event: "execute:start", callback: (ctx: ExecutorContext) => void | Promise<void>): this;
+	on(event: "execute:end", callback: (ctx: ExecutorContext) => void | Promise<void>): this;
+
+	execute(
+		id: string,
+		command: { type: string; payload: unknown },
+	): Promise<ExecutionResult>;
+
+	create(
+		id: string,
+		init: { initialState: string; data: unknown },
+	): Promise<ExecutionResult>;
+}
+```
+
+### Error handling
+
+**`execute()` and `create()` never throw** — same guarantee as `router.dispatch()`. The executor wraps the entire middleware pipeline in a catch boundary:
+
+```typescript
+async execute(id, command) {
+	const ctx = createExecuteContext(id, command);
+
+	await this.hooks.emit("execute:start", ctx);
+	try {
+		await compose([...this.middleware, this.coreHandler])(ctx);
+	} catch (err) {
+		// Anything that escaped middleware → unexpected error
+		ctx.result = { ok: false, error: { category: "unexpected", error: err } };
+		ctx.snapshot = null;
+	}
+	await this.hooks.emit("execute:end", ctx); // guaranteed if start fired
+
+	return this.toExecutionResult(ctx);
+}
+```
+
+Three layers of error handling:
+
+| Error type | Where handled | How |
+|---|---|---|
+| Expected domain errors | Router (inner) | Result pattern — `router.dispatch()` returns `{ ok: false }` |
+| Expected IO errors | Middleware (middle) | Set `ctx.result`, return early — no throw |
+| Unexpected errors | Executor boundary (outer) | try/catch → `{ category: "unexpected" }` |
+
+### Core handler
+
+The core handler is appended as the terminal middleware (innermost function in the onion). Its behavior depends on `ctx.operation`:
 
 - **execute**: calls `definition.restore()` on `ctx.stored.snapshot` to rehydrate from JSON, calls `router.dispatch()`, sets `ctx.result`, `ctx.snapshot` (via `definition.snapshot()`), and `ctx.events`
 - **create**: calls `definition.createWorkflow()`, sets `ctx.snapshot` (via `definition.snapshot()`). If `createWorkflow` throws (invalid state name or data fails Zod validation), the error is caught and mapped to `{ category: "validation" }` on `ctx.result`. No events are emitted for creates.
@@ -93,21 +133,20 @@ type ExecutorError =
 	| { category: "conflict"; id: string; expectedVersion: number; actualVersion: number }
 	| { category: "already_exists"; id: string }
 	| { category: "restore"; id: string; issues: unknown[] }
-	| { category: "router_not_found"; routerName: string };
+	| { category: "unexpected"; error: unknown };
 ```
 
 Error flow: the core handler calls `router.dispatch()` which returns `DispatchResult`. If `result.ok` is false, the core handler maps `result.error` (a `PipelineError` with categories `validation`, `domain`, `router`, `unexpected`, `dependency`) onto `ctx.result` and does not set `ctx.snapshot`. The executor reads `ctx.result` and surfaces the `PipelineError` in `ExecutionResult`. This means all five `PipelineError` categories flow through to consumers via the `ExecutionResult.error` union, discriminated by `category` as usual.
 
 ### ExecutorContext
 
-The context that flows through executor middleware. Uses a discriminated union on `operation` — consistent with how `DispatchResult` discriminates on `ok` and `PipelineError` discriminates on `category`.
+Uses a discriminated union on `operation` — consistent with how `DispatchResult` discriminates on `ok` and `PipelineError` discriminates on `category`.
 
 ```typescript
 type ExecutorContext = ExecuteContext | CreateContext;
 
 interface ExecutorContextBase {
 	readonly id: string;
-	readonly routerName: string;
 	readonly expectedVersion?: number; // optional — set by transport handlers for early conflict detection
 
 	// Mutable — populated by middleware
@@ -142,6 +181,43 @@ type ExecutorMiddleware = (
 
 Same signature as router middleware — Koa-style onion model, reuses the existing `compose()` function.
 
+### Hooks
+
+Two lifecycle hooks, mirroring `dispatch:start` / `dispatch:end` on the router:
+
+| Hook | When | Guarantee |
+|---|---|---|
+| `execute:start` | Before middleware pipeline runs | Always fires |
+| `execute:end` | After pipeline completes or errors | Fires if `execute:start` fired |
+
+Both receive `ExecutorContext`. `ctx.operation` tells you whether it's a create or execute. Hooks are observers — they cannot modify the flow. Errors in hooks are caught and forwarded to `onHookError` (same as router hooks).
+
+### Plugins
+
+```typescript
+type ExecutorPlugin = ((executor: WorkflowExecutor<any>) => void) & { readonly [PLUGIN_SYMBOL]: true };
+
+function defineExecutorPlugin(
+	fn: (executor: WorkflowExecutor<any>) => void,
+): ExecutorPlugin;
+```
+
+Same branded function pattern as router plugins. A plugin receives the executor and can call `use()` and `on()`:
+
+```typescript
+const otelExecutorPlugin = defineExecutorPlugin((executor) => {
+	executor.on("execute:start", (ctx) => { /* start span */ });
+	executor.on("execute:end", (ctx) => { /* end span */ });
+	executor.use(async (ctx, next) => {
+		await otelContext.with(activeSpan, next);
+	});
+});
+
+executor.use(otelExecutorPlugin);
+```
+
+The executor and router otel plugins are independent — they don't know about each other. The parent-child span relationship works through OTel context propagation: the router dispatch happens within the executor's active span.
+
 ## Built-in Middleware
 
 ### `withStore(store: StoreAdapter)`
@@ -153,19 +229,38 @@ function withStore(store: StoreAdapter): ExecutorMiddleware {
 	return async (ctx, next) => {
 		if (ctx.operation === "execute") {
 			const stored = await store.load(ctx.id);
-			if (!stored) { /* set not_found error, return */ }
+			if (!stored) {
+				ctx.result = { ok: false, error: { category: "not_found", id: ctx.id } };
+				return; // don't call next()
+			}
 			ctx.stored = stored;
+
+			// Early conflict detection — if transport provided expectedVersion
+			if (ctx.expectedVersion !== undefined && ctx.expectedVersion !== stored.version) {
+				ctx.result = {
+					ok: false,
+					error: {
+						category: "conflict",
+						id: ctx.id,
+						expectedVersion: ctx.expectedVersion,
+						actualVersion: stored.version,
+					},
+				};
+				return;
+			}
 		} else {
 			// Early check — the real uniqueness guarantee is expectedVersion: 0 on save.
 			// This load is just for a better error message on the common case.
 			const existing = await store.load(ctx.id);
-			if (existing) { /* set already_exists error, return */ }
+			if (existing) {
+				ctx.result = { ok: false, error: { category: "already_exists", id: ctx.id } };
+				return;
+			}
 		}
 
 		await next();
 
 		// Guard: only save if the core handler produced a snapshot.
-		// Handles both successful dispatches and successful creates.
 		// Skips save if dispatch failed or create threw (snapshot stays null).
 		if (ctx.snapshot) {
 			try {
@@ -177,14 +272,21 @@ function withStore(store: StoreAdapter): ExecutorMiddleware {
 				});
 				ctx.version = (ctx.stored?.version ?? 0) + 1;
 			} catch (err) {
-				// ConcurrencyConflictError from store → map to ExecutorError
+				// ConcurrencyConflictError from store → set result, don't throw
 				if (err instanceof ConcurrencyConflictError) {
-					ctx.result = null;
+					ctx.result = {
+						ok: false,
+						error: {
+							category: "conflict",
+							id: ctx.id,
+							expectedVersion: ctx.stored?.version ?? 0,
+							actualVersion: -1, // unknown — another writer won
+						},
+					};
 					ctx.snapshot = null;
-					// Set conflict error — will be surfaced in ExecutionResult
-					throw new ExecutorConflictError(ctx.id, ctx.stored?.version ?? 0);
+					return;
 				}
-				throw err; // unexpected store errors propagate
+				throw err; // truly unexpected → hits executor boundary
 			}
 		}
 	};
@@ -200,9 +302,8 @@ function withBroadcast(subscribers: SubscriberRegistry): ExecutorMiddleware {
 	return async (ctx, next) => {
 		await next();
 
-		// Guard on ctx.snapshot — this is the reliable signal that
-		// execution succeeded and a save happened. Works regardless
-		// of middleware ordering (does not depend on ctx.version).
+		// Guard on ctx.snapshot — reliable signal that execution succeeded
+		// and save happened (if withStore is present).
 		if (ctx.snapshot) {
 			subscribers.notify(ctx.id, {
 				snapshot: ctx.snapshot,
@@ -214,7 +315,7 @@ function withBroadcast(subscribers: SubscriberRegistry): ExecutorMiddleware {
 }
 ```
 
-**Middleware ordering:** `withStore` must come before `withBroadcast` in the `createExecutor` arguments so that `ctx.version` is populated before broadcast fires. If `withBroadcast` runs without `withStore`, `ctx.version` will be `0` in the broadcast message — the snapshot is still correct, but the version is meaningless. This ordering is documented and intuitive (you store before you broadcast).
+**Middleware ordering:** `withStore` must come before `withBroadcast` in the `use()` calls so that `ctx.version` is populated before broadcast fires. This ordering is documented and intuitive — you store before you broadcast.
 
 ### SubscriberRegistry
 
@@ -244,11 +345,86 @@ interface SaveOptions {
 }
 ```
 
-A Postgres store saves both in one transaction. A memory store can ignore the events field. A separate process polls the outbox for durable event processing — that is a user concern, not a core concern.
+The `events` field is optional — backward-compatible with existing store implementations. The built-in `memoryStore()` will be updated to accept and ignore the events field.
+
+A Postgres store saves both in one transaction. A memory store ignores the events. A separate process polls the outbox for durable event processing — that is a user concern, not a core concern.
+
+### Outbox Pattern Example
+
+The outbox pattern ensures events are persisted atomically with the snapshot, then consumed reliably by a separate process. Here is a complete example using a transactional store:
+
+```typescript
+// A store adapter that implements the outbox pattern
+function postgresOutboxStore(pool: Pool): StoreAdapter {
+	return {
+		async load(id) {
+			const row = await pool.query(
+				"SELECT snapshot, version FROM workflows WHERE id = $1",
+				[id],
+			);
+			if (!row) return null;
+			return { snapshot: row.snapshot, version: row.version };
+		},
+
+		async save({ id, snapshot, expectedVersion, events }) {
+			// Single transaction: save snapshot + persist events in outbox table
+			await pool.transaction(async (tx) => {
+				const result = await tx.query(
+					`UPDATE workflows SET snapshot = $1, version = version + 1
+					 WHERE id = $2 AND version = $3
+					 RETURNING version`,
+					[snapshot, id, expectedVersion],
+				);
+				if (result.rowCount === 0) {
+					// INSERT for new workflows, or conflict for version mismatch
+					const existing = await tx.query(
+						"SELECT version FROM workflows WHERE id = $1",
+						[id],
+					);
+					if (existing) throw new ConcurrencyConflictError(id);
+					await tx.query(
+						"INSERT INTO workflows (id, snapshot, version) VALUES ($1, $2, 1)",
+						[id, snapshot],
+					);
+				}
+
+				// Outbox: persist events in the same transaction
+				if (events && events.length > 0) {
+					for (const event of events) {
+						await tx.query(
+							`INSERT INTO outbox (workflow_id, event_type, event_data, created_at)
+							 VALUES ($1, $2, $3, NOW())`,
+							[id, event.type, JSON.stringify(event.data)],
+						);
+					}
+				}
+			});
+		},
+	};
+}
+
+// Usage — the executor doesn't know or care about the outbox
+const executor = new WorkflowExecutor(orderRouter);
+executor.use(withStore(postgresOutboxStore(pool)));
+executor.use(withBroadcast(subscribers));
+
+// A separate process polls the outbox and processes events
+async function processOutbox(pool: Pool) {
+	const rows = await pool.query(
+		"SELECT id, workflow_id, event_type, event_data FROM outbox ORDER BY created_at LIMIT 100",
+	);
+	for (const row of rows) {
+		await handleEvent(row.workflow_id, { type: row.event_type, data: row.event_data });
+		await pool.query("DELETE FROM outbox WHERE id = $1", [row.id]);
+	}
+}
+```
+
+The key: `store.save()` persists the snapshot and events atomically. If the transaction fails, neither is written. The outbox processor is a separate concern — it reads from the outbox table and publishes events to Kafka, sends emails, triggers reactors, etc. The executor and `withStore` middleware know nothing about the outbox — it's entirely encapsulated in the store adapter.
 
 ### StoredWorkflow and StoreAdapter
 
-`StoredWorkflow` and `StoreAdapter` interfaces are unchanged. The `SaveOptions` extension above is backward-compatible — the `events` field is optional, so existing store implementations continue to work without modification. The built-in `memoryStore()` will be updated to accept (and ignore) the events field.
+`StoredWorkflow` and `StoreAdapter` interfaces are unchanged. The `SaveOptions.events` extension is backward-compatible — existing store implementations continue to work without modification.
 
 ```typescript
 interface StoredWorkflow {
@@ -343,14 +519,7 @@ Long polling fallback for environments without WebSocket or SSE support.
 
 ### Client `expectedVersion` Flow
 
-The client sends `expectedVersion` with every dispatch. The server-side transport handler receives this value and passes it to the executor via an optional `expectedVersion` field on `ExecutorContextBase`. The `withStore` middleware checks this: if `expectedVersion` is set and doesn't match `stored.version`, it returns a `conflict` error immediately without calling `next()`. This avoids a double-load: the store loads once inside `withStore`, and the version check happens there too.
-
-```typescript
-interface ExecutorContextBase {
-	// ... existing fields ...
-	readonly expectedVersion?: number; // set by transport handler, checked by withStore
-}
-```
+The client sends `expectedVersion` with every dispatch. The `withStore` middleware checks this: if `expectedVersion` is set on `ExecutorContextBase` and doesn't match `stored.version`, it returns a `conflict` error immediately without calling `next()`. The server-side transport handler sets `ctx.expectedVersion` from the client's request.
 
 If `expectedVersion` is not set (e.g., called directly without a transport), `withStore` skips the check — the optimistic version on `save()` is still the safety net.
 
@@ -362,7 +531,7 @@ Functions using standard Web APIs (`Request`/`Response`). **Note on WebSocket up
 function handleWebSocket(
 	req: Request,
 	subscribers: SubscriberRegistry,
-	execute: ExecuteFn,
+	executor: WorkflowExecutor,
 ): Response;
 
 function handleSSE(
@@ -382,24 +551,24 @@ These handle the transport protocol (upgrade, connection management, serializati
 
 ### `createFetch`
 
-Thin fetch handler over the executor. Maps HTTP methods to executor operations.
+Thin fetch handler over executor(s). Maps HTTP methods to executor operations.
 
 ```typescript
 function createFetch(
-	execute: ExecuteFn,
-	create: CreateFn,
+	executors: Record<string, WorkflowExecutor>,
 	store: StoreAdapter,
 ): (request: Request) => Promise<Response>;
 ```
 
 Routes:
-- **GET** `/:routerName/:id` → `store.load(id)` → 200 `{ snapshot, version }`
-- **PUT** `/:routerName/:id` → `create(routerName, id, body)` → 201 `{ snapshot, version }`
-- **POST** `/:routerName/:id` → `execute(routerName, id, body)` → 200 `{ snapshot, version, events }`
+- **GET** `/:name/:id` → `store.load(id)` → 200 `{ snapshot, version }`
+- **PUT** `/:name/:id` → `executors[name].create(id, body)` → 201 `{ snapshot, version }`
+- **POST** `/:name/:id` → `executors[name].execute(id, body)` → 200 `{ snapshot, version, events }`
+
+Note: `createFetch` takes `store` separately for the GET route because loading a workflow is a read — no executor pipeline needed. The store is also used inside `withStore`, so the user passes it twice. This is intentional — `createFetch` does not reach into the executor's internals.
 
 Error mapping:
 - `not_found` → 404
-- `router_not_found` → 404
 - `conflict` → 409
 - `already_exists` → 409
 - `validation` → 400
@@ -426,11 +595,20 @@ const store = createWorkflowStore(router, {
 When `transport` is provided:
 - `store.dispatch()` calls `transport.dispatch()` with the current version as `expectedVersion`
 - On success: updates local workflow from returned snapshot
-- On `CONFLICT`: re-fetches latest snapshot from transport result, surfaces error to UI
+- On `CONFLICT`: surfaces error to UI — client must reload
 - Subscribes to `transport.subscribe()` on creation — incoming broadcasts update the local workflow
 - `store.cleanup()` calls `subscription.unsubscribe()`
 
 When `transport` is absent: works locally like today, no changes.
+
+## Context Isolation
+
+The executor and router do not share context keys. They are independent layers:
+
+- **Router context** (`Context<TConfig, TDeps>`): command, data, transition, emit, deps, context keys
+- **Executor context** (`ExecutorContext`): id, stored, result, snapshot, version, events
+
+A handler cannot access executor-level information (version, stored workflow) and does not need to. If this changes in the future, a read-only context key bridge can be added — but not now.
 
 ## What Gets Removed
 
@@ -445,9 +623,10 @@ When `transport` is absent: works locally like today, no changes.
 
 | Item | Location | ~Lines |
 |---|---|---|
-| `createExecutor` | `core/src/executor/executor.ts` | 50 |
-| `ExecutorContext`, `ExecutorMiddleware`, types | `core/src/executor/types.ts` | 40 |
-| `withStore` | `core/src/executor/with-store.ts` | 30 |
+| `WorkflowExecutor` | `core/src/executor/executor.ts` | 80 |
+| `ExecutorContext`, `ExecutorMiddleware`, types | `core/src/executor/types.ts` | 50 |
+| `defineExecutorPlugin` | `core/src/executor/plugin.ts` | 15 |
+| `withStore` | `core/src/executor/with-store.ts` | 50 |
 | `withBroadcast` + `createSubscriberRegistry` | `core/src/executor/with-broadcast.ts` | 40 |
 | `Transport` interface + types | `core/src/transport/types.ts` | 30 |
 | `wsTransport` | `core/src/transport/ws.ts` | 60 |
@@ -456,38 +635,159 @@ When `transport` is absent: works locally like today, no changes.
 | Server-side transport helpers | `core/src/transport/server.ts` | 80 |
 | `createFetch` | `core/src/http/http.ts` | 60 |
 | React store transport integration | `react/src/store.ts` | 40 |
+| Executor otel plugin | `otel/src/executor.ts` | 40 |
 
 ## What Stays Unchanged
 
-Router, definition, dispatch, middleware, hooks, plugins, snapshots, migrations, context, compose, memory store (used for testing/dev), otel plugin, testing utilities.
+Router, definition, dispatch, middleware, hooks, plugins, snapshots, migrations, context, compose, memory store (for testing/dev), otel router plugin, testing utilities.
+
+## Testing
+
+Tests for the executor and transport layer. Uses `@rytejs/testing` utilities where applicable.
+
+### Executor tests
+
+- `WorkflowExecutor` — create, execute, middleware pipeline ordering, plugin registration
+- Error handling — not found, conflict, already exists, restore failure, unexpected errors caught at boundary
+- `execute:start` / `execute:end` hooks — fire in correct order, `execute:end` guaranteed on error
+- Middleware ordering — store before broadcast, onion model behavior
+
+### withStore tests
+
+- Load before dispatch, save after dispatch
+- Version increment on save
+- Not found → result, no throw
+- Already exists on create → result, no throw
+- `ConcurrencyConflictError` → conflict result, no throw
+- `expectedVersion` mismatch → early conflict, no dispatch
+- Outbox events passed to `store.save()`
+
+### withBroadcast tests
+
+- Notifies subscribers after successful execution
+- Does not notify on failed dispatch (snapshot is null)
+- Multiple subscribers per workflow ID
+
+### Transport tests
+
+- `wsTransport` — dispatch round-trip, subscribe receives broadcasts, reconnection
+- `sseTransport` — dispatch via fetch, subscribe via EventSource
+- `pollingTransport` — dispatch via fetch, polling interval detects version changes
+- All three: error mapping (NETWORK, CONFLICT, NOT_FOUND, TIMEOUT)
+
+### Integration test
+
+End-to-end: create workflow → dispatch command → verify broadcast received → verify version incremented → concurrent write → verify conflict returned.
+
+### Outbox pattern test
+
+```typescript
+describe("outbox pattern", () => {
+	test("snapshot and events are saved atomically", async () => {
+		const saved: SaveOptions[] = [];
+		const outboxStore: StoreAdapter = {
+			data: new Map(),
+			async load(id) { return this.data.get(id) ?? null; },
+			async save(options) {
+				saved.push(options);
+				// Simulate atomic save — both snapshot and events persist or neither does
+				this.data.set(options.id, {
+					snapshot: options.snapshot,
+					version: (options.expectedVersion) + 1,
+				});
+			},
+		};
+
+		const executor = new WorkflowExecutor(orderRouter);
+		executor.use(withStore(outboxStore));
+
+		await executor.create("order-1", { initialState: "Draft", data: { items: ["A"] } });
+		const result = await executor.execute("order-1", { type: "Place", payload: {} });
+
+		expect(result.ok).toBe(true);
+
+		// The save call includes both snapshot and events
+		const executeSave = saved[1]; // second save (first was create)
+		expect(executeSave.snapshot.state).toBe("Placed");
+		expect(executeSave.events).toEqual([
+			{ type: "OrderPlaced", data: { orderId: "order-1" } },
+		]);
+		expect(executeSave.expectedVersion).toBe(1);
+	});
+
+	test("events are empty array when no events emitted", async () => {
+		const saved: SaveOptions[] = [];
+		const outboxStore: StoreAdapter = {
+			data: new Map(),
+			async load(id) { return this.data.get(id) ?? null; },
+			async save(options) {
+				saved.push(options);
+				this.data.set(options.id, {
+					snapshot: options.snapshot,
+					version: (options.expectedVersion) + 1,
+				});
+			},
+		};
+
+		const executor = new WorkflowExecutor(orderRouter);
+		executor.use(withStore(outboxStore));
+
+		await executor.create("order-1", { initialState: "Draft", data: { items: [] } });
+
+		const createSave = saved[0];
+		expect(createSave.events).toEqual([]);
+	});
+
+	test("failed dispatch does not save events", async () => {
+		const saved: SaveOptions[] = [];
+		const outboxStore: StoreAdapter = {
+			data: new Map(),
+			async load(id) { return this.data.get(id) ?? null; },
+			async save(options) {
+				saved.push(options);
+				this.data.set(options.id, {
+					snapshot: options.snapshot,
+					version: (options.expectedVersion) + 1,
+				});
+			},
+		};
+
+		const executor = new WorkflowExecutor(orderRouter);
+		executor.use(withStore(outboxStore));
+
+		await executor.create("order-1", { initialState: "Placed", data: { items: [], placedAt: new Date() } });
+		// Place is not valid in Placed state
+		const result = await executor.execute("order-1", { type: "Place", payload: {} });
+
+		expect(result.ok).toBe(false);
+		// Only one save (the create) — no save for the failed dispatch
+		expect(saved).toHaveLength(1);
+	});
+});
+```
 
 ## Wiring Example: Cloudflare Durable Object
 
 ```typescript
 export class OrderDO {
-	private execute: ExecuteFn;
-	private create: CreateFn;
+	private executor: WorkflowExecutor;
 	private subscribers = createSubscriberRegistry();
 
 	constructor(state: DurableObjectState) {
-		const { execute, create } = createExecutor(
-			orderRouter,
-			withStore(durableObjectStore(state)),
-			withBroadcast(this.subscribers),
-		);
-		this.execute = execute;
-		this.create = create;
+		this.executor = new WorkflowExecutor(orderRouter);
+		this.executor.use(withStore(durableObjectStore(state)));
+		this.executor.use(withBroadcast(this.subscribers));
 	}
 
 	async fetch(request: Request): Promise<Response> {
-		const url = new URL(request.url);
-
 		if (request.headers.get("Upgrade") === "websocket") {
-			return handleWebSocket(request, this.subscribers, this.execute);
+			return handleWebSocket(request, this.subscribers, this.executor);
 		}
 
-		// Standard HTTP API
-		const api = createFetch(this.execute, this.create, durableObjectStore(this.state));
+		const api = createFetch(
+			{ order: this.executor },
+			durableObjectStore(this.state),
+		);
 		return api(request);
 	}
 }
@@ -497,17 +797,33 @@ export class OrderDO {
 
 ```typescript
 const subscribers = createSubscriberRegistry();
+const store = postgresStore(pool);
 
-const { execute, create } = createExecutor(
-	orderRouter,
-	withStore(postgresStore(pool)),
-	withBroadcast(subscribers),
-);
+const orders = new WorkflowExecutor(orderRouter);
+orders.use(withStore(store));
+orders.use(withBroadcast(subscribers));
 
 const app = new Hono();
-const api = createFetch(execute, create, postgresStore(pool));
+const api = createFetch({ order: orders }, store);
 
-app.all("/api/:router/:id", (c) => api(c.req.raw));
-app.get("/ws/:id", (c) => handleWebSocket(c.req.raw, subscribers, execute));
+app.all("/api/:name/:id", (c) => api(c.req.raw));
+app.get("/ws/:id", (c) => handleWebSocket(c.req.raw, subscribers, orders));
 app.get("/sse/:id", (c) => handleSSE(c.req.raw, subscribers));
+```
+
+## Wiring Example: Outbox with Postgres
+
+```typescript
+const store = postgresOutboxStore(pool);
+
+const orders = new WorkflowExecutor(orderRouter);
+orders.use(withStore(store));
+orders.use(withBroadcast(subscribers));
+
+// Executor doesn't know about the outbox — it's in the store adapter.
+// Events are passed to store.save() via SaveOptions.events.
+// The store adapter persists them in the same transaction as the snapshot.
+
+// Separate process: poll outbox, publish to Kafka, send emails, etc.
+setInterval(() => processOutbox(pool), 5000);
 ```
