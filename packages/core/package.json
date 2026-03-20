@@ -20,25 +20,10 @@
 			"import": "./dist/reactor/index.js",
 			"require": "./dist/reactor/index.cjs"
 		},
-		"./http": {
-			"types": "./dist/http/index.d.ts",
-			"import": "./dist/http/index.js",
-			"require": "./dist/http/index.cjs"
-		},
 		"./executor": {
 			"types": "./dist/executor/index.d.ts",
 			"import": "./dist/executor/index.js",
 			"require": "./dist/executor/index.cjs"
-		},
-		"./transport": {
-			"types": "./dist/transport/index.d.ts",
-			"import": "./dist/transport/index.js",
-			"require": "./dist/transport/index.cjs"
-		},
-		"./transport/server": {
-			"types": "./dist/transport/server/index.d.ts",
-			"import": "./dist/transport/server/index.js",
-			"require": "./dist/transport/server/index.cjs"
 		}
 	},
 	"main": "./dist/index.cjs",
