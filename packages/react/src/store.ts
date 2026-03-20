@@ -10,6 +10,7 @@ import type {
 	WorkflowDefinition,
 } from "@rytejs/core";
 import { migrate, type WorkflowRouter } from "@rytejs/core";
+import type { BroadcastMessage } from "@rytejs/core/transport";
 import type { WorkflowStore, WorkflowStoreOptions, WorkflowStoreSnapshot } from "./types.js";
 
 export function createWorkflowStore<
@@ -27,11 +28,16 @@ export function createWorkflowStore<
 ): WorkflowStore<TConfig> {
 	const definition = router.definition;
 
+	if (options?.transport && !initialConfig.id) {
+		throw new Error("Transport requires a workflow id");
+	}
+
 	let workflow: Workflow<TConfig> = loadOrCreate(definition, initialConfig, options);
 	let isDispatching = false;
 	let error: PipelineError<TConfig> | null = null;
 	let snapshot: WorkflowStoreSnapshot<TConfig> = { workflow, isDispatching, error };
 	const listeners = new Set<() => void>();
+	let version = 0;
 
 	function notify() {
 		snapshot = { workflow, isDispatching, error };
@@ -46,6 +52,42 @@ export function createWorkflowStore<
 	): Promise<DispatchResult<TConfig>> => {
 		isDispatching = true;
 		notify();
+
+		// Transport: server-authoritative dispatch
+		if (options?.transport) {
+			// biome-ignore lint/style/noNonNullAssertion: id is guaranteed by the guard at createWorkflowStore entry
+			const workflowId = initialConfig.id!;
+			const transportResult = await options.transport.dispatch(
+				workflowId,
+				{ type: command as string, payload },
+				version,
+			);
+
+			if (transportResult.ok) {
+				const restored = definition.restore(transportResult.snapshot);
+				if (restored.ok) {
+					workflow = restored.workflow;
+					version = transportResult.version;
+					error = null;
+					isDispatching = false;
+					notify();
+					return { ok: true, workflow: restored.workflow, events: [] } as DispatchResult<TConfig>;
+				}
+			}
+
+			// Error path
+			error = (transportResult.ok ? null : transportResult.error) as PipelineError<TConfig> | null;
+			isDispatching = false;
+			notify();
+			return {
+				ok: false,
+				error: error ?? {
+					category: "unexpected",
+					error: new Error("Transport error"),
+					message: "Transport error",
+				},
+			} as DispatchResult<TConfig>;
+		}
 
 		const result = await router.dispatch(workflow, { type: command, payload });
 
@@ -67,6 +109,22 @@ export function createWorkflowStore<
 		return result;
 	};
 
+	let transportSubscription: { unsubscribe(): void } | undefined;
+	if (options?.transport && initialConfig.id) {
+		transportSubscription = options.transport.subscribe(
+			initialConfig.id,
+			(message: BroadcastMessage) => {
+				const restored = definition.restore(message.snapshot);
+				if (restored.ok) {
+					workflow = restored.workflow;
+					version = message.version;
+					error = null;
+					notify();
+				}
+			},
+		);
+	}
+
 	return {
 		getWorkflow: () => workflow,
 		getSnapshot: () => snapshot,
@@ -82,7 +140,9 @@ export function createWorkflowStore<
 			error = null;
 			notify();
 		},
-		cleanup() {},
+		cleanup() {
+			transportSubscription?.unsubscribe();
+		},
 	};
 }
 

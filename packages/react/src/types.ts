@@ -10,6 +10,7 @@ import type {
 	WorkflowConfig,
 	WorkflowOf,
 } from "@rytejs/core";
+import type { Transport } from "@rytejs/core/transport";
 export interface WorkflowStoreSnapshot<TConfig extends WorkflowConfig> {
 	readonly workflow: Workflow<TConfig>;
 	readonly isDispatching: boolean;
@@ -34,6 +35,7 @@ export interface WorkflowStoreOptions<TConfig extends WorkflowConfig> {
 		storage: Storage;
 		migrations?: MigrationPipeline<TConfig>;
 	};
+	transport?: Transport;
 }
 
 export interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
