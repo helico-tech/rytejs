@@ -34,7 +34,7 @@ export function createRedisStore(redisUrl?: string): RedisStoreAdapter {
 		// biome-ignore lint/suspicious/noExplicitAny: Redis client generic return types
 		hgetall(key: string): Promise<any>;
 		hset(key: string, fields: Record<string, string>): Promise<number>;
-		sadd(key: string, members: string[]): Promise<number>;
+		sadd(key: string, member: string): Promise<number>;
 		smembers(key: string): Promise<string[]>;
 	};
 
@@ -52,8 +52,8 @@ export function createRedisStore(redisUrl?: string): RedisStoreAdapter {
 			const key = `mission:${id}`;
 			const snapshotJson = JSON.stringify(snapshot);
 			await redis.hset(key, { snapshot: snapshotJson, version: "1" });
-			await redis.sadd("missions:all", [id]);
-			await redis.sadd(`missions:state:${snapshot.state}`, [id]);
+			await redis.sadd("missions:all", id);
+			await redis.sadd(`missions:state:${snapshot.state}`, id);
 		},
 
 		async load(id: string): Promise<StoredWorkflow | null> {
