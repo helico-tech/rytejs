@@ -130,7 +130,7 @@ export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 		const router = this.router;
 
 		return async (ctx, _next) => {
-			const restoreResult = definition.restore(ctx.stored.snapshot);
+			const restoreResult = definition.deserialize(ctx.stored.snapshot);
 			if (!restoreResult.ok) {
 				ctx.result = {
 					ok: false as const,
@@ -152,7 +152,7 @@ export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 
 			if (dispatchResult.ok) {
 				// biome-ignore lint/suspicious/noExplicitAny: type erasure — TConfig narrows WorkflowSnapshot but ctx.snapshot is unparameterized
-				ctx.snapshot = definition.snapshot(dispatchResult.workflow) as any as WorkflowSnapshot;
+				ctx.snapshot = definition.serialize(dispatchResult.workflow) as any as WorkflowSnapshot;
 				ctx.events = (dispatchResult.events as Array<{ type: string; data: unknown }>).map((e) => ({
 					type: e.type,
 					data: e.data,

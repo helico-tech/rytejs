@@ -77,12 +77,22 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	 * @param workflow - The workflow instance to serialize
 	 * @returns A {@link WorkflowSnapshot} representing the current state
 	 */
+	serialize(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>;
+	/**
+	 * Deserializes a workflow instance from a plain snapshot, validating the state data.
+	 *
+	 * @param snapshot - The snapshot to deserialize from
+	 * @returns A result object: `{ ok: true, workflow }` or `{ ok: false, error }`
+	 */
+	deserialize(
+		snapshot: WorkflowSnapshot<TConfig>,
+	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
+	/**
+	 * @deprecated Use {@link serialize} instead.
+	 */
 	snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>;
 	/**
-	 * Restores a workflow instance from a plain snapshot, validating the state data.
-	 *
-	 * @param snapshot - The snapshot to restore from
-	 * @returns A result object: `{ ok: true, workflow }` or `{ ok: false, error }`
+	 * @deprecated Use {@link deserialize} instead.
 	 */
 	restore(
 		snapshot: WorkflowSnapshot<TConfig>,
@@ -176,7 +186,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			return eventName in config.events;
 		},
 
-		snapshot(workflow: {
+		serialize(workflow: {
 			id: string;
 			state: string;
 			data: unknown;
@@ -196,7 +206,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			};
 		},
 
-		restore(snap: {
+		deserialize(snap: {
 			id: string;
 			definitionName: string;
 			state: string;
@@ -239,6 +249,14 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				},
 				// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
 			} as any;
+		},
+
+		snapshot(...args) {
+			return this.serialize(...args);
+		},
+
+		restore(...args) {
+			return this.deserialize(...args);
 		},
 	};
 }

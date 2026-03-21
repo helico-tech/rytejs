@@ -8,7 +8,7 @@ export interface WorkflowSnapshot<TConfig extends WorkflowConfig = WorkflowConfi
 	readonly definitionName: string;
 	/** Current state name. */
 	readonly state: StateNames<TConfig>;
-	/** State data (untyped — validated on {@link WorkflowDefinition.restore}). */
+	/** State data (untyped — validated on {@link WorkflowDefinition.deserialize}). */
 	readonly data: unknown;
 	/** ISO 8601 timestamp of workflow creation. */
 	readonly createdAt: string;
