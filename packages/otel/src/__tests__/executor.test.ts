@@ -59,6 +59,7 @@ describe("createOtelExecutorMiddleware", () => {
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.name).toBe("ryte.execute.Place");
 		expect(span.attributes["ryte.workflow.id"]).toBe("test-1");
@@ -74,6 +75,7 @@ describe("createOtelExecutorMiddleware", () => {
 		});
 
 		const spans = exporter.getFinishedSpans();
+		// biome-ignore lint/style/noNonNullAssertion: test assumes at least one span
 		const span = spans[0]!;
 		expect(span.attributes["ryte.result"]).toBe("ok");
 		expect(span.status.code).toBe(SpanStatusCode.OK);
@@ -91,6 +93,7 @@ describe("createOtelExecutorMiddleware", () => {
 		});
 
 		const spans = exporter.getFinishedSpans();
+		// biome-ignore lint/style/noNonNullAssertion: test assumes at least one span
 		const span = spans[0]!;
 		expect(span.attributes["ryte.result"]).toBe("error");
 		expect(span.attributes["ryte.error.category"]).toBe("domain");
@@ -109,6 +112,7 @@ describe("createOtelExecutorMiddleware", () => {
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.attributes["ryte.result"]).toBe("error");
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
@@ -124,6 +128,7 @@ describe("createOtelExecutorMiddleware", () => {
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.instrumentationScope.name).toBe("custom-tracer");
 	});

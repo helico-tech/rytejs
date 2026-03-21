@@ -12,6 +12,13 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!**/dist", "!**/node_modules", "!**/.turbo", "!**/coverage"]
+		"includes": [
+			"**",
+			"!**/dist",
+			"!**/node_modules",
+			"!**/.turbo",
+			"!**/coverage",
+			"!**/.wrangler"
+		]
 	}
 }

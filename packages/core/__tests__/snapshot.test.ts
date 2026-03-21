@@ -129,6 +129,7 @@ describe("deserialize()", () => {
 		const snap = {
 			id: "wf-1",
 			definitionName: "order",
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally testing invalid state name
 			state: "Unknown" as any,
 			data: {},
 			createdAt: "2026-01-15T10:00:00.000Z",

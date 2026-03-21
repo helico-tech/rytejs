@@ -2,8 +2,8 @@ import type { WorkflowRouter } from "../router.js";
 import type { EventNames, WorkflowConfig } from "../types.js";
 import type { ReactorCommand, ReactorContext } from "./types.js";
 
-// biome-ignore lint/suspicious/noExplicitAny: internal type erasure for heterogeneous handler storage
 type AnyHandler = (ctx: {
+	// biome-ignore lint/suspicious/noExplicitAny: internal type erasure for heterogeneous handler storage
 	event: { type: string; data: any };
 	workflowId: string;
 }) => ReactorCommand | ReactorCommand[] | null;

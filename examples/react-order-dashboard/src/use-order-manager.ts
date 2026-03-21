@@ -105,6 +105,7 @@ export function useOrderManager(): OrderManager {
 			// Add __init__ entry to the log
 			const log = getOrCreateLog(orderId);
 			if (log.entries.length === 0) {
+				// biome-ignore lint/style/noNonNullAssertion: workflow is non-null for newly created store
 				const workflow = store.getWorkflow()!;
 				const snapshot = orderDefinition.serialize(workflow);
 				log.entries.push({

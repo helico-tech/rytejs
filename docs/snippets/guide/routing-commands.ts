@@ -154,7 +154,7 @@ const task = taskWorkflow.createWorkflow("task-2", {
 });
 
 // #region dispatch
-const result = await router.dispatch(workflow, {
+const _result = await router.dispatch(workflow, {
 	type: "Start",
 	payload: { assignee: "alice" },
 });

@@ -105,7 +105,7 @@ const articleWorkflow = defineWorkflow("article", {
 });
 
 // Define dependencies
-type Deps = {
+type _Deps = {
 	notifier: { notifySubscribers(articleId: string): Promise<number> };
 };
 
@@ -129,6 +129,7 @@ router.state("Draft", ({ on }) => {
 
 		transition("Published", {
 			title: data.title,
+			// biome-ignore lint/style/noNonNullAssertion: guarded by error() check above
 			body: data.body!,
 			publishedAt: new Date(),
 		});

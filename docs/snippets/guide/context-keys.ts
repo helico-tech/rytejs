@@ -79,6 +79,7 @@ router.state("Draft", ({ on }) => {
 
 		transition("Published", {
 			title: data.title,
+			// biome-ignore lint/style/noNonNullAssertion: guarded by error() check above
 			body: data.body!,
 			publishedAt: new Date(),
 		});

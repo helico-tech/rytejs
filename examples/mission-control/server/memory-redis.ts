@@ -22,6 +22,7 @@ export function createMemoryRedis(): MemoryRedis {
 	return {
 		async hset(key, fields) {
 			if (!hashes.has(key)) hashes.set(key, new Map());
+			// biome-ignore lint/style/noNonNullAssertion: guarded by has() + set() above
 			const hash = hashes.get(key)!;
 			let added = 0;
 			for (const [field, value] of Object.entries(fields)) {
@@ -49,6 +50,7 @@ export function createMemoryRedis(): MemoryRedis {
 
 		async sadd(key, member) {
 			if (!sets.has(key)) sets.set(key, new Set());
+			// biome-ignore lint/style/noNonNullAssertion: guarded by has() + set() above
 			const set = sets.get(key)!;
 			if (set.has(member)) return 0;
 			set.add(member);
@@ -87,12 +89,13 @@ export function createMemoryRedis(): MemoryRedis {
 
 		subscribe(channel, callback) {
 			if (!subscribers.has(channel)) subscribers.set(channel, new Set());
+			// biome-ignore lint/style/noNonNullAssertion: guarded by has() + set() above
 			subscribers.get(channel)!.add(callback);
 		},
 
 		psubscribe(pattern, callback) {
 			// Convert Redis glob pattern to regex (e.g., "mission:*" → /^mission:.*$/)
-			const regex = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
+			const regex = new RegExp(`^${pattern.replace(/\*/g, ".*")}$`);
 			patternSubscribers.push({ pattern: regex, callback });
 		},
 	};

@@ -27,10 +27,12 @@ describe("defineMigrations()", () => {
 		const pipeline = defineMigrations(definitionV3, {
 			2: (snap) => ({
 				...snap,
+				// biome-ignore lint/suspicious/noExplicitAny: migration spreads opaque snapshot data
 				data: { ...(snap.data as any), status: "active" },
 			}),
 			3: (snap) => ({
 				...snap,
+				// biome-ignore lint/suspicious/noExplicitAny: migration spreads opaque snapshot data
 				data: { ...(snap.data as any), fullName: "unknown" },
 			}),
 		});
@@ -78,10 +80,12 @@ describe("migrate()", () => {
 	const pipeline = defineMigrations(definitionV3, {
 		2: (snap) => ({
 			...snap,
+			// biome-ignore lint/suspicious/noExplicitAny: migration spreads opaque snapshot data
 			data: { ...(snap.data as any), status: "active" },
 		}),
 		3: (snap) => ({
 			...snap,
+			// biome-ignore lint/suspicious/noExplicitAny: migration spreads opaque snapshot data
 			data: { ...(snap.data as any), fullName: "unknown" },
 		}),
 	});

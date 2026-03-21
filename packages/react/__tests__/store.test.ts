@@ -12,7 +12,9 @@ describe("createWorkflowStore", () => {
 
 		const snapshot = store.getSnapshot();
 		expect(snapshot.workflow).not.toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(snapshot.workflow!.state).toBe("Pending");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(snapshot.workflow!.data).toEqual({ title: "Test" });
 		expect(snapshot.isLoading).toBe(false);
 		expect(snapshot.isDispatching).toBe(false);
@@ -27,6 +29,7 @@ describe("createWorkflowStore", () => {
 			id: "custom-id",
 		});
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after store creation
 		expect(store.getWorkflow()!.id).toBe("custom-id");
 	});
 
@@ -37,7 +40,9 @@ describe("createWorkflowStore", () => {
 			data: { title: "Test" },
 		});
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after store creation
 		expect(store.getWorkflow()!.id).toBeTruthy();
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after store creation
 		expect(typeof store.getWorkflow()!.id).toBe("string");
 	});
 
@@ -51,7 +56,9 @@ describe("createWorkflowStore", () => {
 		const result = await store.dispatch("Start", { assignee: "Alice" });
 
 		expect(result.ok).toBe(true);
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after successful dispatch
 		expect(store.getSnapshot().workflow!.state).toBe("InProgress");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after successful dispatch
 		expect(store.getSnapshot().workflow!.data).toMatchObject({ assignee: "Alice" });
 	});
 
@@ -98,6 +105,7 @@ describe("createWorkflowStore", () => {
 		// Dispatch a valid command → should clear error
 		await store.dispatch("Rename", { title: "Renamed" });
 		expect(store.getSnapshot().error).toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after successful dispatch
 		expect(store.getSnapshot().workflow!.data).toMatchObject({ title: "Renamed" });
 	});
 
@@ -190,7 +198,9 @@ describe("createWorkflowStore", () => {
 		});
 		store.setWorkflow(newWorkflow);
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after setWorkflow
 		expect(store.getSnapshot().workflow!.state).toBe("Done");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after setWorkflow
 		expect(store.getSnapshot().workflow!.id).toBe("new-id");
 		expect(listener).toHaveBeenCalledTimes(1);
 	});

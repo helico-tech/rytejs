@@ -106,8 +106,10 @@ describe("otel metrics", () => {
 
 		const counter = findMetric(METRIC_DISPATCH_COUNT, collected);
 		expect(counter).toBeDefined();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(counter!.dataPoints.length).toBeGreaterThanOrEqual(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		const dp = counter!.dataPoints[0];
 		expect(dp.attributes[ATTR_COMMAND_TYPE]).toBe("Publish");
 		expect(dp.attributes[ATTR_WORKFLOW_STATE]).toBeDefined();
@@ -137,9 +139,12 @@ describe("otel metrics", () => {
 
 		const histogram = findMetric(METRIC_DISPATCH_DURATION, collected);
 		expect(histogram).toBeDefined();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(histogram!.descriptor.unit).toBe("ms");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(histogram!.dataPoints.length).toBeGreaterThanOrEqual(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		const dp = histogram!.dataPoints[0];
 		expect(dp.attributes[ATTR_COMMAND_TYPE]).toBe("Publish");
 		expect(dp.value.count).toBeGreaterThanOrEqual(1);
@@ -167,8 +172,10 @@ describe("otel metrics", () => {
 
 		const counter = findMetric(METRIC_TRANSITION_COUNT, collected);
 		expect(counter).toBeDefined();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(counter!.dataPoints.length).toBeGreaterThanOrEqual(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		const dp = counter!.dataPoints[0];
 		expect(dp.attributes[ATTR_TRANSITION_FROM]).toBe("Draft");
 		expect(dp.attributes[ATTR_TRANSITION_TO]).toBe("Published");
@@ -202,6 +209,7 @@ describe("otel metrics", () => {
 		const counter = findMetric(METRIC_DISPATCH_COUNT, collected);
 		expect(counter).toBeDefined();
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		const dp = counter!.dataPoints[0];
 		expect(dp.attributes[ATTR_RESULT]).toBe("error");
 		expect(dp.attributes[ATTR_ERROR_CATEGORY]).toBe("domain");
@@ -230,6 +238,7 @@ describe("otel metrics", () => {
 		const counter = findMetric(METRIC_DISPATCH_COUNT, collected);
 		expect(counter).toBeDefined();
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		const dp = counter!.dataPoints[0];
 		expect(dp.attributes[ATTR_RESULT]).toBe("error");
 		expect(dp.attributes[ATTR_ERROR_CATEGORY]).toBe("router");

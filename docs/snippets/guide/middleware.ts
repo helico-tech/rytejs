@@ -68,6 +68,7 @@ inlineRouter.state("Draft", ({ on }) => {
 		({ data, command, transition }) => {
 			transition("Review", {
 				title: data.title,
+				// biome-ignore lint/style/noNonNullAssertion: guarded by conditional logic in middleware above
 				body: data.body!,
 				reviewerId: command.payload.reviewerId,
 			});

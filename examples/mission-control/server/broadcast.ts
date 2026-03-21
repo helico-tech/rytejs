@@ -53,6 +53,7 @@ export function createBroadcastManager(redis: MemoryRedis): BroadcastManager {
 			if (!missionClients.has(missionId)) {
 				missionClients.set(missionId, new Set());
 			}
+			// biome-ignore lint/style/noNonNullAssertion: guarded by has() + set() above
 			missionClients.get(missionId)!.add(controller);
 
 			return () => {

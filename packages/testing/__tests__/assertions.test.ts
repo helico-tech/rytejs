@@ -87,6 +87,7 @@ describe("expectError", () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
 		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
+		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid error code to test assertion
 		expect(() => expectError(result, "domain", "WrongCode" as any)).toThrow(
 			"Expected error code 'WrongCode'",
 		);

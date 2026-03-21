@@ -176,7 +176,9 @@ describe("WorkflowExecutor", () => {
 			await executor.execute("order-1", { type: "AddItem", payload: { item: "x" } });
 
 			expect(captured).not.toBeNull();
+			// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 			expect(captured!.stored.snapshot.state).toBe("Draft");
+			// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 			expect(captured!.stored.version).toBe(1);
 		});
 
@@ -201,6 +203,7 @@ describe("WorkflowExecutor", () => {
 			expect(result.ok).toBe(false);
 			// Verify nothing was saved (version unchanged)
 			const loaded = await store.load("order-1");
+			// biome-ignore lint/style/noNonNullAssertion: store.load returns non-null for seeded workflow
 			expect(loaded!.version).toBe(1);
 		});
 
@@ -269,6 +272,7 @@ describe("WorkflowExecutor", () => {
 
 			// Version should be unchanged — error prevented save
 			const loaded = await store.load("order-1");
+			// biome-ignore lint/style/noNonNullAssertion: store.load returns non-null for seeded workflow
 			expect(loaded!.version).toBe(1);
 		});
 	});

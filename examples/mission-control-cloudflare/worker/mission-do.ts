@@ -184,7 +184,7 @@ export class MissionDO extends DurableObject<Env> {
 
 			let command: { type: string; payload: unknown };
 			if (analysis.anomaly) {
-				command = { type: "TriggerAbort", payload: { reason: analysis.reason! } };
+				command = { type: "TriggerAbort", payload: { reason: analysis.reason as string } };
 			} else if (readings.altitude >= 400) {
 				command = { type: "AchieveOrbit", payload: {} };
 			} else {

@@ -95,6 +95,7 @@ async function handleRequest(req: Request): Promise<Response> {
 	// Match /missions/:id/events
 	const eventsMatch = pathname.match(/^\/missions\/([^/]+)\/events$/);
 	if (method === "GET" && eventsMatch) {
+		// biome-ignore lint/style/noNonNullAssertion: regex capture group [1] always exists when match succeeds
 		const id = eventsMatch[1]!;
 		const stream = new ReadableStream({
 			start(controller) {
@@ -127,6 +128,7 @@ async function handleRequest(req: Request): Promise<Response> {
 	if (!missionMatch) {
 		return notFound();
 	}
+	// biome-ignore lint/style/noNonNullAssertion: regex capture group [1] always exists when match succeeds
 	const id = missionMatch[1]!;
 
 	// PUT /missions/:id — Create mission

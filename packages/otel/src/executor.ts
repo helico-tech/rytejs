@@ -1,4 +1,4 @@
-import { type Span, SpanStatusCode, trace } from "@opentelemetry/api";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import type { ExecutorContext, ExecutorMiddleware } from "@rytejs/core/executor";
 import {
 	ATTR_COMMAND_TYPE,
