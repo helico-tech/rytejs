@@ -8,3 +8,4 @@ coverage
 .idea
 docs/api/
 .worktrees
+.playwright-cli
