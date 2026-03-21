@@ -1,10 +1,13 @@
 import { useWorkflow } from "@rytejs/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { missionDef } from "../../shared/mission.ts";
 import { client } from "../App.tsx";
 import { cn } from "../lib/utils.ts";
+import { ArchivedView } from "./ArchivedView.tsx";
 import { AscendingView } from "./AscendingView.tsx";
 import { CountdownView } from "./CountdownView.tsx";
+import type { HistoryEntry } from "./HistoryPanel.tsx";
+import { HistoryPanel } from "./HistoryPanel.tsx";
 import { PlanningView } from "./PlanningView.tsx";
 import { ScrubbedView } from "./ScrubbedView.tsx";
 import { AbortView, CancelledView, OrbitAchievedView } from "./TerminalViews.tsx";
@@ -18,6 +21,32 @@ export function MissionDetail({ id, onDeleted }: MissionDetailProps) {
 	const store = useMemo(() => client.connect(missionDef, id), [id]);
 	const wf = useWorkflow(store);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+	const fetchHistory = useCallback(async () => {
+		try {
+			const res = await fetch(`/api/missions/${id}/history`);
+			if (res.ok) {
+				const data = (await res.json()) as HistoryEntry[];
+				setHistory(data);
+			}
+		} catch {
+			// Network error — will retry on next state change
+		}
+	}, [id]);
+
+	// Fetch history on mount
+	useEffect(() => {
+		fetchHistory();
+	}, [fetchHistory]);
+
+	// Re-fetch history when the workflow store updates
+	useEffect(() => {
+		const unsubscribe = store.subscribe(() => {
+			fetchHistory();
+		});
+		return unsubscribe;
+	}, [store, fetchHistory]);
 
 	const handleDelete = useCallback(async () => {
 		if (!confirm("Delete this mission? This cannot be undone.")) return;
@@ -85,14 +114,28 @@ export function MissionDetail({ id, onDeleted }: MissionDetailProps) {
 						<ScrubbedView data={data} dispatch={wf.dispatch} isDispatching={wf.isDispatching} />
 					),
 					Ascending: (data) => <AscendingView data={data} />,
-					OrbitAchieved: (data) => <OrbitAchievedView data={data} />,
-					AbortSequence: (data) => <AbortView data={data} />,
-					Cancelled: (data) => <CancelledView data={data} />,
+					OrbitAchieved: (data) => (
+						<OrbitAchievedView
+							data={data}
+							dispatch={wf.dispatch}
+							isDispatching={wf.isDispatching}
+						/>
+					),
+					AbortSequence: (data) => (
+						<AbortView data={data} dispatch={wf.dispatch} isDispatching={wf.isDispatching} />
+					),
+					Cancelled: (data) => (
+						<CancelledView data={data} dispatch={wf.dispatch} isDispatching={wf.isDispatching} />
+					),
+					Archived: (data) => (
+						<ArchivedView data={data} dispatch={wf.dispatch} isDispatching={wf.isDispatching} />
+					),
 				},
 				() => (
 					<div className="text-[hsl(var(--muted-foreground))] text-sm">Unknown mission state</div>
 				),
 			)}
+			<HistoryPanel entries={history} />
 		</div>
 	);
 }

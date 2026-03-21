@@ -1,5 +1,5 @@
 import type { WorkflowSnapshot } from "@rytejs/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils.ts";
 import { CreateMission } from "./CreateMission.tsx";
 
@@ -23,11 +23,13 @@ const stateBadgeClass: Record<string, string> = {
 	Scrubbed: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
 	AbortSequence: "bg-[hsl(var(--destructive))]/15 text-[hsl(var(--destructive))]",
 	Cancelled: "bg-[hsl(var(--muted))]/30 text-[hsl(var(--muted-foreground))]",
+	Archived: "bg-[hsl(var(--muted))]/20 text-[hsl(var(--muted-foreground))]/70",
 };
 
 export function MissionList({ selectedId, onSelect, onMissionsChanged }: MissionListProps) {
 	const [missions, setMissions] = useState<MissionListItem[]>([]);
 	const [showCreate, setShowCreate] = useState(false);
+	const [showArchived, setShowArchived] = useState(false);
 	const wsRef = useRef<WebSocket | null>(null);
 	const onMissionsChangedRef = useRef(onMissionsChanged);
 	onMissionsChangedRef.current = onMissionsChanged;
@@ -93,6 +95,14 @@ export function MissionList({ selectedId, onSelect, onMissionsChanged }: Mission
 		};
 	}, [updateMissions]);
 
+	const filteredMissions = useMemo(
+		() =>
+			missions.filter((m) =>
+				showArchived ? m.snapshot.state === "Archived" : m.snapshot.state !== "Archived",
+			),
+		[missions, showArchived],
+	);
+
 	return (
 		<div className="flex flex-col h-full">
 			<div className="p-4 border-b border-[hsl(var(--border))]">
@@ -100,22 +110,55 @@ export function MissionList({ selectedId, onSelect, onMissionsChanged }: Mission
 					<h1 className="text-sm font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
 						Missions
 					</h1>
-					<span className="text-xs text-[hsl(var(--muted-foreground))]">{missions.length}</span>
+					<span className="text-xs text-[hsl(var(--muted-foreground))]">
+						{filteredMissions.length}
+					</span>
 				</div>
-				<button
-					type="button"
-					onClick={() => setShowCreate(!showCreate)}
-					className={cn(
-						"w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
-						"bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]",
-						"hover:opacity-90",
-					)}
-				>
-					{showCreate ? "Cancel" : "+ New Mission"}
-				</button>
+
+				{/* Active / Archived toggle */}
+				<div className="flex rounded-md border border-[hsl(var(--border))] mb-3 overflow-hidden">
+					<button
+						type="button"
+						onClick={() => setShowArchived(false)}
+						className={cn(
+							"flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+							!showArchived
+								? "bg-[hsl(var(--secondary))] text-[hsl(var(--foreground))]"
+								: "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))]/50",
+						)}
+					>
+						Active
+					</button>
+					<button
+						type="button"
+						onClick={() => setShowArchived(true)}
+						className={cn(
+							"flex-1 px-3 py-1.5 text-xs font-medium transition-colors",
+							showArchived
+								? "bg-[hsl(var(--secondary))] text-[hsl(var(--foreground))]"
+								: "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))]/50",
+						)}
+					>
+						Archived
+					</button>
+				</div>
+
+				{!showArchived && (
+					<button
+						type="button"
+						onClick={() => setShowCreate(!showCreate)}
+						className={cn(
+							"w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+							"bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]",
+							"hover:opacity-90",
+						)}
+					>
+						{showCreate ? "Cancel" : "+ New Mission"}
+					</button>
+				)}
 			</div>
 
-			{showCreate && (
+			{showCreate && !showArchived && (
 				<div className="border-b border-[hsl(var(--border))]">
 					<CreateMission
 						onCreated={(id) => {
@@ -128,7 +171,7 @@ export function MissionList({ selectedId, onSelect, onMissionsChanged }: Mission
 			)}
 
 			<div className="flex-1 overflow-y-auto p-2 space-y-1">
-				{missions.map((mission) => (
+				{filteredMissions.map((mission) => (
 					<button
 						key={mission.id}
 						type="button"
@@ -160,9 +203,9 @@ export function MissionList({ selectedId, onSelect, onMissionsChanged }: Mission
 						</div>
 					</button>
 				))}
-				{missions.length === 0 && (
+				{filteredMissions.length === 0 && (
 					<div className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-						No missions yet
+						{showArchived ? "No archived missions" : "No missions yet"}
 					</div>
 				)}
 			</div>

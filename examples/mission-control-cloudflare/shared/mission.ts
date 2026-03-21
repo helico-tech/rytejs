@@ -78,6 +78,27 @@ export const missionDef = defineWorkflow("mission", {
 			cancelledAt: z.coerce.date(),
 			reason: z.string(),
 		}),
+		Archived: z.object({
+			previousState: z.enum(["OrbitAchieved", "AbortSequence", "Cancelled"]),
+			name: z.string(),
+			destination: z.string(),
+			crewMembers: z.array(z.string()),
+			// OrbitAchieved fields
+			fuelLevel: z.number().optional(),
+			launchedAt: z.coerce.date().optional(),
+			altitude: z.number().optional(),
+			velocity: z.number().optional(),
+			heading: z.number().optional(),
+			telemetryReadings: z.array(TelemetryReadingSchema).optional(),
+			orbitAchievedAt: z.coerce.date().optional(),
+			finalAltitude: z.number().optional(),
+			// AbortSequence fields
+			abortedAt: z.coerce.date().optional(),
+			reason: z.string().optional(),
+			lastKnownAltitude: z.number().optional(),
+			// Cancelled fields
+			cancelledAt: z.coerce.date().optional(),
+		}),
 	},
 	commands: {
 		InitiateCountdown: z.object({}),
@@ -93,6 +114,8 @@ export const missionDef = defineWorkflow("mission", {
 		AchieveOrbit: z.object({}),
 		TriggerAbort: z.object({ reason: z.string() }),
 		CancelMission: z.object({ reason: z.string() }),
+		Archive: z.object({}),
+		Unarchive: z.object({}),
 	},
 	events: {
 		CountdownStarted: z.object({ missionId: z.string() }),
@@ -103,6 +126,8 @@ export const missionDef = defineWorkflow("mission", {
 		OrbitAchieved: z.object({ missionId: z.string(), altitude: z.number() }),
 		MissionAborted: z.object({ missionId: z.string(), reason: z.string() }),
 		MissionCancelled: z.object({ missionId: z.string(), reason: z.string() }),
+		MissionArchived: z.object({ missionId: z.string(), previousState: z.string() }),
+		MissionUnarchived: z.object({ missionId: z.string(), restoredState: z.string() }),
 	},
 	errors: {
 		LaunchWindowClosed: z.object({}),

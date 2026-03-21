@@ -1,4 +1,6 @@
+import { useCallback, useState } from "react";
 import type { TelemetryReading } from "../../shared/mission.ts";
+import { cn } from "../lib/utils.ts";
 import { TrajectoryViz } from "./viz/TrajectoryViz.tsx";
 
 // -- OrbitAchieved --
@@ -19,15 +21,35 @@ interface OrbitAchievedData {
 
 interface OrbitAchievedViewProps {
 	data: OrbitAchievedData;
+	// biome-ignore lint/suspicious/noExplicitAny: accepts wf.dispatch which has generic signature
+	dispatch: (...args: any[]) => Promise<any>;
+	isDispatching: boolean;
+	onArchived?: () => void;
 }
 
-export function OrbitAchievedView({ data }: OrbitAchievedViewProps) {
+export function OrbitAchievedView({
+	data,
+	dispatch,
+	isDispatching,
+	onArchived,
+}: OrbitAchievedViewProps) {
+	const [isArchiving, setIsArchiving] = useState(false);
 	const launchedAt = data.launchedAt instanceof Date ? data.launchedAt : new Date(data.launchedAt);
 	const orbitAt =
 		data.orbitAchievedAt instanceof Date ? data.orbitAchievedAt : new Date(data.orbitAchievedAt);
 	const durationMs = orbitAt.getTime() - launchedAt.getTime();
 	const durationMin = Math.floor(durationMs / 60000);
 	const durationSec = Math.floor((durationMs % 60000) / 1000);
+
+	const handleArchive = useCallback(async () => {
+		setIsArchiving(true);
+		try {
+			await dispatch("Archive", {});
+			onArchived?.();
+		} finally {
+			setIsArchiving(false);
+		}
+	}, [dispatch, onArchived]);
 
 	return (
 		<div className="max-w-3xl mx-auto space-y-6">
@@ -82,6 +104,23 @@ export function OrbitAchievedView({ data }: OrbitAchievedViewProps) {
 				</div>
 			</div>
 
+			{/* Archive button */}
+			<div className="flex justify-center">
+				<button
+					type="button"
+					onClick={handleArchive}
+					disabled={isDispatching || isArchiving}
+					className={cn(
+						"px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+						"border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
+						"hover:bg-[hsl(var(--secondary))]",
+						"disabled:opacity-50 disabled:cursor-not-allowed",
+					)}
+				>
+					{isArchiving ? "Archiving..." : "Archive Mission"}
+				</button>
+			</div>
+
 			{/* Crew */}
 			<div className="rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--card))] p-4">
 				<div className="text-[10px] font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
@@ -115,9 +154,25 @@ interface AbortData {
 
 interface AbortViewProps {
 	data: AbortData;
+	// biome-ignore lint/suspicious/noExplicitAny: accepts wf.dispatch which has generic signature
+	dispatch: (...args: any[]) => Promise<any>;
+	isDispatching: boolean;
+	onArchived?: () => void;
 }
 
-export function AbortView({ data }: AbortViewProps) {
+export function AbortView({ data, dispatch, isDispatching, onArchived }: AbortViewProps) {
+	const [isArchiving, setIsArchiving] = useState(false);
+
+	const handleArchive = useCallback(async () => {
+		setIsArchiving(true);
+		try {
+			await dispatch("Archive", {});
+			onArchived?.();
+		} finally {
+			setIsArchiving(false);
+		}
+	}, [dispatch, onArchived]);
+
 	return (
 		<div className="max-w-2xl mx-auto space-y-6">
 			{/* Alert banner */}
@@ -156,6 +211,23 @@ export function AbortView({ data }: AbortViewProps) {
 				</div>
 			</div>
 
+			{/* Archive button */}
+			<div className="flex justify-center">
+				<button
+					type="button"
+					onClick={handleArchive}
+					disabled={isDispatching || isArchiving}
+					className={cn(
+						"px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+						"border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
+						"hover:bg-[hsl(var(--secondary))]",
+						"disabled:opacity-50 disabled:cursor-not-allowed",
+					)}
+				>
+					{isArchiving ? "Archiving..." : "Archive Mission"}
+				</button>
+			</div>
+
 			{/* Crew */}
 			<div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
 				<div className="text-[10px] font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-3">
@@ -188,9 +260,25 @@ interface CancelledData {
 
 interface CancelledViewProps {
 	data: CancelledData;
+	// biome-ignore lint/suspicious/noExplicitAny: accepts wf.dispatch which has generic signature
+	dispatch: (...args: any[]) => Promise<any>;
+	isDispatching: boolean;
+	onArchived?: () => void;
 }
 
-export function CancelledView({ data }: CancelledViewProps) {
+export function CancelledView({ data, dispatch, isDispatching, onArchived }: CancelledViewProps) {
+	const [isArchiving, setIsArchiving] = useState(false);
+
+	const handleArchive = useCallback(async () => {
+		setIsArchiving(true);
+		try {
+			await dispatch("Archive", {});
+			onArchived?.();
+		} finally {
+			setIsArchiving(false);
+		}
+	}, [dispatch, onArchived]);
+
 	return (
 		<div className="max-w-2xl mx-auto space-y-6">
 			<div className="flex items-center gap-3">
@@ -214,6 +302,23 @@ export function CancelledView({ data }: CancelledViewProps) {
 					</div>
 					<div className="text-sm text-[hsl(var(--muted-foreground))]">{data.destination}</div>
 				</div>
+			</div>
+
+			{/* Archive button */}
+			<div className="flex justify-center">
+				<button
+					type="button"
+					onClick={handleArchive}
+					disabled={isDispatching || isArchiving}
+					className={cn(
+						"px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+						"border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
+						"hover:bg-[hsl(var(--secondary))]",
+						"disabled:opacity-50 disabled:cursor-not-allowed",
+					)}
+				>
+					{isArchiving ? "Archiving..." : "Archive Mission"}
+				</button>
 			</div>
 
 			{/* Crew */}
