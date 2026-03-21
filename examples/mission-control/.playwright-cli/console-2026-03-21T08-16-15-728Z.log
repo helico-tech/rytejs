@@ -1,0 +1,5 @@
+Total messages: 4 (Errors: 0, Warnings: 1)
+Returning 2 messages for level "info"
+
+[WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/@fs/home/ralph/ryte/.worktrees/mission-control/examples/mission-control/node_modules/.vite/deps/react-dom_client.js?v=c0c853ca:20102

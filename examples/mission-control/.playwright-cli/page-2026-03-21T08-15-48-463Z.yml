@@ -1,0 +1,33 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - heading "Missions" [level=1] [ref=e8]
+          - generic [ref=e9]: "1"
+        - button "+ New Mission" [ref=e34]
+      - button "Endeavour Planning ISS Dock" [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]: Endeavour
+          - generic [ref=e38]: Planning
+        - generic [ref=e39]: ISS Dock
+  - main [ref=e13]:
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - heading "Endeavour" [level=2] [ref=e43]
+        - generic [ref=e44]: Planning
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]: Destination
+          - generic [ref=e48]: ISS Dock
+        - generic [ref=e49]:
+          - generic [ref=e50]: Fuel Level
+          - generic [ref=e54]: 95%
+      - generic [ref=e55]:
+        - generic [ref=e56]: Crew Members
+        - generic [ref=e57]:
+          - generic [ref=e58]: Chen
+          - generic [ref=e59]: Kowalski
+      - generic [ref=e60]:
+        - button "Initiate Countdown" [ref=e61]
+        - button "Cancel Mission" [ref=e62]

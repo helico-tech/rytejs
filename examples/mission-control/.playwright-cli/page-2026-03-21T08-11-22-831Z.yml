@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - heading "Missions" [level=1] [ref=e8]
+          - generic [ref=e9]: "1"
+        - button "Cancel" [active] [ref=e23]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Mission Name
+          - textbox "Mission Name" [ref=e28]:
+            - /placeholder: Artemis VII
+        - generic [ref=e29]:
+          - generic [ref=e30]: Destination
+          - textbox "Destination" [ref=e31]:
+            - /placeholder: Mars orbit
+        - generic [ref=e32]:
+          - generic [ref=e33]: Crew Members
+          - textbox "Crew Members Comma-separated" [ref=e34]:
+            - /placeholder: Chen, Kowalski, Nakamura
+          - text: Comma-separated
+        - generic [ref=e35]:
+          - generic [ref=e36]: "Fuel Level: 95%"
+          - 'slider "Fuel Level: 95%" [ref=e37]': "95"
+        - button "Create Mission" [ref=e38]
+      - button "SSE Test AbortSequence LEO" [ref=e22]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: SSE Test
+          - generic [ref=e15]: AbortSequence
+        - generic [ref=e16]: LEO
+  - main [ref=e17]:
+    - generic [ref=e19]:
+      - generic [ref=e20]: No mission selected
+      - generic [ref=e21]: Select a mission from the sidebar or create a new one

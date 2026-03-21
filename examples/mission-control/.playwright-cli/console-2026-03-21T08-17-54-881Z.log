@@ -1,0 +1,3 @@
+[     603ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/favicon.ico:0
+[    4967ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[    4967ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:4000/missions/events:0
