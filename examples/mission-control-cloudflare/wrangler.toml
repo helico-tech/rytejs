@@ -4,12 +4,13 @@ compatibility_date = "2025-03-20"
 
 [durable_objects]
 bindings = [
-	{ name = "MISSION", class_name = "MissionDO" }
+	{ name = "MISSION", class_name = "MissionDO" },
+	{ name = "MISSION_INDEX", class_name = "MissionIndexDO" }
 ]
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["MissionDO"]
+new_sqlite_classes = ["MissionDO", "MissionIndexDO"]
 
 [assets]
 directory = "./dist"

@@ -1,5 +1,5 @@
 import type { WorkflowSnapshot } from "@rytejs/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils.ts";
 import { CreateMission } from "./CreateMission.tsx";
 
@@ -12,28 +12,6 @@ interface MissionListItem {
 interface MissionListProps {
 	selectedId: string | null;
 	onSelect: (id: string) => void;
-}
-
-const STORAGE_KEY = "mission-control:missions";
-
-function loadMissionIds(): string[] {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		return raw ? (JSON.parse(raw) as string[]) : [];
-	} catch {
-		return [];
-	}
-}
-
-function saveMissionIds(ids: string[]): void {
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-}
-
-function addMissionId(id: string): void {
-	const ids = loadMissionIds();
-	if (!ids.includes(id)) {
-		saveMissionIds([id, ...ids]);
-	}
 }
 
 const stateBadgeClass: Record<string, string> = {
@@ -49,35 +27,63 @@ const stateBadgeClass: Record<string, string> = {
 export function MissionList({ selectedId, onSelect }: MissionListProps) {
 	const [missions, setMissions] = useState<MissionListItem[]>([]);
 	const [showCreate, setShowCreate] = useState(false);
+	const wsRef = useRef<WebSocket | null>(null);
 
 	const fetchMissions = useCallback(async () => {
-		const ids = loadMissionIds();
-		const results: MissionListItem[] = [];
-
-		for (const id of ids) {
-			try {
-				const res = await fetch(`/api/missions/${id}`);
-				if (res.ok) {
-					const data = (await res.json()) as { snapshot: WorkflowSnapshot; version: number };
-					results.push({ id, snapshot: data.snapshot, version: data.version });
-				}
-			} catch {
-				// Mission may have been deleted or is unreachable
+		try {
+			const res = await fetch("/api/missions");
+			if (res.ok) {
+				const data = (await res.json()) as MissionListItem[];
+				setMissions(data);
 			}
+		} catch {
+			// Network error — will retry via WebSocket reconnect
 		}
-
-		setMissions(results);
 	}, []);
 
+	// Initial fetch
 	useEffect(() => {
 		fetchMissions();
 	}, [fetchMissions]);
 
-	// Poll for updates every 5 seconds (DOs don't support listing natively)
+	// WebSocket subscription for live updates
 	useEffect(() => {
-		const interval = setInterval(fetchMissions, 5000);
-		return () => clearInterval(interval);
-	}, [fetchMissions]);
+		function connect() {
+			const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+			const ws = new WebSocket(`${protocol}//${location.host}/api/missions/ws`);
+			wsRef.current = ws;
+
+			ws.onmessage = (e) => {
+				const msg = JSON.parse(e.data) as {
+					type: "init" | "update";
+					missions: MissionListItem[];
+				};
+				if (msg.type === "init" || msg.type === "update") {
+					setMissions(msg.missions);
+				}
+			};
+
+			ws.onclose = () => {
+				// Reconnect after a short delay
+				setTimeout(connect, 2000);
+			};
+
+			ws.onerror = () => {
+				ws.close();
+			};
+		}
+
+		connect();
+
+		return () => {
+			const ws = wsRef.current;
+			if (ws) {
+				wsRef.current = null;
+				ws.onclose = null;
+				ws.close();
+			}
+		};
+	}, []);
 
 	return (
 		<div className="flex flex-col h-full">
@@ -105,10 +111,9 @@ export function MissionList({ selectedId, onSelect }: MissionListProps) {
 				<div className="border-b border-[hsl(var(--border))]">
 					<CreateMission
 						onCreated={(id) => {
-							addMissionId(id);
 							setShowCreate(false);
 							onSelect(id);
-							fetchMissions();
+							// The WebSocket will push the updated list automatically
 						}}
 					/>
 				</div>

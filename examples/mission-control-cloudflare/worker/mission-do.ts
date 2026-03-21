@@ -118,6 +118,7 @@ export class MissionDO extends DurableObject<Env> {
 						version: result.version,
 						events: result.events,
 					});
+					await this.notifyIndex(id, result.snapshot, result.version);
 					await this.scheduleAlarmIfNeeded(result.snapshot);
 				}
 			} else {
@@ -132,6 +133,7 @@ export class MissionDO extends DurableObject<Env> {
 						version: result.version,
 						events: result.events,
 					});
+					await this.notifyIndex(id, result.snapshot, result.version);
 					await this.scheduleAlarmIfNeeded(result.snapshot);
 				}
 			}
@@ -162,6 +164,7 @@ export class MissionDO extends DurableObject<Env> {
 					version: result.version,
 					events: result.events,
 				});
+				await this.notifyIndex(id, result.snapshot, result.version);
 				await this.scheduleAlarmIfNeeded(result.snapshot);
 			}
 		}
@@ -192,6 +195,26 @@ export class MissionDO extends DurableObject<Env> {
 			} catch {
 				// Client disconnected
 			}
+		}
+	}
+
+	private async notifyIndex(
+		id: string,
+		snapshot: WorkflowSnapshot,
+		version: number,
+	): Promise<void> {
+		try {
+			const indexId = this.env.MISSION_INDEX.idFromName("global");
+			const indexStub = this.env.MISSION_INDEX.get(indexId);
+			await indexStub.fetch(
+				new Request("http://internal/", {
+					method: "POST",
+					body: JSON.stringify({ id, snapshot, version }),
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
+		} catch {
+			// Index notification is best-effort during alarms
 		}
 	}
 
