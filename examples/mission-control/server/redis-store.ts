@@ -1,6 +1,7 @@
 import type { WorkflowSnapshot } from "@rytejs/core";
 import type { SaveOptions, StoreAdapter, StoredWorkflow } from "@rytejs/core/store";
 import { ConcurrencyConflictError } from "@rytejs/core/store";
+import { RedisClient } from "bun";
 
 export interface RedisStoreAdapter extends StoreAdapter {
 	create(id: string, snapshot: WorkflowSnapshot): Promise<void>;
@@ -25,27 +26,7 @@ return 'OK'
 `;
 
 export function createRedisStore(redisUrl?: string): RedisStoreAdapter {
-	const url = redisUrl ?? "redis://localhost:6379";
-
-	// biome-ignore lint/suspicious/noExplicitAny: Bun.RedisClient may not exist on all Bun versions
-	const RedisClient = (globalThis as any).Bun?.RedisClient;
-	let redis: {
-		send(command: string, args: string[]): Promise<string | null>;
-		// biome-ignore lint/suspicious/noExplicitAny: Redis client generic return types
-		hgetall(key: string): Promise<any>;
-		hset(key: string, fields: Record<string, string>): Promise<number>;
-		sadd(key: string, member: string): Promise<number>;
-		smembers(key: string): Promise<string[]>;
-	};
-
-	if (RedisClient) {
-		redis = new RedisClient(url);
-	} else {
-		// Fallback: import default redis from "bun"
-		// biome-ignore lint/suspicious/noExplicitAny: dynamic Bun redis import
-		const bun = require("bun") as any;
-		redis = bun.redis ?? new bun.RedisClient(url);
-	}
+	const redis = new RedisClient(redisUrl ?? "redis://localhost:6379");
 
 	return {
 		async create(id: string, snapshot: WorkflowSnapshot): Promise<void> {
