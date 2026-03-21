@@ -192,7 +192,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				createdAt: workflow.createdAt.toISOString(),
 				updatedAt: workflow.updatedAt.toISOString(),
 				modelVersion: config.modelVersion ?? 1,
-				version: workflow.version ?? 0,
+				version: workflow.version ?? 1,
 			};
 		},
 

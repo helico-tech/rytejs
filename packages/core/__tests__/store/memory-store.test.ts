@@ -10,7 +10,7 @@ const makeSnapshot = (id: string, state = "Draft") => ({
 	createdAt: new Date().toISOString(),
 	updatedAt: new Date().toISOString(),
 	modelVersion: 1,
-	version: 0,
+	version: 1,
 });
 
 describe("memoryStore", () => {

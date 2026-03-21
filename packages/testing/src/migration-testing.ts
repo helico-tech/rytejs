@@ -39,7 +39,7 @@ function makeTestSnapshot<TConfig extends WorkflowConfig>(
 		createdAt: "2026-01-01T00:00:00.000Z",
 		updatedAt: "2026-01-01T00:00:00.000Z",
 		modelVersion: version,
-		version: 0,
+		version: 1,
 	};
 }
 

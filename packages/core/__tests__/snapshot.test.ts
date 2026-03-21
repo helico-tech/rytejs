@@ -29,7 +29,7 @@ describe("snapshot()", () => {
 		expect(typeof snap.createdAt).toBe("string");
 		expect(typeof snap.updatedAt).toBe("string");
 		expect(snap.modelVersion).toBe(1);
-		expect(snap.version).toBe(0);
+		expect(snap.version).toBe(1);
 	});
 
 	test("serializes dates as ISO 8601 strings", () => {
