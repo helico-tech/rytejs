@@ -1,6 +1,6 @@
 import {
-	BasicTracerProvider,
 	InMemorySpanExporter,
+	NodeTracerProvider,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
@@ -23,12 +23,13 @@ const definition = defineWorkflow("order", {
 
 describe("otel plugin integration", () => {
 	let exporter: InMemorySpanExporter;
-	let provider: BasicTracerProvider;
+	let provider: NodeTracerProvider;
 
 	beforeEach(() => {
 		exporter = new InMemorySpanExporter();
-		provider = new BasicTracerProvider();
-		provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+		provider = new NodeTracerProvider({
+			spanProcessors: [new SimpleSpanProcessor(exporter)],
+		});
 		provider.register();
 	});
 
@@ -77,7 +78,7 @@ describe("otel plugin integration", () => {
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
-		expect(spans[0]!.instrumentationLibrary.name).toBe("custom-scope");
+		expect(spans[0]!.instrumentationScope.name).toBe("custom-scope");
 	});
 
 	test("multiple dispatches create independent spans", async () => {

@@ -5,8 +5,6 @@ export default defineConfig({
 		environment: "jsdom",
 		passWithNoTests: true,
 		pool: "threads",
-		poolOptions: {
-			threads: { maxThreads: 2 },
-		},
+		maxConcurrency: 2,
 	},
 });

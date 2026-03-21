@@ -13,14 +13,14 @@ import { logs } from "@opentelemetry/api-logs";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { Resource } from "@opentelemetry/resources";
+import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 
-const resource = new Resource({
+const resource = resourceFromAttributes({
 	[ATTR_SERVICE_NAME]: "ryte-otel-example",
 	[ATTR_SERVICE_VERSION]: "0.1.0",
 });
@@ -37,8 +37,10 @@ const logExporter = new OTLPLogExporter({
 	url: "http://localhost:4318/v1/logs",
 });
 
-const loggerProvider = new LoggerProvider({ resource });
-loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
+const loggerProvider = new LoggerProvider({
+	resource,
+	processors: [new BatchLogRecordProcessor(logExporter)],
+});
 logs.setGlobalLoggerProvider(loggerProvider);
 
 const sdk = new NodeSDK({

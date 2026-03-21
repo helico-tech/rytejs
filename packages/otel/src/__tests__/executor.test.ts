@@ -1,7 +1,7 @@
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
-	BasicTracerProvider,
 	InMemorySpanExporter,
+	NodeTracerProvider,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import type { ExecutorContext } from "@rytejs/core/executor";
@@ -10,8 +10,9 @@ import { createOtelExecutorMiddleware } from "../executor.js";
 
 // Setup in-memory tracing
 const exporter = new InMemorySpanExporter();
-const provider = new BasicTracerProvider();
-provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+const provider = new NodeTracerProvider({
+	spanProcessors: [new SimpleSpanProcessor(exporter)],
+});
 provider.register();
 
 function makeCtx(overrides?: Partial<ExecutorContext>): ExecutorContext {
@@ -124,6 +125,6 @@ describe("createOtelExecutorMiddleware", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 		const span = spans[0]!;
-		expect(span.instrumentationLibrary.name).toBe("custom-tracer");
+		expect(span.instrumentationScope.name).toBe("custom-tracer");
 	});
 });

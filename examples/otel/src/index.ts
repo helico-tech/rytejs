@@ -38,7 +38,7 @@ const server = createServer(async (req, res) => {
 		return;
 	}
 
-	const id = match[1];
+	const id = match[1] as string;
 
 	try {
 		if (req.method === "GET") {
@@ -62,7 +62,8 @@ const server = createServer(async (req, res) => {
 				data: parsed.data,
 			});
 			const snapshot = orderWorkflow.serialize(workflow);
-			await store.save({ id, snapshot, expectedVersion: 0 });
+			// biome-ignore lint/suspicious/noExplicitAny: memoryStore accepts any WorkflowSnapshot
+			await store.save({ id, snapshot: snapshot as any, expectedVersion: 0 });
 			res.writeHead(201, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(snapshot));
 			logger.info({ id }, "workflow created");
