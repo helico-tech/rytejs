@@ -16,4 +16,6 @@ export interface WorkflowSnapshot<TConfig extends WorkflowConfig = WorkflowConfi
 	readonly updatedAt: string;
 	/** Schema version number for migration support. */
 	readonly modelVersion: number;
+	/** Optimistic concurrency version. Starts at 1, increments on each successful save. */
+	readonly version: number;
 }

@@ -18,7 +18,11 @@ export function memoryStore(): StoreAdapter {
 				throw new ConcurrencyConflictError(id, expectedVersion, currentVersion);
 			}
 
-			data.set(id, { snapshot, version: currentVersion + 1 });
+			const newVersion = currentVersion + 1;
+			data.set(id, {
+				snapshot: { ...snapshot, version: newVersion },
+				version: newVersion,
+			});
 		},
 	};
 }

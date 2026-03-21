@@ -182,6 +182,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			data: unknown;
 			createdAt: Date;
 			updatedAt: Date;
+			version?: number;
 		}) {
 			return {
 				id: workflow.id,
@@ -191,6 +192,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				createdAt: workflow.createdAt.toISOString(),
 				updatedAt: workflow.updatedAt.toISOString(),
 				modelVersion: config.modelVersion ?? 1,
+				version: workflow.version ?? 0,
 			};
 		},
 

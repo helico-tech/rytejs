@@ -138,7 +138,7 @@ async function handleRequest(req: Request): Promise<Response> {
 			initialState: "Planning",
 			data: { name, destination, crewMembers, fuelLevel },
 		});
-		const snapshot = missionDef.snapshot(workflow);
+		const snapshot = { ...missionDef.snapshot(workflow), version: 1 };
 
 		await store.create(id, snapshot);
 		await broadcast.publish(id, snapshot, 1, []);

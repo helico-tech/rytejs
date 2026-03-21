@@ -114,6 +114,7 @@ describe("persistence", () => {
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 				modelVersion: 1,
+				version: 1,
 			}),
 		);
 		const router = createTestRouter();

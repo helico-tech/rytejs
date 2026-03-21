@@ -10,6 +10,7 @@ const makeSnapshot = (id: string, state = "Draft") => ({
 	createdAt: new Date().toISOString(),
 	updatedAt: new Date().toISOString(),
 	modelVersion: 1,
+	version: 0,
 });
 
 describe("memoryStore", () => {
@@ -25,7 +26,8 @@ describe("memoryStore", () => {
 
 		const stored = await store.load("wf-1");
 		expect(stored).not.toBeNull();
-		expect(stored!.snapshot).toEqual(snapshot);
+		expect(stored!.snapshot).toEqual({ ...snapshot, version: 1 });
+		expect(stored!.snapshot.version).toBe(1);
 		expect(stored!.version).toBe(1);
 	});
 

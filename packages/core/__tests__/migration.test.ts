@@ -95,6 +95,7 @@ describe("migrate()", () => {
 			createdAt: "2026-01-01T00:00:00.000Z",
 			updatedAt: "2026-01-01T00:00:00.000Z",
 			modelVersion: version,
+			version: 1,
 		};
 	}
 
@@ -179,6 +180,7 @@ describe("migrate()", () => {
 			createdAt: "2026-01-01T00:00:00.000Z",
 			updatedAt: "2026-01-01T00:00:00.000Z",
 			modelVersion: 1,
+			version: 1,
 		};
 		const result = migrate(badPipeline, snap);
 		expect(result.ok).toBe(false);
@@ -214,6 +216,7 @@ describe("migrate()", () => {
 			createdAt: "2026-01-01T00:00:00.000Z",
 			updatedAt: "2026-01-01T00:00:00.000Z",
 			modelVersion: 1,
+			version: 1,
 		};
 		migrate(badPipeline, snap, { onError });
 		expect(onError).toHaveBeenCalledOnce();

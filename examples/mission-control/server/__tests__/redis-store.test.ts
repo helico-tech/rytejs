@@ -26,6 +26,7 @@ function makeSnapshot(
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 		modelVersion: 1,
+		version: 0,
 	};
 }
 

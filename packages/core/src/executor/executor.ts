@@ -70,6 +70,9 @@ export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 
 		// 5. Save if dispatch succeeded
 		if (ctx.snapshot) {
+			const newVersion = stored.version + 1;
+			const savedSnapshot = { ...ctx.snapshot, version: newVersion };
+
 			try {
 				await this.store.save({
 					id,
@@ -101,8 +104,8 @@ export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 
 			return {
 				ok: true,
-				snapshot: ctx.snapshot,
-				version: stored.version + 1,
+				snapshot: savedSnapshot,
+				version: newVersion,
 				events: ctx.events,
 			};
 		}

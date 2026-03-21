@@ -13,7 +13,8 @@ export function createRedisStore(redis: MemoryRedis): RedisStoreAdapter {
 	return {
 		async create(id: string, snapshot: WorkflowSnapshot): Promise<void> {
 			const key = `mission:${id}`;
-			const snapshotJson = JSON.stringify(snapshot);
+			const versionedSnapshot = { ...snapshot, version: 1 };
+			const snapshotJson = JSON.stringify(versionedSnapshot);
 			await redis.hset(key, { snapshot: snapshotJson, version: "1" });
 			await redis.sadd("missions:all", id);
 			await redis.sadd(`missions:state:${snapshot.state}`, id);
@@ -48,9 +49,10 @@ export function createRedisStore(redis: MemoryRedis): RedisStoreAdapter {
 				: "";
 			const newState = snapshot.state;
 
+			const newVersion = expectedVersion + 1;
 			await redis.hset(key, {
-				snapshot: JSON.stringify(snapshot),
-				version: String(expectedVersion + 1),
+				snapshot: JSON.stringify({ ...snapshot, version: newVersion }),
+				version: String(newVersion),
 			});
 
 			if (oldState) {

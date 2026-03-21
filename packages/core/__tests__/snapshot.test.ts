@@ -29,6 +29,7 @@ describe("snapshot()", () => {
 		expect(typeof snap.createdAt).toBe("string");
 		expect(typeof snap.updatedAt).toBe("string");
 		expect(snap.modelVersion).toBe(1);
+		expect(snap.version).toBe(0);
 	});
 
 	test("serializes dates as ISO 8601 strings", () => {
@@ -93,6 +94,7 @@ describe("restore()", () => {
 			createdAt: "2026-01-15T10:00:00.000Z",
 			updatedAt: "2026-01-15T10:05:00.000Z",
 			modelVersion: 1,
+			version: 1,
 		};
 		const result = definition.restore(snap);
 
@@ -112,6 +114,7 @@ describe("restore()", () => {
 			createdAt: "2026-01-15T10:00:00.000Z",
 			updatedAt: "2026-01-15T10:05:00.000Z",
 			modelVersion: 1,
+			version: 1,
 		};
 		const result = definition.restore(snap);
 
@@ -131,6 +134,7 @@ describe("restore()", () => {
 			createdAt: "2026-01-15T10:00:00.000Z",
 			updatedAt: "2026-01-15T10:05:00.000Z",
 			modelVersion: 1,
+			version: 1,
 		};
 		const result = definition.restore(snap);
 

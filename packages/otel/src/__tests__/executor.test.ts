@@ -27,6 +27,7 @@ function makeCtx(overrides?: Partial<ExecutorContext>): ExecutorContext {
 				createdAt: "",
 				updatedAt: "",
 				modelVersion: 1,
+				version: 1,
 			},
 			version: 1,
 		},
