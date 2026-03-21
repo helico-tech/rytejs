@@ -10,7 +10,7 @@ function seed(store: ReturnType<typeof memoryStore>, id: string, data: { items: 
 		initialState: "Draft",
 		data,
 	});
-	const snapshot = definition.snapshot(workflow) as WorkflowSnapshot;
+	const snapshot = definition.serialize(workflow) as WorkflowSnapshot;
 	return store.save({ id, snapshot, expectedVersion: 0 });
 }
 

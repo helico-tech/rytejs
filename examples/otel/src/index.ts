@@ -61,7 +61,7 @@ const server = createServer(async (req, res) => {
 				initialState: parsed.initialState,
 				data: parsed.data,
 			});
-			const snapshot = orderWorkflow.snapshot(workflow);
+			const snapshot = orderWorkflow.serialize(workflow);
 			await store.save({ id, snapshot, expectedVersion: 0 });
 			res.writeHead(201, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(snapshot));

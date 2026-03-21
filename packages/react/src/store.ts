@@ -65,7 +65,7 @@ export function createWorkflowStore<
 
 		if (result.ok && options?.persist) {
 			const { key, storage } = options.persist;
-			const snap = definition.snapshot(workflow);
+			const snap = definition.serialize(workflow);
 			storage.setItem(key, JSON.stringify(snap));
 		}
 
@@ -111,13 +111,13 @@ function loadOrCreate<TConfig extends WorkflowConfig, S extends StateNames<TConf
 						return createFresh(definition, initialConfig);
 					}
 				}
-				const restored = definition.restore(parsed);
+				const restored = definition.deserialize(parsed);
 				if (restored.ok) {
 					return restored.workflow;
 				}
 			}
 		} catch {
-			// Invalid JSON or restore failed — fall through to create fresh
+			// Invalid JSON or deserialize failed — fall through to create fresh
 		}
 	}
 

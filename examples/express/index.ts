@@ -20,7 +20,7 @@ import { z } from "zod";
 // Every workflow begins with a definition: the set of states, commands,
 // events, and domain errors it supports. Zod schemas validate data at
 // every boundary — creation, command dispatch, state transitions, and
-// snapshot restore.
+// snapshot deserialize.
 
 const taskWorkflow = defineWorkflow("task", {
 	states: {
@@ -146,7 +146,7 @@ app.post("/workflows", (req, res) => {
 		initialState: "Todo",
 		data: { title },
 	});
-	const snapshot = taskWorkflow.snapshot(workflow);
+	const snapshot = taskWorkflow.serialize(workflow);
 
 	// Persist the snapshot.
 	store.set(id, snapshot);
@@ -161,9 +161,9 @@ app.post("/workflows", (req, res) => {
  * Dispatch a command to an existing workflow. This endpoint demonstrates
  * the full load -> dispatch -> persist -> publish cycle:
  *
- *   1. Load   — read the snapshot from the store and restore it
+ *   1. Load   — read the snapshot from the store and deserialize it
  *   2. Dispatch — run the command through the router
- *   3. Persist — snapshot the updated workflow and save it
+ *   3. Persist — serialize the updated workflow and save it
  *   4. Publish — return emitted events to the caller
  *
  * Body: { type: string, payload: object }
@@ -179,7 +179,7 @@ app.post("/workflows/:id/dispatch", async (req, res) => {
 
 	// ---- 1. Load ----
 	// Retrieve the persisted snapshot and rehydrate it into a live workflow
-	// instance. restore() validates the snapshot data against the current
+	// instance. deserialize() validates the snapshot data against the current
 	// schema, catching any schema-drift issues early.
 	const snapshot = store.get(id);
 	if (!snapshot) {
@@ -187,9 +187,9 @@ app.post("/workflows/:id/dispatch", async (req, res) => {
 		return;
 	}
 
-	const restored = taskWorkflow.restore(snapshot);
+	const restored = taskWorkflow.deserialize(snapshot);
 	if (!restored.ok) {
-		res.status(500).json({ error: "Failed to restore workflow", details: restored.error });
+		res.status(500).json({ error: "Failed to deserialize workflow", details: restored.error });
 		return;
 	}
 
@@ -211,7 +211,7 @@ app.post("/workflows/:id/dispatch", async (req, res) => {
 
 	// ---- 3. Persist ----
 	// Snapshot the updated workflow and write it back to the store.
-	const updatedSnapshot = taskWorkflow.snapshot(result.workflow);
+	const updatedSnapshot = taskWorkflow.serialize(result.workflow);
 	store.set(id, updatedSnapshot);
 
 	// ---- 4. Publish ----

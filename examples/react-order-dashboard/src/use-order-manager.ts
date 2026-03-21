@@ -106,7 +106,7 @@ export function useOrderManager(): OrderManager {
 			const log = getOrCreateLog(orderId);
 			if (log.entries.length === 0) {
 				const workflow = store.getWorkflow()!;
-				const snapshot = orderDefinition.snapshot(workflow);
+				const snapshot = orderDefinition.serialize(workflow);
 				log.entries.push({
 					id: 0,
 					command: "__init__",
@@ -180,7 +180,7 @@ export function useOrderManager(): OrderManager {
 
 			const entry = log.entries[cursor];
 			if (!entry) return;
-			const result = orderDefinition.restore(entry.snapshot);
+			const result = orderDefinition.deserialize(entry.snapshot);
 			if (result.ok) {
 				store.setWorkflow(result.workflow);
 				log.cursor = cursor;

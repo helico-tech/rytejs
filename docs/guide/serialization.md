@@ -4,7 +4,7 @@ Workflows can be serialized to plain JSON-safe objects and restored with validat
 
 ## Snapshotting
 
-`definition.snapshot()` converts a workflow into a plain object:
+`definition.serialize()` converts a workflow into a plain object:
 
 <<< @/snippets/guide/serialization.ts#snapshot
 
@@ -12,7 +12,7 @@ The snapshot is `JSON.stringify`-safe — no classes, symbols, or circular refer
 
 ## Restoring
 
-`definition.restore()` validates a snapshot against the current schemas and reconstructs the workflow:
+`definition.deserialize()` validates a snapshot against the current schemas and reconstructs the workflow:
 
 <<< @/snippets/guide/serialization.ts#restore
 

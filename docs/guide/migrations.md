@@ -2,7 +2,7 @@
 
 Workflows evolve over time. When you change state schemas, old snapshots stored in your database no longer match the new shape. Migrations let you transform those snapshots through a versioned pipeline so they can be safely restored.
 
-The `modelVersion` field on every snapshot is the anchor — it records which version of your schema produced the data. When you bump `modelVersion` on the definition, old snapshots carry a lower number and need to be migrated before `restore()` will accept them.
+The `modelVersion` field on every snapshot is the anchor — it records which version of your schema produced the data. When you bump `modelVersion` on the definition, old snapshots carry a lower number and need to be migrated before `deserialize()` will accept them.
 
 ## Defining a Migration Pipeline
 
@@ -16,7 +16,7 @@ Each key is either a plain transform function or an object with a `description` 
 
 The `description` is optional but shows up in `onStep` callbacks (see [Observability Callbacks](#observability-callbacks)).
 
-Each key is the **target version** — the function transforms from `(key - 1)` to `key`. Migration functions operate on `unknown` data, so `as any` casts are expected here. Type safety is restored at the `restore()` boundary, not inside the migration functions themselves.
+Each key is the **target version** — the function transforms from `(key - 1)` to `key`. Migration functions operate on `unknown` data, so `as any` casts are expected here. Type safety is restored at the `deserialize()` boundary, not inside the migration functions themselves.
 
 The pipeline auto-stamps `modelVersion` after each step, even if your function sets it. You only transform data and, optionally, state.
 
@@ -44,9 +44,9 @@ If the definition has `modelVersion: 1` (or unset) and the map is empty, a valid
 
 If the snapshot is already at the target version, it is returned as-is.
 
-## The Full Pattern: migrate() then restore()
+## The Full Pattern: migrate() then deserialize()
 
-`migrate()` and `restore()` are separate calls. Run migration first to bring the snapshot up to the current schema version, then restore to validate and reconstruct the typed workflow:
+`migrate()` and `deserialize()` are separate calls. Run migration first to bring the snapshot up to the current schema version, then deserialize to validate and reconstruct the typed workflow:
 
 <<< @/snippets/guide/migrations.ts#full-pattern
 
@@ -86,7 +86,7 @@ Runs the entire pipeline from `from` to the target version and asserts the final
 
 ### testMigrationRestore — migrate + restore round-trip
 
-Runs `migrate()` then `definition.restore()` and asserts the restore succeeds. Use this to catch cases where migration produces data that satisfies the pipeline but fails schema validation:
+Runs `migrate()` then `definition.deserialize()` and asserts the deserialize succeeds. Use this to catch cases where migration produces data that satisfies the pipeline but fails schema validation:
 
 <<< @/snippets/guide/migrations.ts#test-restore
 

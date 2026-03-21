@@ -87,16 +87,6 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	deserialize(
 		snapshot: WorkflowSnapshot<TConfig>,
 	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
-	/**
-	 * @deprecated Use {@link serialize} instead.
-	 */
-	snapshot(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>;
-	/**
-	 * @deprecated Use {@link deserialize} instead.
-	 */
-	restore(
-		snapshot: WorkflowSnapshot<TConfig>,
-	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
 }
 
 /**
@@ -249,14 +239,6 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				},
 				// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
 			} as any;
-		},
-
-		snapshot(...args) {
-			return this.serialize(...args);
-		},
-
-		restore(...args) {
-			return this.deserialize(...args);
 		},
 	};
 }

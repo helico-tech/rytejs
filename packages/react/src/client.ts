@@ -67,7 +67,7 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 		.then((result) => {
 			if (disposed) return;
 			if (result !== null) {
-				const restored = definition.restore(result.snapshot);
+				const restored = definition.deserialize(result.snapshot);
 				if (restored.ok) {
 					workflow = restored.workflow;
 					version = result.version;
@@ -91,7 +91,7 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 	// Subscribe to live broadcasts
 	const subscription = transport.subscribe(id, (message: BroadcastMessage) => {
 		if (disposed) return;
-		const restored = definition.restore(message.snapshot);
+		const restored = definition.deserialize(message.snapshot);
 		if (restored.ok) {
 			workflow = restored.workflow;
 			version = message.version;
@@ -122,7 +122,7 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 			const result = await transport.dispatch(id, { type: command as string, payload }, version);
 
 			if (result.ok) {
-				const restored = definition.restore(result.snapshot);
+				const restored = definition.deserialize(result.snapshot);
 				if (restored.ok) {
 					workflow = restored.workflow;
 					version = result.version;

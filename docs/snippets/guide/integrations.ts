@@ -23,7 +23,7 @@ declare const request: unknown;
 
 	// 2. Load the workflow from storage
 	const snapshot = await store.get(workflowId);
-	const restored = definition.restore(snapshot as Parameters<typeof definition.restore>[0]);
+	const restored = definition.deserialize(snapshot as Parameters<typeof definition.deserialize>[0]);
 	if (!restored.ok) throw new Error("Invalid workflow data");
 
 	// 3. Dispatch the command
@@ -31,7 +31,7 @@ declare const request: unknown;
 
 	// 4. Persist the updated workflow
 	if (result.ok) {
-		await store.set(workflowId, definition.snapshot(result.workflow));
+		await store.set(workflowId, definition.serialize(result.workflow));
 	}
 
 	// 5. Publish events

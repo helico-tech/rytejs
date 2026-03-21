@@ -8,7 +8,7 @@ Every integration is five steps:
 
 <<< @/snippets/guide/integrations.ts#pattern
 
-The `snapshot()` and `restore()` methods handle serialization -- dates become ISO strings, data is validated against Zod schemas on restore. You can store snapshots in any JSON-compatible database.
+The `serialize()` and `deserialize()` methods handle serialization -- dates become ISO strings, data is validated against Zod schemas on deserialize. You can store snapshots in any JSON-compatible database.
 
 ## Express
 
@@ -34,7 +34,7 @@ app.post("/workflows", (req, res) => {
     initialState: "Todo",
     data: { title },
   });
-  store.set(id, taskWorkflow.snapshot(workflow));
+  store.set(id, taskWorkflow.serialize(workflow));
   res.json(workflow);
 });
 
@@ -43,13 +43,13 @@ app.post("/workflows/:id/dispatch", async (req, res) => {
   const snapshot = store.get(req.params.id);
   if (!snapshot) return res.status(404).json({ error: "Not found" });
 
-  const restored = taskWorkflow.restore(snapshot);
+  const restored = taskWorkflow.deserialize(snapshot);
   if (!restored.ok) return res.status(500).json({ error: "Invalid data" });
 
   const result = await router.dispatch(restored.workflow, req.body);
 
   if (result.ok) {
-    store.set(req.params.id, taskWorkflow.snapshot(result.workflow));
+    store.set(req.params.id, taskWorkflow.serialize(result.workflow));
     res.json({ workflow: result.workflow, events: result.events });
   } else {
     res.status(400).json({ error: result.error });
@@ -61,7 +61,7 @@ app.get("/workflows/:id", (req, res) => {
   const snapshot = store.get(req.params.id);
   if (!snapshot) return res.status(404).json({ error: "Not found" });
 
-  const restored = taskWorkflow.restore(snapshot);
+  const restored = taskWorkflow.deserialize(snapshot);
   if (!restored.ok) return res.status(500).json({ error: "Invalid data" });
 
   res.json(restored.workflow);
@@ -93,7 +93,7 @@ app.post("/workflows", async (c) => {
     initialState: "Todo",
     data: { title },
   });
-  store.set(id, taskWorkflow.snapshot(workflow));
+  store.set(id, taskWorkflow.serialize(workflow));
   return c.json(workflow, 201);
 });
 
@@ -101,13 +101,13 @@ app.post("/workflows/:id/dispatch", async (c) => {
   const snapshot = store.get(c.req.param("id"));
   if (!snapshot) return c.json({ error: "Not found" }, 404);
 
-  const restored = taskWorkflow.restore(snapshot);
+  const restored = taskWorkflow.deserialize(snapshot);
   if (!restored.ok) return c.json({ error: "Invalid data" }, 500);
 
   const result = await router.dispatch(restored.workflow, await c.req.json());
 
   if (result.ok) {
-    store.set(c.req.param("id"), taskWorkflow.snapshot(result.workflow));
+    store.set(c.req.param("id"), taskWorkflow.serialize(result.workflow));
     return c.json({ workflow: result.workflow, events: result.events });
   }
   return c.json({ error: result.error }, 400);
@@ -117,7 +117,7 @@ app.get("/workflows/:id", (c) => {
   const snapshot = store.get(c.req.param("id"));
   if (!snapshot) return c.json({ error: "Not found" }, 404);
 
-  const restored = taskWorkflow.restore(snapshot);
+  const restored = taskWorkflow.deserialize(snapshot);
   if (!restored.ok) return c.json({ error: "Invalid data" }, 500);
 
   return c.json(restored.workflow);
@@ -157,7 +157,7 @@ await consumer.run({
       return;
     }
 
-    const restored = taskWorkflow.restore(snapshot);
+    const restored = taskWorkflow.deserialize(snapshot);
     if (!restored.ok) {
       console.error(`Invalid workflow data for ${workflowId}`);
       return;
@@ -166,7 +166,7 @@ await consumer.run({
     const result = await router.dispatch(restored.workflow, command);
 
     if (result.ok) {
-      store.set(workflowId, taskWorkflow.snapshot(result.workflow));
+      store.set(workflowId, taskWorkflow.serialize(result.workflow));
       for (const event of result.events) {
         console.log(`Event: ${event.type}`, event.data);
       }
@@ -197,4 +197,4 @@ Snapshots are plain JSON objects. Store them anywhere:
 | DynamoDB | Store as item, partition key on `id` |
 | File system | `JSON.stringify` / `JSON.parse`, good for prototyping |
 
-The `restore()` method validates data against Zod schemas on load, so you always get a valid workflow regardless of what's in storage.
+The `deserialize()` method validates data against Zod schemas on load, so you always get a valid workflow regardless of what's in storage.

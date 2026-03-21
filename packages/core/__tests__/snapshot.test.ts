@@ -14,13 +14,13 @@ const definition = defineWorkflow("order", {
 	errors: {},
 });
 
-describe("snapshot()", () => {
+describe("serialize()", () => {
 	test("produces a plain JSON-safe object", () => {
 		const wf = definition.createWorkflow("wf-1", {
 			initialState: "Draft",
 			data: { items: ["apple"] },
 		});
-		const snap = definition.snapshot(wf);
+		const snap = definition.serialize(wf);
 
 		expect(snap.id).toBe("wf-1");
 		expect(snap.definitionName).toBe("order");
@@ -37,7 +37,7 @@ describe("snapshot()", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const snap = definition.snapshot(wf);
+		const snap = definition.serialize(wf);
 
 		expect(new Date(snap.createdAt).toISOString()).toBe(snap.createdAt);
 		expect(new Date(snap.updatedAt).toISOString()).toBe(snap.updatedAt);
@@ -48,7 +48,7 @@ describe("snapshot()", () => {
 			initialState: "Draft",
 			data: { items: ["a", "b"] },
 		});
-		const snap = definition.snapshot(wf);
+		const snap = definition.serialize(wf);
 		const json = JSON.stringify(snap);
 		const parsed = JSON.parse(json);
 
@@ -60,20 +60,20 @@ describe("snapshot()", () => {
 			initialState: "Placed",
 			data: { items: ["apple"], placedAt: new Date("2026-01-01T00:00:00.000Z") },
 		});
-		const snap = definition.snapshot(wf);
+		const snap = definition.serialize(wf);
 
 		expect(snap.state).toBe("Placed");
 	});
 });
 
-describe("restore()", () => {
+describe("deserialize()", () => {
 	test("restores a valid snapshot", () => {
 		const wf = definition.createWorkflow("wf-1", {
 			initialState: "Draft",
 			data: { items: ["apple"] },
 		});
-		const snap = definition.snapshot(wf);
-		const result = definition.restore(snap);
+		const snap = definition.serialize(wf);
+		const result = definition.deserialize(snap);
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -96,7 +96,7 @@ describe("restore()", () => {
 			modelVersion: 1,
 			version: 1,
 		};
-		const result = definition.restore(snap);
+		const result = definition.deserialize(snap);
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -116,7 +116,7 @@ describe("restore()", () => {
 			modelVersion: 1,
 			version: 1,
 		};
-		const result = definition.restore(snap);
+		const result = definition.deserialize(snap);
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -136,7 +136,7 @@ describe("restore()", () => {
 			modelVersion: 1,
 			version: 1,
 		};
-		const result = definition.restore(snap);
+		const result = definition.deserialize(snap);
 
 		expect(result.ok).toBe(false);
 	});
@@ -146,10 +146,10 @@ describe("restore()", () => {
 			initialState: "Draft",
 			data: { items: ["apple", "banana"] },
 		});
-		const snap = definition.snapshot(wf);
+		const snap = definition.serialize(wf);
 		const json = JSON.stringify(snap);
 		const parsed = JSON.parse(json);
-		const result = definition.restore(parsed);
+		const result = definition.deserialize(parsed);
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -166,7 +166,7 @@ describe("modelVersion", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const snap = definition.snapshot(wf);
+		const snap = definition.serialize(wf);
 		expect(snap.modelVersion).toBe(1);
 	});
 
@@ -184,7 +184,7 @@ describe("modelVersion", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const snap = versionedDef.snapshot(wf);
+		const snap = versionedDef.serialize(wf);
 		expect(snap.modelVersion).toBe(2);
 	});
 });

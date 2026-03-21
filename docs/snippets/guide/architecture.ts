@@ -51,7 +51,7 @@ declare const paymentService: {
 	// #region io-domain-io
 	// 1. IO in — load state
 	const snapshot = await db.get(workflowId);
-	const restored = definition.restore(snapshot);
+	const restored = definition.deserialize(snapshot);
 	if (!restored.ok) throw new Error("Invalid workflow");
 
 	// 2. Domain — pure logic, no side effects
@@ -60,7 +60,7 @@ declare const paymentService: {
 	// 3. IO out — persist + publish
 	if (result.ok) {
 		await db.transaction(async (tx) => {
-			await tx.set(workflowId, definition.snapshot(result.workflow));
+			await tx.set(workflowId, definition.serialize(result.workflow));
 			for (const event of result.events) {
 				await tx.publish("workflow-events", event);
 			}

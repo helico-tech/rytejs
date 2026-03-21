@@ -98,7 +98,7 @@ async function loadWorkflow() {
 		return;
 	}
 
-	const restored = definition.restore(migrated.snapshot);
+	const restored = definition.deserialize(migrated.snapshot);
 	if (!restored.ok) {
 		console.error(restored.error); // ValidationError: schema mismatch
 		return;

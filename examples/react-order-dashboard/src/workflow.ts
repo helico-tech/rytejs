@@ -258,7 +258,7 @@ export function createOrderStore(options: OrderStoreOptions): WorkflowStore<Orde
 
 		const durationMs = performance.now() - start;
 		const afterWorkflow = result.ok ? result.workflow : store.getWorkflow()!;
-		const afterSnapshot = orderDefinition.snapshot(afterWorkflow);
+		const afterSnapshot = orderDefinition.serialize(afterWorkflow);
 
 		onLog({
 			command: command as string,

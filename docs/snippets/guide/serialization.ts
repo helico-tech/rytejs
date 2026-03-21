@@ -25,7 +25,7 @@ const wf = definition.createWorkflow("order-1", {
 	data: { items: ["apple"], placedAt: new Date() },
 });
 
-const snap = definition.snapshot(wf);
+const snap = definition.serialize(wf);
 // {
 //   id: "order-1",
 //   definitionName: "order",
@@ -38,7 +38,7 @@ const snap = definition.snapshot(wf);
 // #endregion snapshot
 
 // #region restore
-const result = definition.restore(snap);
+const result = definition.deserialize(snap);
 
 if (result.ok) {
 	// result.workflow is a fully typed Workflow<TConfig>
@@ -65,12 +65,12 @@ declare const db: {
 	});
 
 	// Save
-	const snap = definition.snapshot(workflow);
+	const snap = definition.serialize(workflow);
 	await db.put(`workflow:${snap.id}`, JSON.stringify(snap));
 
 	// Load
 	const json = await db.get(`workflow:${workflow.id}`);
-	const result = definition.restore(JSON.parse(json));
+	const result = definition.deserialize(JSON.parse(json));
 })();
 // #endregion persistence
 
@@ -98,7 +98,7 @@ const wfV2 = definitionV2.createWorkflow("order-3", {
 	data: { items: ["cherry"], placedAt: new Date() },
 });
 
-const snapV2 = definitionV2.snapshot(wfV2);
+const snapV2 = definitionV2.serialize(wfV2);
 snapV2.modelVersion; // 2
 // #endregion model-version
 
@@ -121,6 +121,6 @@ declare function migrateV1toV2(data: unknown): unknown;
 		snap.modelVersion = 2;
 	}
 
-	const result = definitionV2.restore(snap as unknown as WorkflowSnapshot);
+	const result = definitionV2.deserialize(snap as unknown as WorkflowSnapshot);
 }
 // #endregion version-check

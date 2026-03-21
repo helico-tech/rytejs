@@ -6,7 +6,7 @@ import { definition } from "./helpers.js";
 function createMockTransport(overrides?: Partial<Transport>): Transport {
 	return {
 		load: vi.fn(async () => ({
-			snapshot: definition.snapshot(
+			snapshot: definition.serialize(
 				definition.createWorkflow("test-1", {
 					initialState: "Pending",
 					data: { title: "Test" },
@@ -16,7 +16,7 @@ function createMockTransport(overrides?: Partial<Transport>): Transport {
 		})),
 		dispatch: vi.fn(async () => ({
 			ok: true as const,
-			snapshot: definition.snapshot(
+			snapshot: definition.serialize(
 				definition.createWorkflow("test-1", {
 					initialState: "InProgress",
 					data: { title: "Test", assignee: "Alice" },
@@ -185,7 +185,7 @@ describe("createWorkflowClient", () => {
 		});
 
 		broadcastCallback!({
-			snapshot: definition.snapshot(updatedWorkflow),
+			snapshot: definition.serialize(updatedWorkflow),
 			version: 3,
 			events: [],
 		});
@@ -247,7 +247,7 @@ describe("createWorkflowClient", () => {
 
 		// Now resolve the load
 		resolveLoad!({
-			snapshot: definition.snapshot(
+			snapshot: definition.serialize(
 				definition.createWorkflow("test-1", {
 					initialState: "Pending",
 					data: { title: "Test" },

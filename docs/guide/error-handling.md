@@ -27,9 +27,9 @@ Zod validation failed. The `source` field tells you where:
 | `"state"`      | `update()` produced invalid state data         |
 | `"transition"` | `transition()` data doesn't match target       |
 | `"event"`      | `emit()` data doesn't match event schema       |
-| `"restore"`    | `restore()` data doesn't match state schema    |
+| `"restore"`    | `deserialize()` data doesn't match state schema |
 
-> **Note:** The `"restore"` source only appears from `definition.restore()`, not from `dispatch()`.
+> **Note:** The `"restore"` source only appears from `definition.deserialize()`, not from `dispatch()`.
 
 ```ts
 if (!result.ok && result.error.category === "validation") {

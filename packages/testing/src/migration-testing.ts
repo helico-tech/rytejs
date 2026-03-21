@@ -121,7 +121,7 @@ export function testMigrationRestore<TConfig extends WorkflowConfig>(
 		throw new Error(`Migration failed: ${migrated.error.message}`);
 	}
 
-	const restored = pipeline.definition.restore(migrated.snapshot);
+	const restored = pipeline.definition.deserialize(migrated.snapshot);
 
 	if (!restored.ok) {
 		throw new Error(`Restore failed after migration: ${restored.error.message}`);

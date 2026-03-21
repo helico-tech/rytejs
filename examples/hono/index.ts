@@ -118,7 +118,7 @@ app.post("/workflows", async (c) => {
 	});
 
 	// Persist: serialize the workflow into a JSON-safe snapshot
-	const snapshot = taskWorkflow.snapshot(workflow);
+	const snapshot = taskWorkflow.serialize(workflow);
 	store.set(body.id, snapshot);
 
 	console.log(`[created] workflow=${body.id} state=${snapshot.state}`);
@@ -135,9 +135,9 @@ app.post("/workflows", async (c) => {
  * This handler demonstrates the full load -> dispatch -> persist -> publish
  * pattern that you would use in production:
  *
- *   1. Load:    Restore the workflow from the persisted snapshot
+ *   1. Load:    Deserialize the workflow from the persisted snapshot
  *   2. Dispatch: Run the command through the router (validates, executes handler)
- *   3. Persist: Snapshot the updated workflow and save it back to the store
+ *   3. Persist: Serialize the updated workflow and save it back to the store
  *   4. Publish: Return events to the caller (in production, publish to a bus)
  */
 app.post("/workflows/:id/dispatch", async (c) => {
@@ -150,12 +150,15 @@ app.post("/workflows/:id/dispatch", async (c) => {
 		return c.json({ error: "Workflow not found" }, 404);
 	}
 
-	// Restore the snapshot back into a live workflow object.
-	// restore() re-validates the data against the state schema, so it can fail
+	// Deserialize the snapshot back into a live workflow object.
+	// deserialize() re-validates the data against the state schema, so it can fail
 	// if the snapshot is corrupt or the schema has evolved.
-	const restored = taskWorkflow.restore(existing);
+	const restored = taskWorkflow.deserialize(existing);
 	if (!restored.ok) {
-		return c.json({ error: "Failed to restore workflow", details: restored.error.message }, 500);
+		return c.json(
+			{ error: "Failed to deserialize workflow", details: restored.error.message },
+			500,
+		);
 	}
 
 	// --- Dispatch ---
@@ -171,7 +174,7 @@ app.post("/workflows/:id/dispatch", async (c) => {
 	}
 
 	// --- Persist ---
-	const snapshot = taskWorkflow.snapshot(result.workflow);
+	const snapshot = taskWorkflow.serialize(result.workflow);
 	store.set(id, snapshot);
 
 	// --- Publish ---
