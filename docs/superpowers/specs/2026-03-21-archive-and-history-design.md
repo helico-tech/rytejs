@@ -11,22 +11,58 @@ Two features for the mission-control-cloudflare example:
 ### Workflow Definition Changes (`shared/mission.ts`)
 
 **New state: `Archived`**
-- Data schema carries all possible terminal state fields (orbit data, abort data, cancellation data) plus `previousState: string` to know which terminal state it came from
-- This is a union of OrbitAchieved, AbortSequence, and Cancelled data fields, all optional except `previousState`
+
+Uses `z.enum(["OrbitAchieved", "AbortSequence", "Cancelled"])` for `previousState`. Includes shared fields (`name`, `destination`, `crewMembers`) as required, and all terminal-specific fields as optional:
+
+```typescript
+Archived: z.object({
+	previousState: z.enum(["OrbitAchieved", "AbortSequence", "Cancelled"]),
+	name: z.string(),
+	destination: z.string(),
+	crewMembers: z.array(z.string()),
+	// OrbitAchieved fields (optional)
+	fuelLevel: z.number().optional(),
+	launchedAt: z.string().optional(),
+	altitude: z.number().optional(),
+	velocity: z.number().optional(),
+	heading: z.number().optional(),
+	telemetryReadings: z.array(...).optional(),
+	orbitAchievedAt: z.string().optional(),
+	finalAltitude: z.number().optional(),
+	// AbortSequence fields (optional)
+	abortedAt: z.string().optional(),
+	reason: z.string().optional(), // shared by AbortSequence + Cancelled
+	lastKnownAltitude: z.number().optional(),
+	// Cancelled fields (optional)
+	cancelledAt: z.string().optional(),
+})
+```
 
 **New commands:**
-- `Archive` — payload: `{}` (no additional data needed)
-- `Unarchive` — payload: `{}` (no additional data needed)
+- `Archive` — payload: `{}`
+- `Unarchive` — payload: `{}`
+
+**New events:**
+- `MissionArchived` — data: `{ previousState: string }`
+- `MissionUnarchived` — data: `{ restoredState: string }`
 
 ### Router Changes (`worker/router.ts`)
 
 **Archive handlers** on each terminal state:
-- `OrbitAchieved.on("Archive")` → transition to `Archived` with `previousState: "OrbitAchieved"` + current data
-- `AbortSequence.on("Archive")` → transition to `Archived` with `previousState: "AbortSequence"` + current data
-- `Cancelled.on("Archive")` → transition to `Archived` with `previousState: "Cancelled"` + current data
+- `OrbitAchieved.on("Archive")` → emit `MissionArchived`, transition to `Archived` with `previousState: "OrbitAchieved"` + current data
+- `AbortSequence.on("Archive")` → emit `MissionArchived`, transition to `Archived` with `previousState: "AbortSequence"` + current data
+- `Cancelled.on("Archive")` → emit `MissionArchived`, transition to `Archived` with `previousState: "Cancelled"` + current data
 
-**Unarchive handler** on `Archived`:
-- `Archived.on("Unarchive")` → transition back to `previousState` with the stored data (minus `previousState` field)
+**Unarchive handler** on `Archived` — uses conditional branching since `transition()` requires static state names:
+```typescript
+Archived.on("Unarchive", ({ data, transition, emit }) => {
+	emit({ type: "MissionUnarchived", data: { restoredState: data.previousState } });
+	const { previousState, ...rest } = data;
+	if (previousState === "OrbitAchieved") transition("OrbitAchieved", rest);
+	else if (previousState === "AbortSequence") transition("AbortSequence", rest);
+	else if (previousState === "Cancelled") transition("Cancelled", rest);
+});
+```
 
 ### No Backend Infrastructure Changes
 
@@ -37,8 +73,10 @@ The MissionIndexDO already stores the snapshot, which includes `state`. Filterin
 ### MissionDO Storage Additions
 
 **New storage keys:**
-- `history:{missionId}:{sequence}` — individual history entry
+- `history:{missionId}:{zero-padded sequence}` — individual history entry (e.g., `history:abc:000042`)
 - `historySeq:{missionId}` — auto-incrementing sequence counter (starts at 0)
+
+Zero-padded sequence numbers ensure correct lexicographic ordering via `storage.list()`.
 
 **History entry schema:**
 ```typescript
@@ -53,30 +91,31 @@ interface HistoryEntry {
 
 ### Recording Logic
 
-After each successful `executor.execute()` in `MissionDO.fetch()`:
+After each successful `executor.execute()` — in **both `fetch()` and `alarm()`**:
 1. Read current sequence from `historySeq:{missionId}` (default 0)
 2. Create one `command` entry: `{ seq, timestamp, type: "command", name: command.type, data: command.payload }`
 3. Create one `event` entry per emitted event: `{ seq, timestamp, type: "event", name: event.type, data: event.data }`
 4. Write all entries to storage and update the sequence counter
 5. Include new entries in the WebSocket broadcast
 
+Extract a shared `recordHistory(missionId, command, result)` helper called from both `fetch()` and `alarm()`.
+
 ### MissionDO HTTP Addition
 
-- `GET /api/missions/:id/history` — load all `history:{missionId}:*` keys from storage, return as ordered array
+- `GET /api/missions/:id/history` — list all `history:{missionId}:` prefixed keys from storage via `storage.list()`, return as ordered array (already sorted by zero-padded sequence)
 
 ### MissionDO WebSocket Changes
 
-Current message format:
-```json
-{ "type": "init", "snapshot": {...}, "version": 1 }
-{ "type": "update", "snapshot": {...}, "version": 2 }
+The existing MissionDO WebSocket sends `BroadcastMessage` from `@rytejs/react`:
+```typescript
+{ snapshot: WorkflowSnapshot, version: number, events: Array<{ type: string; data: unknown }> }
 ```
 
-New message format:
-```json
-{ "type": "init", "snapshot": {...}, "version": 1, "history": [...] }
-{ "type": "update", "snapshot": {...}, "version": 2, "newHistory": [...] }
-```
+**History is delivered via a hybrid approach:**
+- **Initial load:** `MissionDetail` fetches full history via `GET /api/missions/:id/history` on mount
+- **Live updates:** New history entries are derived client-side from the `events` array already present in each `BroadcastMessage`, plus the command that triggered the update
+
+This avoids changing the `@rytejs/react` `BroadcastMessage` type or the WebSocket protocol. The client maintains its own history state by appending entries as updates arrive.
 
 ### Worker Routing Addition
 
@@ -89,7 +128,8 @@ New message format:
 - Add a toggle below the header that switches between "Active" and "Archived" views
 - Filter: "Active" = `snapshot.state !== "Archived"`, "Archived" = `snapshot.state === "Archived"`
 - "New Mission" button hidden when viewing the archive
-- Toggle is a simple two-segment control or text toggle
+- Toggle is a simple two-segment control
+- Add `Archived` entry to `stateBadgeClass` mapping (gray/muted styling)
 
 ## 4. Frontend — Archive/Unarchive Buttons
 
@@ -120,23 +160,35 @@ Placed below the state-specific view in MissionDetail. Vertical timeline layout:
 ### Data Flow
 
 - MissionDetail manages history state separately from the workflow hook
-- On mount: connects to WebSocket, receives `init` message with full `history` array
-- On updates: receives `update` messages with `newHistory` entries, appends to local state
-- History is fetched/received through the existing mission WebSocket connection (no separate connection)
+- On mount: fetches full history via `GET /api/missions/:id/history`
+- On updates: the `@rytejs/react` store broadcasts `BroadcastMessage` with `events`; the component derives new history entries from the command that triggered the update + the emitted events, and appends to local state
+- No WebSocket protocol changes needed
 
-## 6. Summary of Files to Change
+### MissionDetail Changes
+
+- Add `Archived` branch to `wf.match()` that renders `ArchivedView`
+- Manage history state (`useState<HistoryEntry[]>`) and fetch on mount
+- Subscribe to workflow store updates to derive incremental history entries
+- Render `HistoryPanel` below the state-specific view
+
+## 6. Notes
+
+- **Deletion** — `deleteAll()` on the MissionDO clears history entries along with everything else. This is correct: deleting a mission deletes its history.
+- **History volume** — ascending phase generates telemetry every 2s. For a demo this is fine. No pagination needed.
+
+## 7. Summary of Files to Change
 
 **Shared:**
-- `shared/mission.ts` — add Archived state, Archive/Unarchive commands + events
+- `shared/mission.ts` — add Archived state, Archive/Unarchive commands, MissionArchived/MissionUnarchived events
 
 **Worker:**
-- `worker/router.ts` — add Archive/Unarchive handlers
-- `worker/mission-do.ts` — history recording, history loading, WebSocket message changes
+- `worker/router.ts` — add Archive/Unarchive handlers for terminal states + Archived state
+- `worker/mission-do.ts` — history recording (shared helper for fetch + alarm), history HTTP endpoint
 - `worker/index.ts` — add `/api/missions/:id/history` route
 
 **Frontend:**
-- `client/components/MissionList.tsx` — archive toggle, filtering
-- `client/components/MissionDetail.tsx` — history state management, render HistoryPanel
+- `client/components/MissionList.tsx` — archive toggle, filtering, Archived badge style
+- `client/components/MissionDetail.tsx` — Archived branch in wf.match(), history state, HistoryPanel rendering
 - `client/components/TerminalViews.tsx` — add Archive buttons to terminal views
 - `client/components/ArchivedView.tsx` — new component for archived mission display
 - `client/components/HistoryPanel.tsx` — new component for history timeline
