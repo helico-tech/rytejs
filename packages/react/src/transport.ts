@@ -1,4 +1,5 @@
 import type { WorkflowSnapshot } from "@rytejs/core";
+import type { StoredWorkflow } from "@rytejs/core/store";
 
 export interface BroadcastMessage {
 	snapshot: WorkflowSnapshot;
@@ -7,6 +8,8 @@ export interface BroadcastMessage {
 }
 
 export interface Transport {
+	load(id: string): Promise<StoredWorkflow | null>;
+
 	dispatch(
 		id: string,
 		command: { type: string; payload: unknown },

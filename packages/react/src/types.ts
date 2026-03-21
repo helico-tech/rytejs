@@ -10,15 +10,16 @@ import type {
 	WorkflowConfig,
 	WorkflowOf,
 } from "@rytejs/core";
-import type { Transport } from "./transport.js";
+
 export interface WorkflowStoreSnapshot<TConfig extends WorkflowConfig> {
-	readonly workflow: Workflow<TConfig>;
+	readonly workflow: Workflow<TConfig> | null;
+	readonly isLoading: boolean;
 	readonly isDispatching: boolean;
 	readonly error: PipelineError<TConfig> | null;
 }
 
 export interface WorkflowStore<TConfig extends WorkflowConfig> {
-	getWorkflow(): Workflow<TConfig>;
+	getWorkflow(): Workflow<TConfig> | null;
 	getSnapshot(): WorkflowStoreSnapshot<TConfig>;
 	subscribe(listener: () => void): () => void;
 	dispatch<C extends CommandNames<TConfig>>(
@@ -35,13 +36,13 @@ export interface WorkflowStoreOptions<TConfig extends WorkflowConfig> {
 		storage: Storage;
 		migrations?: MigrationPipeline<TConfig>;
 	};
-	transport?: Transport;
 }
 
 export interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
-	readonly workflow: Workflow<TConfig>;
+	readonly workflow: Workflow<TConfig> | null;
 	readonly state: StateNames<TConfig>;
 	readonly data: StateData<TConfig, StateNames<TConfig>>;
+	readonly isLoading: boolean;
 	readonly isDispatching: boolean;
 	readonly error: PipelineError<TConfig> | null;
 	dispatch<C extends CommandNames<TConfig>>(
@@ -63,6 +64,6 @@ export interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
 				workflow: WorkflowOf<TConfig, S>,
 			) => R;
 		}>,
-		fallback: (workflow: Workflow<TConfig>) => R,
+		fallback: (workflow: Workflow<TConfig> | null) => R,
 	): R;
 }
