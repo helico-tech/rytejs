@@ -105,7 +105,7 @@ export function useOrderManager(): OrderManager {
 			// Add __init__ entry to the log
 			const log = getOrCreateLog(orderId);
 			if (log.entries.length === 0) {
-				const workflow = store.getWorkflow();
+				const workflow = store.getWorkflow()!;
 				const snapshot = orderDefinition.snapshot(workflow);
 				log.entries.push({
 					id: 0,

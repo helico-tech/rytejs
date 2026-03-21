@@ -250,14 +250,14 @@ export function createOrderStore(options: OrderStoreOptions): WorkflowStore<Orde
 
 	// Wrap dispatch to capture before/after snapshots for logging
 	const wrappedDispatch: typeof originalDispatch = async (command, payload) => {
-		const beforeWorkflow = store.getWorkflow();
+		const beforeWorkflow = store.getWorkflow()!;
 		const fromState = beforeWorkflow.state;
 		const start = performance.now();
 
 		const result = await originalDispatch(command, payload);
 
 		const durationMs = performance.now() - start;
-		const afterWorkflow = result.ok ? result.workflow : store.getWorkflow();
+		const afterWorkflow = result.ok ? result.workflow : store.getWorkflow()!;
 		const afterSnapshot = orderDefinition.snapshot(afterWorkflow);
 
 		onLog({

@@ -64,13 +64,13 @@ function AppWithRegistrySync({
 	const prevRef = useRef({ state: "", customer: "" });
 
 	useEffect(() => {
-		const customer = "customer" in workflow.data ? (workflow.data.customer as string) : "";
+		const customer = "customer" in workflow!.data ? (workflow!.data.customer as string) : "";
 		const currentState = state as string;
 		if (prevRef.current.state !== currentState || prevRef.current.customer !== customer) {
 			prevRef.current = { state: currentState, customer };
 			onRegistryUpdate(orderId, { state: currentState, customer });
 		}
-	}, [state, workflow.data, orderId, onRegistryUpdate]);
+	}, [state, workflow?.data, orderId, onRegistryUpdate]);
 
 	return <App />;
 }
