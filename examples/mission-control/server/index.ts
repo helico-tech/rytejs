@@ -2,20 +2,20 @@ import { WorkflowExecutor } from "@rytejs/core/executor";
 import { missionDef } from "../shared/mission.ts";
 import { createBroadcastManager } from "./broadcast.ts";
 import { startCountdownLoop } from "./countdown-loop.ts";
+import { createMemoryRedis } from "./memory-redis.ts";
 import { createRedisStore } from "./redis-store.ts";
 import { createMissionRouter } from "./router.ts";
 import { createTelemetryService } from "./telemetry.ts";
 import { startTrackingLoop } from "./tracking-loop.ts";
 
-const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
-
 // ── Wire dependencies ──
 
-const store = createRedisStore(REDIS_URL);
+const redis = createMemoryRedis();
+const store = createRedisStore(redis);
 const telemetry = createTelemetryService();
 const router = createMissionRouter({ telemetry });
 const executor = new WorkflowExecutor(router, store);
-const broadcast = createBroadcastManager(REDIS_URL);
+const broadcast = createBroadcastManager(redis);
 
 // ── CORS headers ──
 
@@ -171,7 +171,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
 // ── Start services ──
 
-await broadcast.start();
+broadcast.start();
 const tracking = startTrackingLoop(store, executor, telemetry);
 const countdownLoop = startCountdownLoop(store, executor);
 

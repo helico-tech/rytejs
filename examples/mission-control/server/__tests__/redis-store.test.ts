@@ -1,11 +1,11 @@
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { WorkflowSnapshot } from "@rytejs/core";
 import { ConcurrencyConflictError } from "@rytejs/core/store";
+import { createMemoryRedis } from "../memory-redis.ts";
 import type { RedisStoreAdapter } from "../redis-store.ts";
 import { createRedisStore } from "../redis-store.ts";
 
 let store: RedisStoreAdapter;
-let redisAvailable = false;
 
 function makeSnapshot(
 	id: string,
@@ -29,35 +29,13 @@ function makeSnapshot(
 	};
 }
 
-beforeAll(async () => {
-	try {
-		store = createRedisStore("redis://localhost:6379");
-		// Probe connectivity
-		await store.list();
-		redisAvailable = true;
-	} catch {
-		console.warn("Redis not available — skipping redis-store tests");
-	}
-});
-
-afterEach(async () => {
-	if (!redisAvailable) return;
-	// Clean up test keys
-	// biome-ignore lint/suspicious/noExplicitAny: accessing internal redis for cleanup
-	const redis = store as any;
-	try {
-		const ids = await store.list();
-		for (const { id } of ids) {
-			await redis.load(id); // just to confirm existence
-		}
-	} catch {
-		// ignore cleanup errors
-	}
+beforeEach(() => {
+	const redis = createMemoryRedis();
+	store = createRedisStore(redis);
 });
 
 describe("Redis Store", () => {
 	test("create and load", async () => {
-		if (!redisAvailable) return;
 		const snap = makeSnapshot("test-create-1", "Planning");
 		await store.create("test-create-1", snap);
 
@@ -69,13 +47,11 @@ describe("Redis Store", () => {
 	});
 
 	test("load returns null for non-existent", async () => {
-		if (!redisAvailable) return;
 		const loaded = await store.load("non-existent-xyz");
 		expect(loaded).toBeNull();
 	});
 
 	test("save increments version", async () => {
-		if (!redisAvailable) return;
 		const snap = makeSnapshot("test-version-1", "Planning");
 		await store.create("test-version-1", snap);
 
@@ -96,7 +72,6 @@ describe("Redis Store", () => {
 	});
 
 	test("save throws ConcurrencyConflictError on version mismatch", async () => {
-		if (!redisAvailable) return;
 		const snap = makeSnapshot("test-conflict-1", "Planning");
 		await store.create("test-conflict-1", snap);
 
@@ -122,7 +97,6 @@ describe("Redis Store", () => {
 	});
 
 	test("findByState returns missions in that state", async () => {
-		if (!redisAvailable) return;
 		const snap1 = makeSnapshot("test-state-a", "Planning");
 		const snap2 = makeSnapshot("test-state-b", "Planning");
 		const snap3 = makeSnapshot("test-state-c", "Countdown", {
@@ -146,7 +120,6 @@ describe("Redis Store", () => {
 	});
 
 	test("list returns all missions", async () => {
-		if (!redisAvailable) return;
 		const snap = makeSnapshot("test-list-1", "Planning");
 		await store.create("test-list-1", snap);
 
@@ -161,7 +134,6 @@ describe("Redis Store", () => {
 	});
 
 	test("state index updates on transition", async () => {
-		if (!redisAvailable) return;
 		const snap = makeSnapshot("test-transition-1", "Planning");
 		await store.create("test-transition-1", snap);
 
