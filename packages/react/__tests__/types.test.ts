@@ -44,10 +44,10 @@ describe("type inference", () => {
 		expectTypeOf<Return>().toMatchTypeOf<Promise<DispatchResult<TodoConfig>>>();
 	});
 
-	test("workflow is a discriminated union", () => {
+	test("workflow is a discriminated union or null", () => {
 		type W = UseWorkflowReturn<TodoConfig>["workflow"];
 
-		expectTypeOf<W>().toMatchTypeOf<Workflow<TodoConfig>>();
+		expectTypeOf<W>().toMatchTypeOf<Workflow<TodoConfig> | null>();
 	});
 
 	test("error is PipelineError or null", () => {

@@ -14,9 +14,10 @@ describe("useWorkflow — full mode", () => {
 
 		const { result } = renderHook(() => useWorkflow(store));
 
-		expect(result.current.workflow.state).toBe("Pending");
+		expect(result.current.workflow!.state).toBe("Pending");
 		expect(result.current.state).toBe("Pending");
 		expect(result.current.data).toEqual({ title: "Test" });
+		expect(result.current.isLoading).toBe(false);
 		expect(result.current.isDispatching).toBe(false);
 		expect(result.current.error).toBeNull();
 	});
@@ -34,7 +35,7 @@ describe("useWorkflow — full mode", () => {
 			await store.dispatch("Start", { assignee: "Alice" });
 		});
 
-		expect(result.current.workflow.state).toBe("InProgress");
+		expect(result.current.workflow!.state).toBe("InProgress");
 		expect(result.current.state).toBe("InProgress");
 	});
 
@@ -118,7 +119,7 @@ describe("useWorkflow — match", () => {
 
 		const { result } = renderHook(() => useWorkflow(store));
 
-		const label = result.current.match({ Pending: () => "pending" }, (wf) => `other: ${wf.state}`);
+		const label = result.current.match({ Pending: () => "pending" }, (wf) => `other: ${wf!.state}`);
 
 		expect(label).toBe("other: InProgress");
 	});

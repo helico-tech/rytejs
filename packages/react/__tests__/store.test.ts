@@ -11,8 +11,10 @@ describe("createWorkflowStore", () => {
 		});
 
 		const snapshot = store.getSnapshot();
-		expect(snapshot.workflow.state).toBe("Pending");
-		expect(snapshot.workflow.data).toEqual({ title: "Test" });
+		expect(snapshot.workflow).not.toBeNull();
+		expect(snapshot.workflow!.state).toBe("Pending");
+		expect(snapshot.workflow!.data).toEqual({ title: "Test" });
+		expect(snapshot.isLoading).toBe(false);
 		expect(snapshot.isDispatching).toBe(false);
 		expect(snapshot.error).toBeNull();
 	});
@@ -25,7 +27,7 @@ describe("createWorkflowStore", () => {
 			id: "custom-id",
 		});
 
-		expect(store.getWorkflow().id).toBe("custom-id");
+		expect(store.getWorkflow()!.id).toBe("custom-id");
 	});
 
 	test("creates workflow with generated id when not provided", () => {
@@ -35,8 +37,8 @@ describe("createWorkflowStore", () => {
 			data: { title: "Test" },
 		});
 
-		expect(store.getWorkflow().id).toBeTruthy();
-		expect(typeof store.getWorkflow().id).toBe("string");
+		expect(store.getWorkflow()!.id).toBeTruthy();
+		expect(typeof store.getWorkflow()!.id).toBe("string");
 	});
 
 	test("dispatch updates workflow on success", async () => {
@@ -49,8 +51,8 @@ describe("createWorkflowStore", () => {
 		const result = await store.dispatch("Start", { assignee: "Alice" });
 
 		expect(result.ok).toBe(true);
-		expect(store.getSnapshot().workflow.state).toBe("InProgress");
-		expect(store.getSnapshot().workflow.data).toMatchObject({ assignee: "Alice" });
+		expect(store.getSnapshot().workflow!.state).toBe("InProgress");
+		expect(store.getSnapshot().workflow!.data).toMatchObject({ assignee: "Alice" });
 	});
 
 	test("dispatch returns DispatchResult on failure", async () => {
@@ -96,7 +98,7 @@ describe("createWorkflowStore", () => {
 		// Dispatch a valid command → should clear error
 		await store.dispatch("Rename", { title: "Renamed" });
 		expect(store.getSnapshot().error).toBeNull();
-		expect(store.getSnapshot().workflow.data).toMatchObject({ title: "Renamed" });
+		expect(store.getSnapshot().workflow!.data).toMatchObject({ title: "Renamed" });
 	});
 
 	test("isDispatching is true during dispatch", async () => {
@@ -188,8 +190,8 @@ describe("createWorkflowStore", () => {
 		});
 		store.setWorkflow(newWorkflow);
 
-		expect(store.getSnapshot().workflow.state).toBe("Done");
-		expect(store.getSnapshot().workflow.id).toBe("new-id");
+		expect(store.getSnapshot().workflow!.state).toBe("Done");
+		expect(store.getSnapshot().workflow!.id).toBe("new-id");
 		expect(listener).toHaveBeenCalledTimes(1);
 	});
 

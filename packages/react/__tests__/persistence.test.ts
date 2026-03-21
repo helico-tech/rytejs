@@ -72,8 +72,8 @@ describe("persistence", () => {
 			{ persist: { key: "test-workflow", storage } },
 		);
 
-		expect(store2.getSnapshot().workflow.state).toBe("InProgress");
-		expect(store2.getSnapshot().workflow.id).toBe("wf-1");
+		expect(store2.getSnapshot().workflow!.state).toBe("InProgress");
+		expect(store2.getSnapshot().workflow!.id).toBe("wf-1");
 	});
 
 	test("falls back to initial config when storage is empty", () => {
@@ -85,8 +85,8 @@ describe("persistence", () => {
 			{ persist: { key: "nonexistent", storage } },
 		);
 
-		expect(store.getSnapshot().workflow.state).toBe("Pending");
-		expect(store.getSnapshot().workflow.data).toEqual({ title: "Fallback" });
+		expect(store.getSnapshot().workflow!.state).toBe("Pending");
+		expect(store.getSnapshot().workflow!.data).toEqual({ title: "Fallback" });
 	});
 
 	test("falls back to initial config when stored data is corrupt", () => {
@@ -99,7 +99,7 @@ describe("persistence", () => {
 			{ persist: { key: "test-workflow", storage } },
 		);
 
-		expect(store.getSnapshot().workflow.state).toBe("Pending");
+		expect(store.getSnapshot().workflow!.state).toBe("Pending");
 	});
 
 	test("falls back when stored snapshot fails validation", () => {
@@ -123,7 +123,7 @@ describe("persistence", () => {
 			{ persist: { key: "test-workflow", storage } },
 		);
 
-		expect(store.getSnapshot().workflow.state).toBe("Pending");
-		expect(store.getSnapshot().workflow.data).toEqual({ title: "Fallback" });
+		expect(store.getSnapshot().workflow!.state).toBe("Pending");
+		expect(store.getSnapshot().workflow!.data).toEqual({ title: "Fallback" });
 	});
 });
