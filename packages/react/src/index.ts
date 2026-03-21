@@ -1,3 +1,4 @@
+export { createWorkflowClient } from "./client.js";
 export { createWorkflowContext } from "./context.js";
 export { createWorkflowStore } from "./store.js";
 export type {
