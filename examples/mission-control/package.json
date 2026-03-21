@@ -1,0 +1,34 @@
+{
+	"name": "@rytejs/example-mission-control",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev:server": "bun run --watch server/index.ts",
+		"dev:client": "vite",
+		"dev": "bun run dev:server & vite",
+		"build": "vite build",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@rytejs/core": "workspace:*",
+		"@rytejs/react": "workspace:*",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"zod": "^4.0.0",
+		"clsx": "^2.0.0",
+		"tailwind-merge": "^2.0.0"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "^4.0.0",
+		"@types/bun": "latest",
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"@vitejs/plugin-react": "^4.0.0",
+		"tailwindcss": "^4.0.0",
+		"typescript": "^5.7.0",
+		"vite": "^6.0.0"
+	},
+	"engines": {
+		"bun": ">=1.2.0"
+	}
+}
