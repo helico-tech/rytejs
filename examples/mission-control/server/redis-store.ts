@@ -5,6 +5,7 @@ import type { MemoryRedis } from "./memory-redis.ts";
 
 export interface RedisStoreAdapter extends StoreAdapter {
 	create(id: string, snapshot: WorkflowSnapshot): Promise<void>;
+	delete(id: string): Promise<boolean>;
 	findByState(state: string): Promise<Array<{ id: string }>>;
 	list(): Promise<Array<{ id: string; snapshot: WorkflowSnapshot; version: number }>>;
 }
@@ -18,6 +19,23 @@ export function createRedisStore(redis: MemoryRedis): RedisStoreAdapter {
 			await redis.hset(key, { snapshot: snapshotJson, version: "1" });
 			await redis.sadd("missions:all", id);
 			await redis.sadd(`missions:state:${snapshot.state}`, id);
+		},
+
+		async delete(id: string): Promise<boolean> {
+			const key = `mission:${id}`;
+			const data = await redis.hgetall(key);
+			if (!data) return false;
+
+			// Remove state index entry
+			if (data.snapshot) {
+				const snapshot = JSON.parse(data.snapshot) as WorkflowSnapshot;
+				await redis.srem(`missions:state:${snapshot.state}`, id);
+			}
+
+			// Remove from global set and delete hash
+			await redis.srem("missions:all", id);
+			await redis.del(key);
+			return true;
 		},
 
 		async load(id: string): Promise<StoredWorkflow | null> {

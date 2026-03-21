@@ -1,6 +1,7 @@
 export interface MemoryRedis {
 	hset(key: string, fields: Record<string, string>): Promise<number>;
 	hgetall(key: string): Promise<Record<string, string> | null>;
+	del(key: string): Promise<number>;
 	sadd(key: string, member: string): Promise<number>;
 	srem(key: string, member: string): Promise<number>;
 	smembers(key: string): Promise<string[]>;
@@ -38,6 +39,12 @@ export function createMemoryRedis(): MemoryRedis {
 				result[field] = value;
 			}
 			return result;
+		},
+
+		async del(key) {
+			const existed = hashes.has(key);
+			hashes.delete(key);
+			return existed ? 1 : 0;
 		},
 
 		async sadd(key, member) {

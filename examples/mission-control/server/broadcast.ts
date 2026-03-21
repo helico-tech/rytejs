@@ -8,6 +8,7 @@ export interface BroadcastManager {
 		version: number,
 		events: Array<{ type: string; data: unknown }>,
 	): Promise<void>;
+	publishDeletion(id: string): Promise<void>;
 	addMissionClient(missionId: string, controller: ReadableStreamDefaultController): () => void;
 	addListClient(controller: ReadableStreamDefaultController): () => void;
 	start(): void;
@@ -38,6 +39,12 @@ export function createBroadcastManager(redis: MemoryRedis): BroadcastManager {
 			events: Array<{ type: string; data: unknown }>,
 		): Promise<void> {
 			const message = JSON.stringify({ id, snapshot, version, events });
+			await redis.publish(`mission:${id}`, message);
+			await redis.publish("missions:list", message);
+		},
+
+		async publishDeletion(id: string): Promise<void> {
+			const message = JSON.stringify({ id, deleted: true });
 			await redis.publish(`mission:${id}`, message);
 			await redis.publish("missions:list", message);
 		},

@@ -29,7 +29,7 @@ executor.use(async (ctx, next) => {
 
 const CORS_HEADERS: Record<string, string> = {
 	"Access-Control-Allow-Origin": "*",
-	"Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+	"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 	"Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -144,6 +144,14 @@ async function handleRequest(req: Request): Promise<Response> {
 		await broadcast.publish(id, snapshot, 1, []);
 
 		return json({ snapshot, version: 1 }, 201);
+	}
+
+	// DELETE /missions/:id — Delete mission
+	if (method === "DELETE") {
+		const deleted = await store.delete(id);
+		if (!deleted) return notFound(`Mission ${id} not found`);
+		await broadcast.publishDeletion(id);
+		return json({ ok: true });
 	}
 
 	// POST /missions/:id — Execute command

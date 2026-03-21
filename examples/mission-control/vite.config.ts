@@ -12,6 +12,12 @@ export default defineConfig({
 				changeOrigin: true,
 				// Prevent proxy from requesting compressed responses — SSE requires unbuffered streaming
 				headers: { "Accept-Encoding": "identity" },
+				// Skip proxy for browser navigation (SPA deep links like /missions/:id)
+				bypass(req) {
+					if (req.headers.accept?.includes("text/html")) {
+						return "/index.html";
+					}
+				},
 			},
 		},
 	},
