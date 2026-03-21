@@ -41,6 +41,7 @@ function countdownWorkflow(id = "mission-1"): Workflow<MissionConfig> {
 			fuelLevel: 95,
 			countdownStartedAt: new Date(),
 			telemetryStatus: "go",
+			secondsRemaining: 10,
 		},
 	});
 }
@@ -70,6 +71,7 @@ function ascendingWorkflow(id = "mission-1"): Workflow<MissionConfig> {
 			fuelLevel: 95,
 			countdownStartedAt: new Date(),
 			telemetryStatus: "go",
+			secondsRemaining: 0,
 			launchedAt: new Date(),
 			altitude: 150,
 			velocity: 4,
@@ -155,6 +157,28 @@ describe("Mission Router", () => {
 		expect(result.workflow.state).toBe("Scrubbed");
 		expect(result.events).toHaveLength(1);
 		expect(result.events[0]?.type).toBe("LaunchScrubbed");
+	});
+
+	test("Countdown + UpdateCountdown", async () => {
+		const router = createMissionRouter({ telemetry: createMockTelemetry() });
+		const wf = countdownWorkflow();
+
+		const result = await router.dispatch(wf, {
+			type: "UpdateCountdown",
+			payload: { secondsRemaining: 7 },
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) throw new Error();
+		expect(result.workflow.state).toBe("Countdown");
+		if (result.workflow.state === "Countdown") {
+			expect(result.workflow.data.secondsRemaining).toBe(7);
+		}
+		expect(result.events).toHaveLength(1);
+		expect(result.events[0]?.type).toBe("CountdownTick");
+		if (result.events[0]?.type === "CountdownTick") {
+			expect(result.events[0].data.secondsRemaining).toBe(7);
+		}
 	});
 
 	test("Scrubbed -> Countdown (retry)", async () => {

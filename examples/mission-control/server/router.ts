@@ -22,6 +22,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				...data,
 				countdownStartedAt: new Date(),
 				telemetryStatus: "go",
+				secondsRemaining: 10,
 			});
 			emit({
 				type: "CountdownStarted",
@@ -45,6 +46,20 @@ export function createMissionRouter(deps: MissionDeps) {
 	});
 
 	router.state("Countdown", ({ on }) => {
+		on("UpdateCountdown", ({ data, command, update, emit, workflow }) => {
+			update({
+				...data,
+				secondsRemaining: command.payload.secondsRemaining,
+			});
+			emit({
+				type: "CountdownTick",
+				data: {
+					missionId: workflow.id,
+					secondsRemaining: command.payload.secondsRemaining,
+				},
+			});
+		});
+
 		on("Launch", ({ data, transition, emit, workflow }) => {
 			transition("Ascending", {
 				...data,
@@ -93,6 +108,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				fuelLevel: data.fuelLevel,
 				countdownStartedAt: new Date(),
 				telemetryStatus: "go",
+				secondsRemaining: 10,
 			});
 			emit({
 				type: "CountdownStarted",

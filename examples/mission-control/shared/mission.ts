@@ -25,6 +25,7 @@ export const missionDef = defineWorkflow("mission", {
 			fuelLevel: z.number(),
 			countdownStartedAt: z.coerce.date(),
 			telemetryStatus: z.enum(["go", "no-go"]),
+			secondsRemaining: z.number(),
 		}),
 		Scrubbed: z.object({
 			name: z.string(),
@@ -42,6 +43,7 @@ export const missionDef = defineWorkflow("mission", {
 			fuelLevel: z.number(),
 			countdownStartedAt: z.coerce.date(),
 			telemetryStatus: z.enum(["go", "no-go"]),
+			secondsRemaining: z.number(),
 			launchedAt: z.coerce.date(),
 			altitude: z.number(),
 			velocity: z.number(),
@@ -79,6 +81,7 @@ export const missionDef = defineWorkflow("mission", {
 	},
 	commands: {
 		InitiateCountdown: z.object({}),
+		UpdateCountdown: z.object({ secondsRemaining: z.number() }),
 		ScrubLaunch: z.object({ reason: z.string() }),
 		RetryCountdown: z.object({}),
 		Launch: z.object({}),
@@ -93,6 +96,7 @@ export const missionDef = defineWorkflow("mission", {
 	},
 	events: {
 		CountdownStarted: z.object({ missionId: z.string() }),
+		CountdownTick: z.object({ missionId: z.string(), secondsRemaining: z.number() }),
 		LaunchScrubbed: z.object({ missionId: z.string(), reason: z.string() }),
 		Launched: z.object({ missionId: z.string() }),
 		TelemetryUpdated: z.object({ missionId: z.string(), altitude: z.number() }),

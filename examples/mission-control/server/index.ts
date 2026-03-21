@@ -1,6 +1,7 @@
 import { WorkflowExecutor } from "@rytejs/core/executor";
 import { missionDef } from "../shared/mission.ts";
 import { createBroadcastManager } from "./broadcast.ts";
+import { startCountdownLoop } from "./countdown-loop.ts";
 import { createRedisStore } from "./redis-store.ts";
 import { createMissionRouter } from "./router.ts";
 import { createTelemetryService } from "./telemetry.ts";
@@ -172,6 +173,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
 await broadcast.start();
 const tracking = startTrackingLoop(store, executor, telemetry);
+const countdownLoop = startCountdownLoop(store, executor);
 
 const server = Bun.serve({
 	port: 4000,
@@ -184,6 +186,7 @@ console.log(`Mission Control server on http://localhost:${server.port}`);
 process.on("SIGINT", () => {
 	console.log("\nShutting down...");
 	tracking.stop();
+	countdownLoop.stop();
 	broadcast.stop();
 	server.stop();
 	process.exit(0);
