@@ -6,22 +6,33 @@ function createReturn<TConfig extends WorkflowConfig>(
 	snapshot: WorkflowStoreSnapshot<TConfig>,
 	dispatch: WorkflowStore<TConfig>["dispatch"],
 ): UseWorkflowReturn<TConfig> {
+	const wf = snapshot.workflow;
 	return {
-		workflow: snapshot.workflow,
-		state: snapshot.workflow.state,
-		data: snapshot.workflow.data,
+		workflow: wf,
+		// biome-ignore lint/suspicious/noExplicitAny: state/data are undefined when workflow is null (loading) — consumers check isLoading first
+		state: wf?.state as any,
+		// biome-ignore lint/suspicious/noExplicitAny: see above
+		data: wf?.data as any,
+		isLoading: snapshot.isLoading,
 		isDispatching: snapshot.isDispatching,
 		error: snapshot.error,
 		dispatch,
 		// biome-ignore lint/suspicious/noExplicitAny: match overloads handled by UseWorkflowReturn type
-		match(matchers: Record<string, any>, fallback?: (workflow: Workflow<TConfig>) => any): any {
-			const state = snapshot.workflow.state as string;
+		match(
+			matchers: Record<string, any>,
+			fallback?: (workflow: Workflow<TConfig> | null) => any,
+		): any {
+			if (!wf) {
+				if (fallback) return fallback(wf);
+				throw new Error("Cannot match on a loading workflow — check isLoading first");
+			}
+			const state = wf.state as string;
 			const matcher = matchers[state];
 			if (matcher) {
-				return matcher(snapshot.workflow.data, snapshot.workflow);
+				return matcher(wf.data, wf);
 			}
 			if (fallback) {
-				return fallback(snapshot.workflow);
+				return fallback(wf);
 			}
 			throw new Error(`No match for state "${state}" and no fallback provided`);
 		},
@@ -50,8 +61,13 @@ export function useWorkflow<TConfig extends WorkflowConfig, R>(
 	equalityFnRef.current = equalityFn;
 
 	const selectorSnapshot = useCallback(() => {
+		const wf = store.getWorkflow();
+		if (!wf) {
+			// Workflow is loading — return cached value if available
+			return cachedRef.current;
+		}
 		// biome-ignore lint/style/noNonNullAssertion: selectorSnapshot is only used when selector is defined (checked at call site)
-		const next = selectorRef.current!(store.getWorkflow());
+		const next = selectorRef.current!(wf);
 		const eq = equalityFnRef.current ?? Object.is;
 		if (hasCachedRef.current && eq(cachedRef.current as R, next)) {
 			return cachedRef.current;
