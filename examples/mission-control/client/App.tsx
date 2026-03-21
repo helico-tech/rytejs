@@ -4,7 +4,10 @@ import { MissionDetail } from "./components/MissionDetail.tsx";
 import { MissionList } from "./components/MissionList.tsx";
 import { createMissionTransport } from "./transport.ts";
 
-const transport = createMissionTransport("");
+const transport = createMissionTransport({
+	apiUrl: "", // Proxied through Vite → localhost:4000
+	sseUrl: "http://localhost:4000", // Direct — SSE doesn't work through Vite's proxy
+});
 export const client = createWorkflowClient(transport);
 
 export function App() {

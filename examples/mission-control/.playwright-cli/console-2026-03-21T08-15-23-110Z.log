@@ -1,0 +1,4 @@
+[      15ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[  120328ms] [WARNING] SSE error for 42d03682-b90a-45a6-8e11-8574f28b7ff5, reconnecting... @ http://localhost:5173/transport.ts:22
+[  120328ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[  126530ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52

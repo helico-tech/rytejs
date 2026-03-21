@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - heading "Missions" [level=1] [ref=e8]
+          - generic [ref=e9]: "0"
+        - button "Cancel" [ref=e18]
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: Mission Name
+          - textbox "Mission Name" [ref=e23]:
+            - /placeholder: Artemis VII
+            - text: Apollo XI
+        - generic [ref=e24]:
+          - generic [ref=e25]: Destination
+          - textbox "Destination" [ref=e26]:
+            - /placeholder: Mars orbit
+            - text: Low Earth Orbit
+        - generic [ref=e27]:
+          - generic [ref=e28]: Crew Members
+          - textbox "Crew Members Comma-separated" [ref=e29]:
+            - /placeholder: Chen, Kowalski, Nakamura
+            - text: Armstrong, Aldrin, Collins
+          - text: Comma-separated
+        - generic [ref=e30]:
+          - generic [ref=e31]: "Fuel Level: 95%"
+          - 'slider "Fuel Level: 95%" [ref=e32]': "95"
+        - generic [ref=e34]: Network error
+        - button "Create Mission" [ref=e33]
+      - generic [ref=e12]: No missions yet
+  - main [ref=e13]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: No mission selected
+      - generic [ref=e17]: Select a mission from the sidebar or create a new one

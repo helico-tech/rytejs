@@ -14,8 +14,16 @@ const redis = createMemoryRedis();
 const store = createRedisStore(redis);
 const telemetry = createTelemetryService();
 const router = createMissionRouter({ telemetry });
-const executor = new WorkflowExecutor(router, store);
 const broadcast = createBroadcastManager(redis);
+const executor = new WorkflowExecutor(router, store);
+
+// Middleware: broadcast every successful execution (covers HTTP, countdown loop, tracking loop)
+executor.use(async (ctx, next) => {
+	await next();
+	if (ctx.snapshot) {
+		await broadcast.publish(ctx.id, ctx.snapshot, ctx.stored.version + 1, ctx.events);
+	}
+});
 
 // ── CORS headers ──
 
@@ -144,7 +152,6 @@ async function handleRequest(req: Request): Promise<Response> {
 		const result = await executor.execute(id, body);
 
 		if (result.ok) {
-			await broadcast.publish(id, result.snapshot, result.version, result.events);
 			return json(result);
 		}
 

@@ -10,6 +10,8 @@ export default defineConfig({
 			"/missions": {
 				target: "http://localhost:4000",
 				changeOrigin: true,
+				// Prevent proxy from requesting compressed responses — SSE requires unbuffered streaming
+				headers: { "Accept-Encoding": "identity" },
 			},
 		},
 	},

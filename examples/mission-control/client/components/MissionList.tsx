@@ -46,7 +46,7 @@ export function MissionList({ selectedId, onSelect }: MissionListProps) {
 
 	// Subscribe to list-level SSE for live updates
 	useEffect(() => {
-		const source = new EventSource("/missions/events");
+		const source = new EventSource("http://localhost:4000/missions/events");
 		source.onmessage = () => {
 			fetchMissions();
 		};

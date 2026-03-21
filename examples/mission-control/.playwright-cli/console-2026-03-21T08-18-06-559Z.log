@@ -1,0 +1,7 @@
+[      17ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[   12106ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[   12106ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:4000/missions/events:0
+[   63109ms] [WARNING] SSE error for b14790e1-d324-4fb1-9c36-cbed4d54cba7, reconnecting... @ http://localhost:5173/transport.ts:23
+[   63109ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:4000/missions/b14790e1-d324-4fb1-9c36-cbed4d54cba7/events:0
+[   63113ms] [WARNING] Mission list SSE error, reconnecting... @ http://localhost:5173/components/MissionList.tsx:52
+[   63113ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:4000/missions/events:0
