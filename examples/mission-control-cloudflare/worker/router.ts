@@ -168,5 +168,64 @@ export function createMissionRouter(deps: MissionDeps) {
 		});
 	});
 
+	router.state("OrbitAchieved", ({ on }) => {
+		on("Archive", ({ data, transition, emit, workflow }) => {
+			transition("Archived", {
+				previousState: "OrbitAchieved" as const,
+				...data,
+			});
+			emit({
+				type: "MissionArchived",
+				data: { missionId: workflow.id, previousState: "OrbitAchieved" },
+			});
+		});
+	});
+
+	router.state("AbortSequence", ({ on }) => {
+		on("Archive", ({ data, transition, emit, workflow }) => {
+			transition("Archived", {
+				previousState: "AbortSequence" as const,
+				...data,
+			});
+			emit({
+				type: "MissionArchived",
+				data: { missionId: workflow.id, previousState: "AbortSequence" },
+			});
+		});
+	});
+
+	router.state("Cancelled", ({ on }) => {
+		on("Archive", ({ data, transition, emit, workflow }) => {
+			transition("Archived", {
+				previousState: "Cancelled" as const,
+				...data,
+			});
+			emit({
+				type: "MissionArchived",
+				data: { missionId: workflow.id, previousState: "Cancelled" },
+			});
+		});
+	});
+
+	router.state("Archived", ({ on }) => {
+		on("Unarchive", ({ data, transition, emit, workflow }) => {
+			const { previousState, ...rest } = data;
+			emit({
+				type: "MissionUnarchived",
+				data: { missionId: workflow.id, restoredState: previousState },
+			});
+			if (previousState === "OrbitAchieved") {
+				// biome-ignore lint/suspicious/noExplicitAny: Archived carries union of terminal data, previousState discriminates
+				transition("OrbitAchieved", rest as any);
+			} else if (previousState === "AbortSequence") {
+				// biome-ignore lint/suspicious/noExplicitAny: Archived carries union of terminal data, previousState discriminates
+				transition("AbortSequence", rest as any);
+			} else {
+				// biome-ignore lint/suspicious/noExplicitAny: Archived carries union of terminal data, previousState discriminates
+				transition("Cancelled", rest as any);
+			}
+		});
+	});
+
 	return router;
 }

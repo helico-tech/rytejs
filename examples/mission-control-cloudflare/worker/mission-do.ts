@@ -7,8 +7,16 @@ import type { Env } from "./index.ts";
 import { createMissionRouter } from "./router.ts";
 import { createTelemetryService } from "./telemetry.ts";
 
-// biome-ignore lint/suspicious/noExplicitAny: type erasure — executor holds WorkflowConfig base type
+interface HistoryEntry {
+	seq: number;
+	timestamp: string;
+	type: "command" | "event";
+	name: string;
+	data: Record<string, unknown>;
+}
+
 export class MissionDO extends DurableObject<Env> {
+	// biome-ignore lint/suspicious/noExplicitAny: type erasure — executor holds WorkflowConfig base type
 	private executor: WorkflowExecutor<any>;
 	private store: ReturnType<typeof createDOStore>;
 	private telemetry = createTelemetryService();
@@ -72,6 +80,7 @@ export class MissionDO extends DurableObject<Env> {
 			const result = await this.executor.execute(id, body);
 
 			if (result.ok) {
+				await this.recordHistory(id, body, result);
 				this.broadcast({
 					snapshot: result.snapshot,
 					version: result.version,
@@ -84,8 +93,17 @@ export class MissionDO extends DurableObject<Env> {
 			return Response.json(result);
 		}
 
-		// GET — Load snapshot
+		// GET — Load snapshot or history
 		if (method === "GET") {
+			const url = new URL(request.url);
+			if (url.pathname.endsWith("/history")) {
+				const id = await this.getMissionId();
+				if (!id) return Response.json({ error: "No mission" }, { status: 404 });
+				const historyMap = await this.ctx.storage.list<HistoryEntry>({
+					prefix: `history:${id}:`,
+				});
+				return Response.json([...historyMap.values()]);
+			}
 			const id = await this.getMissionId();
 			if (!id) return Response.json({ error: "No mission" }, { status: 404 });
 			const stored = await this.store.load(id);
@@ -130,11 +148,13 @@ export class MissionDO extends DurableObject<Env> {
 		if (state === "Countdown") {
 			const data = stored.snapshot.data as { secondsRemaining: number };
 			if (data.secondsRemaining > 0) {
-				const result = await this.executor.execute(id, {
+				const command = {
 					type: "UpdateCountdown",
 					payload: { secondsRemaining: data.secondsRemaining - 1 },
-				});
+				};
+				const result = await this.executor.execute(id, command);
 				if (result.ok) {
+					await this.recordHistory(id, command, result);
 					this.broadcast({
 						snapshot: result.snapshot,
 						version: result.version,
@@ -145,11 +165,10 @@ export class MissionDO extends DurableObject<Env> {
 				}
 			} else {
 				// T-0: Launch!
-				const result = await this.executor.execute(id, {
-					type: "Launch",
-					payload: {},
-				});
+				const command = { type: "Launch", payload: {} };
+				const result = await this.executor.execute(id, command);
 				if (result.ok) {
+					await this.recordHistory(id, command, result);
 					this.broadcast({
 						snapshot: result.snapshot,
 						version: result.version,
@@ -181,6 +200,7 @@ export class MissionDO extends DurableObject<Env> {
 
 			const result = await this.executor.execute(id, command);
 			if (result.ok) {
+				await this.recordHistory(id, command, result);
 				this.broadcast({
 					snapshot: result.snapshot,
 					version: result.version,
@@ -244,5 +264,46 @@ export class MissionDO extends DurableObject<Env> {
 		if (this.missionId) return this.missionId;
 		this.missionId = (await this.ctx.storage.get<string>("missionId")) ?? null;
 		return this.missionId;
+	}
+
+	private async recordHistory(
+		missionId: string,
+		command: { type: string; payload: unknown },
+		// biome-ignore lint/suspicious/noExplicitAny: executor result type varies
+		result: { ok: true; events: Array<{ type: string; data: unknown }> } & Record<string, any>,
+	): Promise<HistoryEntry[]> {
+		const seqKey = `historySeq:${missionId}`;
+		let seq = (await this.ctx.storage.get<number>(seqKey)) ?? 0;
+		const timestamp = new Date().toISOString();
+		const entries: HistoryEntry[] = [];
+
+		// Record command
+		const cmdEntry: HistoryEntry = {
+			seq,
+			timestamp,
+			type: "command",
+			name: command.type,
+			data: (command.payload ?? {}) as Record<string, unknown>,
+		};
+		await this.ctx.storage.put(`history:${missionId}:${String(seq).padStart(6, "0")}`, cmdEntry);
+		entries.push(cmdEntry);
+		seq++;
+
+		// Record each event
+		for (const event of result.events) {
+			const evtEntry: HistoryEntry = {
+				seq,
+				timestamp,
+				type: "event",
+				name: event.type,
+				data: (event.data ?? {}) as Record<string, unknown>,
+			};
+			await this.ctx.storage.put(`history:${missionId}:${String(seq).padStart(6, "0")}`, evtEntry);
+			entries.push(evtEntry);
+			seq++;
+		}
+
+		await this.ctx.storage.put(seqKey, seq);
+		return entries;
 	}
 }

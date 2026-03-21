@@ -64,11 +64,12 @@ export default {
 			return stub.fetch(request);
 		}
 
-		// Match /api/missions/:id or /api/missions/:id/ws
-		const match = pathname.match(/^\/api\/missions\/([^/]+)(\/ws)?$/);
+		// Match /api/missions/:id or /api/missions/:id/ws or /api/missions/:id/history
+		const match = pathname.match(/^\/api\/missions\/([^/]+)(\/ws|\/history)?$/);
 		if (match) {
 			const id = match[1] as string;
 			const isWs = match[2] === "/ws";
+			const isHistory = match[2] === "/history";
 
 			// Get or create the DO for this mission
 			const doId = env.MISSION.idFromName(id);
@@ -77,6 +78,10 @@ export default {
 			if (isWs) {
 				// WebSocket upgrade — forward to DO
 				return stub.fetch(request);
+			}
+
+			if (isHistory && request.method === "GET") {
+				return stub.fetch(new Request(new URL("/history", request.url), { method: "GET" }));
 			}
 
 			// PUT — Create mission
