@@ -93,15 +93,15 @@ See [Migrations](/guide/migrations) for details on defining migration pipelines.
 
 ## Transport
 
-Pass a `transport` option to `createWorkflowStore` to dispatch commands through a server instead of locally. Implement the `Transport` interface (exported from `@rytejs/react`) to connect to your server — dispatches go through the executor pipeline, and broadcasts push updates back to the client.
+Use `createWorkflowClient` to connect to a server-backed workflow. Commands dispatch through the server, and broadcasts push updates back to the client.
 
 <<< @/snippets/guide/react.ts#transport-store
 
-Transport mode requires an `id` on the initial config — the server needs to know which workflow to dispatch against.
+Transport mode requires an `id` — the server needs to know which workflow to operate on.
 
 ### Real-time Updates
 
-When using a transport, the store automatically subscribes to server broadcasts. Incoming updates replace the local workflow state and trigger re-renders.
+The client automatically subscribes to server broadcasts. Incoming updates replace the local workflow state and trigger re-renders.
 
 ### Cleanup
 
