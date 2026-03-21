@@ -10,7 +10,11 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["MissionDO", "MissionIndexDO"]
+new_sqlite_classes = ["MissionDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["MissionIndexDO"]
 
 [assets]
 directory = "./dist"
