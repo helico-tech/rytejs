@@ -13,7 +13,7 @@ import type {
 	WorkflowOf,
 } from "@rytejs/core";
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
-import type { Transport } from "@rytejs/react";
+import type { Transport, TransportResult } from "@rytejs/react";
 import { z } from "zod";
 
 // ── Declare @rytejs/react types (not a docs dependency) ─────────────────────
@@ -75,8 +75,29 @@ interface WorkflowStoreOptions<TConfig extends WorkflowConfig> {
 		storage: Storage;
 		migrations?: MigrationPipeline<TConfig>;
 	};
-	transport?: Transport;
 }
+
+interface RemoteWorkflowStore<TConfig extends WorkflowConfig> {
+	getSnapshot(): {
+		readonly workflow: Workflow<TConfig> | null;
+		readonly isLoading: boolean;
+		readonly isDispatching: boolean;
+		readonly error: { category: "transport"; code: string; message: string } | null;
+	};
+	subscribe(listener: () => void): () => void;
+	dispatch<C extends CommandNames<TConfig>>(
+		command: C,
+		payload: CommandPayload<TConfig, C>,
+	): Promise<TransportResult>;
+	cleanup(): void;
+}
+
+declare function createWorkflowClient(transport: Transport): {
+	connect<TConfig extends WorkflowConfig>(
+		definition: WorkflowDefinition<TConfig>,
+		id: string,
+	): RemoteWorkflowStore<TConfig>;
+};
 
 interface UseWorkflowReturn<TConfig extends WorkflowConfig> {
 	readonly workflow: Workflow<TConfig>;
@@ -312,28 +333,27 @@ const persistedStore = createWorkflowStore(
 
 // #region transport-store
 const exampleTransport: Transport = {
+	async load(id) {
+		// Load workflow from server — e.g., fetch("GET", `/api/workflows/${id}`)
+		throw new Error(`Not implemented: load(${id})`);
+	},
 	async dispatch(id, command, expectedVersion) {
-		// Implement server dispatch — e.g., fetch("POST", `/api/workflows/${id}`, ...)
+		// Dispatch command to server — e.g., fetch("POST", `/api/workflows/${id}`, ...)
 		throw new Error(`Not implemented: dispatch(${id})`);
 	},
 	subscribe(id, callback) {
-		// Implement server subscription — e.g., EventSource, WebSocket
+		// Subscribe to live updates — e.g., EventSource, WebSocket
 		return { unsubscribe() {} };
 	},
 };
 
-const transportStore = createWorkflowStore(
-	router,
-	{
-		state: "Todo",
-		data: { title: "Write docs", priority: 0 },
-		id: "task-1", // Required when using transport
-	},
-	{ transport: exampleTransport },
-);
+const client = createWorkflowClient(exampleTransport);
+
+// connect() loads the workflow from the server and subscribes to updates
+const remoteStore = client.connect(taskWorkflow, "task-1");
 
 // Dispatch goes through the server instead of locally
-await transportStore.dispatch("Start", { assignee: "alice" });
+await remoteStore.dispatch("Start", { assignee: "alice" });
 
 // Incoming broadcasts update the store automatically
 // #endregion transport-store
@@ -342,7 +362,7 @@ await transportStore.dispatch("Start", { assignee: "alice" });
 
 // #region transport-cleanup
 // Unsubscribe from transport when done (e.g., React component unmount)
-transportStore.cleanup();
+remoteStore.cleanup();
 // #endregion transport-cleanup
 
 void unsubscribe;
@@ -353,4 +373,5 @@ void TaskContext;
 void persistedStore;
 void wfHook;
 void useWorkflow;
-void transportStore;
+void remoteStore;
+void client;
