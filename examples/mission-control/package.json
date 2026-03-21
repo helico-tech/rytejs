@@ -6,8 +6,7 @@
 		"dev:server": "bun run --watch server/index.ts",
 		"dev:client": "vite",
 		"dev": "bun run dev:server & vite",
-		"build": "vite build",
-		"test": "bun test"
+		"build": "vite build"
 	},
 	"dependencies": {
 		"@rytejs/core": "workspace:*",
