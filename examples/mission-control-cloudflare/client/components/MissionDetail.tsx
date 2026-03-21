@@ -1,7 +1,8 @@
 import { useWorkflow } from "@rytejs/react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { missionDef } from "../../shared/mission.ts";
 import { client } from "../App.tsx";
+import { cn } from "../lib/utils.ts";
 import { AscendingView } from "./AscendingView.tsx";
 import { CountdownView } from "./CountdownView.tsx";
 import { PlanningView } from "./PlanningView.tsx";
@@ -10,11 +11,26 @@ import { AbortView, CancelledView, OrbitAchievedView } from "./TerminalViews.tsx
 
 interface MissionDetailProps {
 	id: string;
+	onDeleted?: () => void;
 }
 
-export function MissionDetail({ id }: MissionDetailProps) {
+export function MissionDetail({ id, onDeleted }: MissionDetailProps) {
 	const store = useMemo(() => client.connect(missionDef, id), [id]);
 	const wf = useWorkflow(store);
+	const [isDeleting, setIsDeleting] = useState(false);
+
+	const handleDelete = useCallback(async () => {
+		if (!confirm("Delete this mission? This cannot be undone.")) return;
+		setIsDeleting(true);
+		try {
+			const res = await fetch(`/api/missions/${id}`, { method: "DELETE" });
+			if (res.ok) {
+				onDeleted?.();
+			}
+		} finally {
+			setIsDeleting(false);
+		}
+	}, [id, onDeleted]);
 
 	if (wf.isLoading) {
 		return (
@@ -42,6 +58,21 @@ export function MissionDetail({ id }: MissionDetailProps) {
 
 	return (
 		<div className="p-6">
+			<div className="flex justify-end mb-4">
+				<button
+					type="button"
+					onClick={handleDelete}
+					disabled={isDeleting}
+					className={cn(
+						"px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+						"bg-[hsl(var(--destructive))]/10 text-[hsl(var(--destructive))]",
+						"hover:bg-[hsl(var(--destructive))]/20",
+						"disabled:opacity-50 disabled:cursor-not-allowed",
+					)}
+				>
+					{isDeleting ? "Deleting..." : "Delete Mission"}
+				</button>
+			</div>
 			{wf.match(
 				{
 					Planning: (data) => (

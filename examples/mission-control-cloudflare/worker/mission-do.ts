@@ -93,6 +93,28 @@ export class MissionDO extends DurableObject<Env> {
 			return Response.json(stored);
 		}
 
+		// DELETE — Delete mission
+		if (method === "DELETE") {
+			const id = await this.getMissionId();
+			if (!id) return Response.json({ error: "No mission" }, { status: 404 });
+
+			// Clear all storage for this mission
+			await this.ctx.storage.deleteAll();
+			this.missionId = null;
+
+			// Notify connected WebSocket clients
+			for (const ws of this.ctx.getWebSockets()) {
+				try {
+					ws.send(JSON.stringify({ deleted: true }));
+					ws.close(1000, "Mission deleted");
+				} catch {
+					// Client already disconnected
+				}
+			}
+
+			return Response.json({ ok: true });
+		}
+
 		return Response.json({ error: "Method not allowed" }, { status: 405 });
 	}
 

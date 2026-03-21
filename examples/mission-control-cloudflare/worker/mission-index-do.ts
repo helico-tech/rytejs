@@ -40,6 +40,18 @@ export class MissionIndexDO extends DurableObject {
 			return Response.json({ ok: true });
 		}
 
+		// DELETE — remove a mission entry (called by worker after MissionDO deletion)
+		if (method === "DELETE") {
+			const url = new URL(request.url);
+			const id = url.pathname.replace("/", "");
+			await this.ctx.storage.delete(`mission:${id}`);
+
+			// Broadcast updated list to all connected WebSocket clients
+			await this.broadcastList();
+
+			return Response.json({ ok: true });
+		}
+
 		return Response.json({ error: "Method not allowed" }, { status: 405 });
 	}
 

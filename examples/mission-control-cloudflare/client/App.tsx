@@ -1,5 +1,5 @@
 import { createWorkflowClient } from "@rytejs/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MissionDetail } from "./components/MissionDetail.tsx";
 import { MissionList } from "./components/MissionList.tsx";
 import { createMissionTransport } from "./transport.ts";
@@ -7,17 +7,34 @@ import { createMissionTransport } from "./transport.ts";
 const transport = createMissionTransport();
 export const client = createWorkflowClient(transport);
 
+function getIdFromUrl(): string | null {
+	const match = window.location.pathname.match(/^\/missions\/(.+)$/);
+	return match ? match[1] : null;
+}
+
 export function App() {
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [selectedId, setSelectedId] = useState<string | null>(getIdFromUrl);
+
+	const selectMission = useCallback((id: string | null) => {
+		setSelectedId(id);
+		const path = id ? `/missions/${id}` : "/";
+		window.history.pushState(null, "", path);
+	}, []);
+
+	useEffect(() => {
+		const onPopState = () => setSelectedId(getIdFromUrl());
+		window.addEventListener("popstate", onPopState);
+		return () => window.removeEventListener("popstate", onPopState);
+	}, []);
 
 	return (
 		<div className="flex h-screen overflow-hidden">
 			<aside className="w-80 flex-shrink-0 border-r border-[hsl(var(--border))] overflow-y-auto">
-				<MissionList selectedId={selectedId} onSelect={setSelectedId} />
+				<MissionList selectedId={selectedId} onSelect={selectMission} />
 			</aside>
 			<main className="flex-1 overflow-y-auto">
 				{selectedId ? (
-					<MissionDetail key={selectedId} id={selectedId} />
+					<MissionDetail key={selectedId} id={selectedId} onDeleted={() => selectMission(null)} />
 				) : (
 					<div className="flex items-center justify-center h-full">
 						<div className="text-center">

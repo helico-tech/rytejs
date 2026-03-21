@@ -30,6 +30,11 @@ async function notifyIndex(
 	);
 }
 
+async function deleteFromIndex(env: Env, missionId: string): Promise<void> {
+	const stub = getIndexStub(env);
+	await stub.fetch(new Request(`http://internal/${missionId}`, { method: "DELETE" }));
+}
+
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
@@ -41,7 +46,7 @@ export default {
 				status: 204,
 				headers: {
 					"Access-Control-Allow-Origin": "*",
-					"Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+					"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 					"Access-Control-Allow-Headers": "Content-Type, Upgrade",
 				},
 			});
@@ -116,6 +121,18 @@ export default {
 					if (data.ok && data.snapshot) {
 						await notifyIndex(env, id, data.snapshot, data.version!);
 					}
+				}
+
+				return response;
+			}
+
+			// DELETE — Delete mission
+			if (request.method === "DELETE") {
+				const response = await stub.fetch(new Request(request.url, { method: "DELETE" }));
+
+				if (response.ok) {
+					// Notify index to remove mission from list
+					await deleteFromIndex(env, id);
 				}
 
 				return response;
