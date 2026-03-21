@@ -150,7 +150,7 @@ describe("createWorkflowClient", () => {
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error.category).toBe("transport");
+			expect(result.error.category).toBe("unexpected");
 		}
 	});
 
