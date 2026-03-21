@@ -67,7 +67,7 @@ export default {
 		// Match /api/missions/:id or /api/missions/:id/ws
 		const match = pathname.match(/^\/api\/missions\/([^/]+)(\/ws)?$/);
 		if (match) {
-			const id = match[1]!;
+			const id = match[1] as string;
 			const isWs = match[2] === "/ws";
 
 			// Get or create the DO for this mission
@@ -119,7 +119,7 @@ export default {
 						version?: number;
 					};
 					if (data.ok && data.snapshot) {
-						await notifyIndex(env, id, data.snapshot, data.version!);
+						await notifyIndex(env, id, data.snapshot, data.version as number);
 					}
 				}
 
@@ -141,7 +141,12 @@ export default {
 			return stub.fetch(request);
 		}
 
-		// Everything else: static assets (React SPA)
-		return env.ASSETS.fetch(request);
+		// Non-API routes: serve static assets with SPA fallback
+		const assetResponse = await env.ASSETS.fetch(request);
+		if (assetResponse.status === 404) {
+			// SPA fallback: serve index.html for client-side routing
+			return env.ASSETS.fetch(new Request(new URL("/", request.url), request));
+		}
+		return assetResponse;
 	},
 } satisfies ExportedHandler<Env>;

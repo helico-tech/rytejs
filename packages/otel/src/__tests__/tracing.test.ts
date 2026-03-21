@@ -1,7 +1,7 @@
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
-	BasicTracerProvider,
 	InMemorySpanExporter,
+	NodeTracerProvider,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
@@ -40,12 +40,13 @@ const definition = defineWorkflow("order", {
 });
 
 let exporter: InMemorySpanExporter;
-let provider: BasicTracerProvider;
+let provider: NodeTracerProvider;
 
 beforeEach(() => {
 	exporter = new InMemorySpanExporter();
-	provider = new BasicTracerProvider();
-	provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+	provider = new NodeTracerProvider({
+		spanProcessors: [new SimpleSpanProcessor(exporter)],
+	});
 });
 
 afterEach(async () => {

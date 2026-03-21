@@ -12,6 +12,7 @@ interface MissionListItem {
 interface MissionListProps {
 	selectedId: string | null;
 	onSelect: (id: string | null) => void;
+	onMissionsChanged?: (ids: Set<string>) => void;
 }
 
 const stateBadgeClass: Record<string, string> = {
@@ -24,22 +25,29 @@ const stateBadgeClass: Record<string, string> = {
 	Cancelled: "bg-[hsl(var(--muted))]/30 text-[hsl(var(--muted-foreground))]",
 };
 
-export function MissionList({ selectedId, onSelect }: MissionListProps) {
+export function MissionList({ selectedId, onSelect, onMissionsChanged }: MissionListProps) {
 	const [missions, setMissions] = useState<MissionListItem[]>([]);
 	const [showCreate, setShowCreate] = useState(false);
 	const wsRef = useRef<WebSocket | null>(null);
+	const onMissionsChangedRef = useRef(onMissionsChanged);
+	onMissionsChangedRef.current = onMissionsChanged;
+
+	const updateMissions = useCallback((data: MissionListItem[]) => {
+		setMissions(data);
+		onMissionsChangedRef.current?.(new Set(data.map((m) => m.id)));
+	}, []);
 
 	const fetchMissions = useCallback(async () => {
 		try {
 			const res = await fetch("/api/missions");
 			if (res.ok) {
 				const data = (await res.json()) as MissionListItem[];
-				setMissions(data);
+				updateMissions(data);
 			}
 		} catch {
 			// Network error — will retry via WebSocket reconnect
 		}
-	}, []);
+	}, [updateMissions]);
 
 	// Initial fetch
 	useEffect(() => {
@@ -59,7 +67,7 @@ export function MissionList({ selectedId, onSelect }: MissionListProps) {
 					missions: MissionListItem[];
 				};
 				if (msg.type === "init" || msg.type === "update") {
-					setMissions(msg.missions);
+					updateMissions(msg.missions);
 				}
 			};
 
@@ -83,7 +91,7 @@ export function MissionList({ selectedId, onSelect }: MissionListProps) {
 				ws.close();
 			}
 		};
-	}, []);
+	}, [updateMissions]);
 
 	return (
 		<div className="flex flex-col h-full">
