@@ -6,7 +6,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
-		"@rytejs/core": "0.6.0",
+		"@rytejs/core": "0.7.0",
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {
