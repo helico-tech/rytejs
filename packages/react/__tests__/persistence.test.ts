@@ -72,7 +72,9 @@ describe("persistence", () => {
 			{ persist: { key: "test-workflow", storage } },
 		);
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null when restored from storage
 		expect(store2.getSnapshot().workflow!.state).toBe("InProgress");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null when restored from storage
 		expect(store2.getSnapshot().workflow!.id).toBe("wf-1");
 	});
 
@@ -85,7 +87,9 @@ describe("persistence", () => {
 			{ persist: { key: "nonexistent", storage } },
 		);
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null with initial config
 		expect(store.getSnapshot().workflow!.state).toBe("Pending");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null with initial config
 		expect(store.getSnapshot().workflow!.data).toEqual({ title: "Fallback" });
 	});
 
@@ -99,6 +103,7 @@ describe("persistence", () => {
 			{ persist: { key: "test-workflow", storage } },
 		);
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null with initial config
 		expect(store.getSnapshot().workflow!.state).toBe("Pending");
 	});
 
@@ -124,7 +129,9 @@ describe("persistence", () => {
 			{ persist: { key: "test-workflow", storage } },
 		);
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null with initial config
 		expect(store.getSnapshot().workflow!.state).toBe("Pending");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null with initial config
 		expect(store.getSnapshot().workflow!.data).toEqual({ title: "Fallback" });
 	});
 });

@@ -14,6 +14,7 @@ describe("useWorkflow — full mode", () => {
 
 		const { result } = renderHook(() => useWorkflow(store));
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null when store is initialized
 		expect(result.current.workflow!.state).toBe("Pending");
 		expect(result.current.state).toBe("Pending");
 		expect(result.current.data).toEqual({ title: "Test" });
@@ -35,6 +36,7 @@ describe("useWorkflow — full mode", () => {
 			await store.dispatch("Start", { assignee: "Alice" });
 		});
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after dispatch
 		expect(result.current.workflow!.state).toBe("InProgress");
 		expect(result.current.state).toBe("InProgress");
 	});
@@ -119,6 +121,7 @@ describe("useWorkflow — match", () => {
 
 		const { result } = renderHook(() => useWorkflow(store));
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null for matched states
 		const label = result.current.match({ Pending: () => "pending" }, (wf) => `other: ${wf!.state}`);
 
 		expect(label).toBe("other: InProgress");

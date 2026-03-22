@@ -56,7 +56,7 @@ const hooksRouter = new WorkflowRouter(taskWorkflow)
 	.on("error", (error) => {
 		console.error(`Error: ${error.category}`, error);
 	})
-	.state("Todo", ({ on }) => {
+	.state("Todo", ({ on: _on }) => {
 		/* ... */
 	});
 // #endregion hooks

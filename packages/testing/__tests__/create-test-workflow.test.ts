@@ -33,6 +33,7 @@ describe("createTestWorkflow", () => {
 	});
 
 	test("validates data against state schema", () => {
+		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
 		expect(() => createTestWorkflow(definition, "Draft", { items: "not-array" as any })).toThrow();
 	});
 

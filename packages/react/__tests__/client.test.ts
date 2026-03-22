@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { createWorkflowClient } from "../src/client.js";
-import type { Transport, TransportResult } from "../src/transport.js";
+import type { Transport } from "../src/transport.js";
 import { definition } from "./helpers.js";
 
 function createMockTransport(overrides?: Partial<Transport>): Transport {
@@ -67,7 +67,9 @@ describe("createWorkflowClient", () => {
 
 		const snapshot = store.getSnapshot();
 		expect(snapshot.workflow).not.toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(snapshot.workflow!.state).toBe("Pending");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(snapshot.workflow!.data).toEqual({ title: "Test" });
 	});
 
@@ -135,7 +137,9 @@ describe("createWorkflowClient", () => {
 		const result = await store.dispatch("Start", { assignee: "Alice" });
 
 		expect(result.ok).toBe(true);
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after successful dispatch
 		expect(store.getSnapshot().workflow!.state).toBe("InProgress");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after successful dispatch
 		expect(store.getSnapshot().workflow!.data).toMatchObject({ assignee: "Alice" });
 	});
 
@@ -184,13 +188,16 @@ describe("createWorkflowClient", () => {
 			data: { title: "Test", assignee: "Bob" },
 		});
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		broadcastCallback!({
 			snapshot: definition.serialize(updatedWorkflow),
 			version: 3,
 			events: [],
 		});
 
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after broadcast update
 		expect(store.getSnapshot().workflow!.state).toBe("InProgress");
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after broadcast update
 		expect(store.getSnapshot().workflow!.data).toMatchObject({ assignee: "Bob" });
 	});
 
@@ -246,6 +253,7 @@ describe("createWorkflowClient", () => {
 		listener.mockClear();
 
 		// Now resolve the load
+		// biome-ignore lint/style/noNonNullAssertion: resolveLoad is assigned in the Promise constructor above
 		resolveLoad!({
 			snapshot: definition.serialize(
 				definition.createWorkflow("test-1", {

@@ -18,6 +18,7 @@ describe("createTestDeps", () => {
 		const deps = createTestDeps<MyDeps>({
 			paymentService: { charge: async () => true },
 		});
+		// biome-ignore lint/suspicious/noExplicitAny: testing that omitted deps are undefined at runtime
 		expect((deps as any).emailService).toBeUndefined();
 	});
 

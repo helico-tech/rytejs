@@ -25,6 +25,7 @@ export function Dashboard() {
 				<OrderContext.Provider store={manager.activeStore}>
 					<div style={{ flex: 1, overflowY: "auto" }}>
 						<AppWithRegistrySync
+							// biome-ignore lint/style/noNonNullAssertion: activeOrderId is non-null when activeStore is truthy
 							orderId={manager.activeOrderId!}
 							onRegistryUpdate={manager.updateRegistryEntry}
 						/>
@@ -64,6 +65,7 @@ function AppWithRegistrySync({
 	const prevRef = useRef({ state: "", customer: "" });
 
 	useEffect(() => {
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null inside Provider context
 		const customer = "customer" in workflow!.data ? (workflow!.data.customer as string) : "";
 		const currentState = state as string;
 		if (prevRef.current.state !== currentState || prevRef.current.customer !== customer) {

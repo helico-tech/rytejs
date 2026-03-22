@@ -72,7 +72,7 @@ export function createTelemetryService(): TelemetryService {
 			};
 		},
 
-		async analyzeReadings(readings: TelemetryReading[]): Promise<AnomalyResult> {
+		async analyzeReadings(_readings: TelemetryReading[]): Promise<AnomalyResult> {
 			await delay(100, 200);
 			// ~10% anomaly chance
 			if (Math.random() < 0.1) {

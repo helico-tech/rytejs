@@ -42,8 +42,11 @@ describe("Redis Store", () => {
 
 		const loaded = await store.load("test-create-1");
 		expect(loaded).not.toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(loaded!.snapshot.id).toBe("test-create-1");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(loaded!.snapshot.state).toBe("Planning");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(loaded!.version).toBe(1);
 	});
 
@@ -68,7 +71,9 @@ describe("Redis Store", () => {
 
 		const loaded = await store.load("test-version-1");
 		expect(loaded).not.toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(loaded!.version).toBe(2);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(loaded!.snapshot.state).toBe("Countdown");
 	});
 
@@ -130,7 +135,9 @@ describe("Redis Store", () => {
 
 		const entry = all.find((m) => m.id === "test-list-1");
 		expect(entry).toBeDefined();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(entry!.snapshot.state).toBe("Planning");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(entry!.version).toBe(1);
 	});
 

@@ -44,6 +44,7 @@ export async function testPath<TConfig extends WorkflowConfig, TDeps>(
 
 	let workflow: Workflow<TConfig> = definition.createWorkflow(
 		`test-${Math.random().toString(36).slice(2, 9)}`,
+		// biome-ignore lint/suspicious/noExplicitAny: step data is untyped — the workflow definition validates it at runtime
 		{ initialState: first.start, data: first.data as any },
 	) as Workflow<TConfig>;
 

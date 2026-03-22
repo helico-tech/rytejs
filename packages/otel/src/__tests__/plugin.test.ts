@@ -56,6 +56,7 @@ describe("otel plugin integration", () => {
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		expect(spans[0]!.name).toBe("ryte.dispatch.Place");
 	});
 
@@ -78,6 +79,7 @@ describe("otel plugin integration", () => {
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		expect(spans[0]!.instrumentationScope.name).toBe("custom-scope");
 	});
 
@@ -110,7 +112,11 @@ describe("otel plugin integration", () => {
 		expect(ids).toContain("wf-2");
 
 		// Spans should have different trace/span IDs
-		expect(spans[0]!.spanContext().spanId).not.toBe(spans[1]!.spanContext().spanId);
+		// biome-ignore lint/style/noNonNullAssertion: test verified spans has 2 entries
+		expect(spans[0]!.spanContext().spanId).not.toBe(
+			// biome-ignore lint/style/noNonNullAssertion: test verified spans has 2 entries
+			spans[1]!.spanContext().spanId,
+		);
 	});
 
 	test("no-op when no SDK is registered", async () => {

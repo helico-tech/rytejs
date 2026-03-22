@@ -42,13 +42,13 @@ declare const oldSnapshot: WorkflowSnapshot;
 
 // #region define-pipeline
 const migrations = defineMigrations(definition, {
-	// biome-ignore lint: migration functions operate on unknown data
 	2: (snap) => ({
 		...snap,
+		// biome-ignore lint/suspicious/noExplicitAny: migration functions operate on unknown data
 		data: { ...(snap.data as any), status: "active" },
 	}),
-	// biome-ignore lint: migration functions operate on unknown data
 	3: (snap) => {
+		// biome-ignore lint/suspicious/noExplicitAny: migration functions operate on unknown data
 		const data = snap.data as any;
 		return {
 			...snap,
@@ -64,7 +64,6 @@ const migrations = defineMigrations(definition, {
 const migrationsV2 = defineMigrations(definitionV2, {
 	2: {
 		description: "Add status field",
-		// biome-ignore lint: migration functions operate on unknown data
 		up: (snap) => ({
 			...snap,
 			data: { ...(snap.data as Record<string, unknown>), status: "active" },
@@ -114,7 +113,7 @@ async function loadWorkflow() {
 
 // #region observability
 const observedResult = migrate(migrations, oldSnapshot, {
-	onStep: (fromVersion, toVersion, snapshot, description) => {
+	onStep: (fromVersion, toVersion, _snapshot, description) => {
 		console.log(`Migrated ${fromVersion} → ${toVersion}: ${description ?? "no description"}`);
 	},
 	onError: (error) => {

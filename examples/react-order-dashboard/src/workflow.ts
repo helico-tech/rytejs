@@ -250,6 +250,7 @@ export function createOrderStore(options: OrderStoreOptions): WorkflowStore<Orde
 
 	// Wrap dispatch to capture before/after snapshots for logging
 	const wrappedDispatch: typeof originalDispatch = async (command, payload) => {
+		// biome-ignore lint/style/noNonNullAssertion: workflow is always non-null when dispatch is callable
 		const beforeWorkflow = store.getWorkflow()!;
 		const fromState = beforeWorkflow.state;
 		const start = performance.now();
@@ -257,6 +258,7 @@ export function createOrderStore(options: OrderStoreOptions): WorkflowStore<Orde
 		const result = await originalDispatch(command, payload);
 
 		const durationMs = performance.now() - start;
+		// biome-ignore lint/style/noNonNullAssertion: workflow is always non-null after dispatch
 		const afterWorkflow = result.ok ? result.workflow : store.getWorkflow()!;
 		const afterSnapshot = orderDefinition.serialize(afterWorkflow);
 

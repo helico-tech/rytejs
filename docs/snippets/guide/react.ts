@@ -337,11 +337,11 @@ const exampleTransport: Transport = {
 		// Load workflow from server — e.g., fetch("GET", `/api/workflows/${id}`)
 		throw new Error(`Not implemented: load(${id})`);
 	},
-	async dispatch(id, command, expectedVersion) {
+	async dispatch(id, _command, _expectedVersion) {
 		// Dispatch command to server — e.g., fetch("POST", `/api/workflows/${id}`, ...)
 		throw new Error(`Not implemented: dispatch(${id})`);
 	},
-	subscribe(id, callback) {
+	subscribe(_id, _callback) {
 		// Subscribe to live updates — e.g., EventSource, WebSocket
 		return { unsubscribe() {} };
 	},

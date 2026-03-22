@@ -75,6 +75,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.name).toBe("ryte.dispatch.Place");
 		expect(span.status.code).toBe(SpanStatusCode.OK);
@@ -103,9 +104,12 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const transitionEvents = spans[0]!.events.filter((e) => e.name === "ryte.transition");
 		expect(transitionEvents).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		expect(transitionEvents[0]!.attributes?.[ATTR_TRANSITION_FROM]).toBe("Draft");
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		expect(transitionEvents[0]!.attributes?.[ATTR_TRANSITION_TO]).toBe("Placed");
 	});
 
@@ -129,8 +133,10 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const domainEvents = spans[0]!.events.filter((e) => e.name === "ryte.event");
 		expect(domainEvents).toHaveLength(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		expect(domainEvents[0]!.attributes?.[ATTR_EVENT_TYPE]).toBe("OrderPlaced");
 	});
 
@@ -155,6 +161,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
 		expect(span.attributes[ATTR_ERROR_CATEGORY]).toBe("domain");
@@ -183,6 +190,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
 		expect(span.status.message).toBe("something went wrong");
@@ -213,6 +221,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
 		expect(span.attributes[ATTR_ERROR_CATEGORY]).toBe("validation");
@@ -248,6 +257,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
 		expect(span.attributes[ATTR_ERROR_CATEGORY]).toBe("dependency");
@@ -277,6 +287,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		const span = spans[0]!;
 		expect(span.status.code).toBe(SpanStatusCode.ERROR);
 		expect(span.attributes[ATTR_ERROR_CATEGORY]).toBe("router");
@@ -304,6 +315,7 @@ describe("tracing plugin", () => {
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
 		// The span was ended (it appears in finished spans)
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toHaveLength(1) above
 		expect(spans[0]!.status.code).toBe(SpanStatusCode.ERROR);
 	});
 });

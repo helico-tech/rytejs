@@ -2,7 +2,7 @@ import type { ExecutorMiddleware } from "@rytejs/core/executor";
 import { WorkflowExecutor } from "@rytejs/core/executor";
 import type { SaveOptions, StoreAdapter, StoredWorkflow } from "@rytejs/core/store";
 import { ConcurrencyConflictError, memoryStore } from "@rytejs/core/store";
-import { taskRouter, taskWorkflow } from "../fixtures.js";
+import { taskRouter } from "../fixtures.js";
 
 // #region adapters
 const pgStore: StoreAdapter = {

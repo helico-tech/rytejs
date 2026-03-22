@@ -78,11 +78,11 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 		})
 		.catch((err: unknown) => {
 			if (disposed) return;
-			// biome-ignore lint/suspicious/noExplicitAny: TransportError mapped to PipelineError shape for interface conformance
 			error = {
 				category: "unexpected",
 				error: err,
 				message: err instanceof Error ? err.message : String(err),
+				// biome-ignore lint/suspicious/noExplicitAny: TransportError mapped to PipelineError shape for interface conformance
 			} as any;
 			isLoading = false;
 			notify();
@@ -151,16 +151,17 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 				},
 			} as DispatchResult<TConfig>;
 		} catch (err: unknown) {
-			// biome-ignore lint/suspicious/noExplicitAny: network error mapped to PipelineError shape
 			error = {
 				category: "unexpected",
 				error: err,
 				message: err instanceof Error ? err.message : String(err),
+				// biome-ignore lint/suspicious/noExplicitAny: network error mapped to PipelineError shape
 			} as any;
 			isDispatching = false;
 			notify();
 			return {
 				ok: false,
+				// biome-ignore lint/style/noNonNullAssertion: error is always assigned in the catch block above
 				error: error!,
 			} as DispatchResult<TConfig>;
 		}

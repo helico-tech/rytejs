@@ -70,7 +70,7 @@ declare const db: {
 
 	// Load
 	const json = await db.get(`workflow:${workflow.id}`);
-	const result = definition.deserialize(JSON.parse(json));
+	const _result = definition.deserialize(JSON.parse(json));
 })();
 // #endregion persistence
 
@@ -121,6 +121,6 @@ declare function migrateV1toV2(data: unknown): unknown;
 		snap.modelVersion = 2;
 	}
 
-	const result = definitionV2.deserialize(snap as unknown as WorkflowSnapshot);
+	const _result = definitionV2.deserialize(snap as unknown as WorkflowSnapshot);
 }
 // #endregion version-check

@@ -101,7 +101,7 @@ const workflow = defineWorkflow("task", {
 const validationRouter = new WorkflowRouter(workflow);
 
 validationRouter.state("Todo", ({ on }) => {
-	on("Complete", ({ data, transition, emit, workflow: wf }) => {
+	on("Complete", ({ data, transition, emit, workflow: _wf }) => {
 		transition("Done", { title: data.title, completedAt: new Date() });
 		// @ts-expect-error taskId must be a string, not a number
 		emit({ type: "TaskCompleted", data: { taskId: 123 } });
@@ -123,7 +123,7 @@ validationRouter.state("Todo", ({ on }) => {
 
 	if (!r1.ok) throw new Error("dispatch failed");
 
-	const r2 = await router.dispatch(r1.workflow, { type: "Complete", payload: {} });
+	const _r2 = await router.dispatch(r1.workflow, { type: "Complete", payload: {} });
 	// r2.events: [{ type: "TaskCompleted", ... }]
 	// TaskStarted is NOT in r2.events
 })();

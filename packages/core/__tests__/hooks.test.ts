@@ -269,7 +269,9 @@ describe("router hook integration", () => {
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
 		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
 		expect(captured).toBeDefined();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(captured!.workflow).toBe(wf);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(captured!.command).toEqual({ type: "Publish", payload: { title: "Hello" } });
 	});
 
@@ -293,7 +295,6 @@ describe("router hook integration", () => {
 			hookFired = true;
 		});
 
-		// biome-ignore lint/suspicious/noExplicitAny: intentionally creating invalid workflow
 		const badWf = {
 			id: "x",
 			definitionName: "hook-test",
@@ -301,6 +302,7 @@ describe("router hook integration", () => {
 			data: {},
 			createdAt: new Date(),
 			updatedAt: new Date(),
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally creating invalid workflow
 		} as any;
 		await router.dispatch(badWf, { type: "Publish", payload: { title: "Hello" } });
 		expect(hookFired).toBe(true);

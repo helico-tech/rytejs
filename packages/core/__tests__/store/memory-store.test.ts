@@ -26,8 +26,11 @@ describe("memoryStore", () => {
 
 		const stored = await store.load("wf-1");
 		expect(stored).not.toBeNull();
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(stored!.snapshot).toEqual({ ...snapshot, version: 1 });
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(stored!.snapshot.version).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeNull check above
 		expect(stored!.version).toBe(1);
 	});
 
@@ -38,6 +41,7 @@ describe("memoryStore", () => {
 		await store.save({ id: "wf-1", snapshot, expectedVersion: 1 });
 
 		const stored = await store.load("wf-1");
+		// biome-ignore lint/style/noNonNullAssertion: store.load returns non-null for saved workflow
 		expect(stored!.version).toBe(2);
 	});
 
