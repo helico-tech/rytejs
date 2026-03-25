@@ -219,6 +219,24 @@ describe("createWorkflowClient", () => {
 		expect(store1).not.toBe(store2);
 	});
 
+	test("cleanup evicts store from cache so reconnect creates a fresh one", async () => {
+		const transport = createMockTransport();
+		const client = createWorkflowClient(transport);
+		const store1 = client.connect(definition, "test-1");
+
+		store1.cleanup();
+
+		const store2 = client.connect(definition, "test-1");
+		expect(store2).not.toBe(store1);
+
+		// New store should load successfully
+		await vi.waitFor(() => {
+			expect(store2.getSnapshot().isLoading).toBe(false);
+		});
+		// biome-ignore lint/style/noNonNullAssertion: workflow is non-null after successful load
+		expect(store2.getSnapshot().workflow!.state).toBe("Pending");
+	});
+
 	test("cleanup unsubscribes from transport", async () => {
 		const unsubscribe = vi.fn();
 		const transport = createMockTransport({
