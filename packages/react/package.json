@@ -1,6 +1,6 @@
 {
 	"name": "@rytejs/react",
-	"version": "0.7.0",
+	"version": "0.7.1",
 	"description": "React bindings for @rytejs/core — use workflows as reactive state stores",
 	"license": "MIT",
 	"type": "module",

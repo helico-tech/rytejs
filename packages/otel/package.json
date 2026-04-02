@@ -1,6 +1,6 @@
 {
 	"name": "@rytejs/otel",
-	"version": "0.7.0",
+	"version": "0.7.1",
 	"description": "OpenTelemetry instrumentation plugin for @rytejs/core",
 	"license": "MIT",
 	"type": "module",
