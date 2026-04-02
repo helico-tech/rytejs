@@ -25,7 +25,7 @@ export function createWorkflowClient(transport: Transport) {
 				return existing as WorkflowStore<TConfig>;
 			}
 
-			const store = createRemoteStore(transport, definition, id);
+			const store = createRemoteStore(transport, definition, id, () => cache.delete(cacheKey));
 			cache.set(cacheKey, store);
 			return store;
 		},
@@ -36,6 +36,7 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 	transport: Transport,
 	definition: WorkflowDefinition<TConfig>,
 	id: string,
+	onDispose: () => void,
 ): WorkflowStore<TConfig> {
 	let workflow: Workflow<TConfig> | null = null;
 	let version = 0;
@@ -185,6 +186,7 @@ function createRemoteStore<TConfig extends WorkflowConfig>(
 		cleanup() {
 			disposed = true;
 			subscription.unsubscribe();
+			onDispose();
 		},
 	};
 }
