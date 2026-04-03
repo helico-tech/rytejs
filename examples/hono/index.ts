@@ -45,22 +45,22 @@ const router = new WorkflowRouter(taskWorkflow)
 		state
 			.on("Assign", (ctx) => {
 				ctx.update({ assignee: ctx.command.payload.assignee });
-				ctx.emit({
-					type: "TaskAssigned",
-					data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+				ctx.emit("TaskAssigned", {
+					taskId: ctx.workflow.id,
+					assignee: ctx.command.payload.assignee,
 				});
 			})
 			.on("Start", (ctx) => {
 				const assignee = ctx.data.assignee;
 				if (!assignee) {
-					ctx.error({ code: "NotAssigned", data: {} });
+					ctx.error("NotAssigned", {});
 				}
 				ctx.transition("InProgress", {
 					title: ctx.data.title,
 					assignee,
 					startedAt: new Date(),
 				});
-				ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
+				ctx.emit("TaskStarted", { taskId: ctx.workflow.id });
 			});
 	})
 	.state("InProgress", (state) => {
@@ -70,7 +70,7 @@ const router = new WorkflowRouter(taskWorkflow)
 				assignee: ctx.data.assignee,
 				completedAt: new Date(),
 			});
-			ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
+			ctx.emit("TaskCompleted", { taskId: ctx.workflow.id });
 		});
 	});
 
@@ -162,10 +162,7 @@ app.post("/workflows/:id/dispatch", async (c) => {
 	}
 
 	// --- Dispatch ---
-	const result = await router.dispatch(restored.workflow, {
-		type: body.type,
-		payload: body.payload ?? {},
-	});
+	const result = await router.dispatch(restored.workflow, body.type, body.payload ?? {});
 
 	if (!result.ok) {
 		// Domain errors, validation errors, and routing errors are all returned

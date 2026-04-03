@@ -60,9 +60,9 @@ const router = new WorkflowRouter(taskWorkflow)
 
 				// Emit a domain event — these are collected and returned with the
 				// dispatch result so the caller can publish them downstream.
-				ctx.emit({
-					type: "TaskAssigned",
-					data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+				ctx.emit("TaskAssigned", {
+					taskId: ctx.workflow.id,
+					assignee: ctx.command.payload.assignee,
 				});
 			})
 			.on("Start", (ctx) => {
@@ -72,7 +72,7 @@ const router = new WorkflowRouter(taskWorkflow)
 				// the signal and returns a structured error result — no exceptions
 				// leak to the HTTP layer.
 				if (!assignee) {
-					ctx.error({ code: "NotAssigned", data: {} });
+					ctx.error("NotAssigned", {});
 				}
 
 				// Transition to a new state with fully validated data.
@@ -81,7 +81,7 @@ const router = new WorkflowRouter(taskWorkflow)
 					assignee,
 					startedAt: new Date(),
 				});
-				ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
+				ctx.emit("TaskStarted", { taskId: ctx.workflow.id });
 			});
 	})
 	.state("InProgress", (state) => {
@@ -91,7 +91,7 @@ const router = new WorkflowRouter(taskWorkflow)
 				assignee: ctx.data.assignee,
 				completedAt: new Date(),
 			});
-			ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
+			ctx.emit("TaskCompleted", { taskId: ctx.workflow.id });
 		});
 	});
 
@@ -198,10 +198,11 @@ app.post("/workflows/:id/dispatch", async (req, res) => {
 	// payload, finds the matching handler, runs middleware, and returns a
 	// discriminated result — either { ok: true, workflow, events } or
 	// { ok: false, error }.
-	const result = await router.dispatch(restored.workflow, {
-		type: type as "Assign" | "Start" | "Complete",
-		payload: payload ?? {},
-	});
+	const result = await router.dispatch(
+		restored.workflow,
+		type as "Assign" | "Start" | "Complete",
+		payload ?? {},
+	);
 
 	if (!result.ok) {
 		// Domain and validation errors are structured — return them as-is.

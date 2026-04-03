@@ -86,7 +86,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry(true) });
 		const wf = planningWorkflow();
 
-		const result = await router.dispatch(wf, { type: "InitiateCountdown", payload: {} });
+		const result = await router.dispatch(wf, "InitiateCountdown", {});
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -99,7 +99,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry(false) });
 		const wf = planningWorkflow();
 
-		const result = await router.dispatch(wf, { type: "InitiateCountdown", payload: {} });
+		const result = await router.dispatch(wf, "InitiateCountdown", {});
 
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
@@ -113,10 +113,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = planningWorkflow();
 
-		const result = await router.dispatch(wf, {
-			type: "CancelMission",
-			payload: { reason: "Budget cuts" },
-		});
+		const result = await router.dispatch(wf, "CancelMission", { reason: "Budget cuts" });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -129,7 +126,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = countdownWorkflow();
 
-		const result = await router.dispatch(wf, { type: "Launch", payload: {} });
+		const result = await router.dispatch(wf, "Launch", {});
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -147,10 +144,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = countdownWorkflow();
 
-		const result = await router.dispatch(wf, {
-			type: "ScrubLaunch",
-			payload: { reason: "Lightning" },
-		});
+		const result = await router.dispatch(wf, "ScrubLaunch", { reason: "Lightning" });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -163,10 +157,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = countdownWorkflow();
 
-		const result = await router.dispatch(wf, {
-			type: "UpdateCountdown",
-			payload: { secondsRemaining: 7 },
-		});
+		const result = await router.dispatch(wf, "UpdateCountdown", { secondsRemaining: 7 });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -185,7 +176,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry(true) });
 		const wf = scrubbedWorkflow();
 
-		const result = await router.dispatch(wf, { type: "RetryCountdown", payload: {} });
+		const result = await router.dispatch(wf, "RetryCountdown", {});
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -198,9 +189,10 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = ascendingWorkflow();
 
-		const result = await router.dispatch(wf, {
-			type: "UpdateTelemetry",
-			payload: { altitude: 200, velocity: 5, heading: 91 },
+		const result = await router.dispatch(wf, "UpdateTelemetry", {
+			altitude: 200,
+			velocity: 5,
+			heading: 91,
 		});
 
 		expect(result.ok).toBe(true);
@@ -221,7 +213,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = ascendingWorkflow();
 
-		const result = await router.dispatch(wf, { type: "AchieveOrbit", payload: {} });
+		const result = await router.dispatch(wf, "AchieveOrbit", {});
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -237,10 +229,7 @@ describe("Mission Router", () => {
 		const router = createMissionRouter({ telemetry: createMockTelemetry() });
 		const wf = ascendingWorkflow();
 
-		const result = await router.dispatch(wf, {
-			type: "TriggerAbort",
-			payload: { reason: "Engine failure" },
-		});
+		const result = await router.dispatch(wf, "TriggerAbort", { reason: "Engine failure" });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();

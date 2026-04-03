@@ -27,22 +27,22 @@ const router = new WorkflowRouter(taskWorkflow)
 		state
 			.on("Assign", (ctx) => {
 				ctx.update({ assignee: ctx.command.payload.assignee });
-				ctx.emit({
-					type: "TaskAssigned",
-					data: { taskId: ctx.workflow.id, assignee: ctx.command.payload.assignee },
+				ctx.emit("TaskAssigned", {
+					taskId: ctx.workflow.id,
+					assignee: ctx.command.payload.assignee,
 				});
 			})
 			.on("Start", (ctx) => {
 				const assignee = ctx.data.assignee;
 				if (!assignee) {
-					ctx.error({ code: "NotAssigned", data: {} });
+					ctx.error("NotAssigned", {});
 				}
 				ctx.transition("InProgress", {
 					title: ctx.data.title,
 					assignee,
 					startedAt: new Date(),
 				});
-				ctx.emit({ type: "TaskStarted", data: { taskId: ctx.workflow.id } });
+				ctx.emit("TaskStarted", { taskId: ctx.workflow.id });
 			});
 	})
 	.state("InProgress", (state) => {
@@ -52,7 +52,7 @@ const router = new WorkflowRouter(taskWorkflow)
 				assignee: ctx.data.assignee,
 				completedAt: new Date(),
 			});
-			ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
+			ctx.emit("TaskCompleted", { taskId: ctx.workflow.id });
 		});
 	});
 
@@ -65,23 +65,20 @@ async function main() {
 	});
 	console.log(`Created: ${task.state}`, task.data);
 
-	let result = await router.dispatch(task, {
-		type: "Assign",
-		payload: { assignee: "alice" },
-	});
+	let result = await router.dispatch(task, "Assign", { assignee: "alice" });
 	if (result.ok) {
 		task = result.workflow;
 		console.log(`Assigned: ${task.state}`, task.data);
 		console.log("Events:", result.events);
 	}
 
-	result = await router.dispatch(task, { type: "Start", payload: {} });
+	result = await router.dispatch(task, "Start", {});
 	if (result.ok) {
 		task = result.workflow;
 		console.log(`Started: ${task.state}`, task.data);
 	}
 
-	result = await router.dispatch(task, { type: "Complete", payload: {} });
+	result = await router.dispatch(task, "Complete", {});
 	if (result.ok) {
 		task = result.workflow;
 		console.log(`Done: ${task.state}`, task.data);

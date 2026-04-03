@@ -114,7 +114,7 @@ router.state("Draft", ({ on }) => {
 
 	on("Submit", ({ data, workflow, transition, emit, error }) => {
 		if (data.items.length === 0) {
-			error({ code: "EmptyOrder", data: {} });
+			error("EmptyOrder", {});
 		}
 		const now = new Date();
 		transition("Submitted", {
@@ -122,9 +122,10 @@ router.state("Draft", ({ on }) => {
 			items: data.items,
 			submittedAt: now,
 		});
-		emit({
-			type: "OrderSubmitted",
-			data: { orderId: workflow.id, customer: data.customer, itemCount: data.items.length },
+		emit("OrderSubmitted", {
+			orderId: workflow.id,
+			customer: data.customer,
+			itemCount: data.items.length,
 		});
 	});
 });
@@ -137,10 +138,7 @@ router.state("Submitted", ({ on }) => {
 			items: data.items,
 			approvedBy: command.payload.approvedBy,
 		});
-		emit({
-			type: "OrderApproved",
-			data: { orderId: workflow.id, approvedBy: command.payload.approvedBy },
-		});
+		emit("OrderApproved", { orderId: workflow.id, approvedBy: command.payload.approvedBy });
 	});
 
 	on("Reject", ({ data, workflow, command, transition, emit }) => {
@@ -150,10 +148,7 @@ router.state("Submitted", ({ on }) => {
 			reason: command.payload.reason,
 			rejectedAt: new Date(),
 		});
-		emit({
-			type: "OrderRejected",
-			data: { orderId: workflow.id, reason: command.payload.reason },
-		});
+		emit("OrderRejected", { orderId: workflow.id, reason: command.payload.reason });
 	});
 });
 
@@ -167,9 +162,10 @@ router.state("Approved", ({ on }) => {
 			paidAt: new Date(),
 			transactionId: command.payload.transactionId,
 		});
-		emit({
-			type: "PaymentProcessed",
-			data: { orderId: workflow.id, transactionId: command.payload.transactionId, amount: total },
+		emit("PaymentProcessed", {
+			orderId: workflow.id,
+			transactionId: command.payload.transactionId,
+			amount: total,
 		});
 	});
 });
@@ -183,10 +179,7 @@ router.state("Paid", ({ on }) => {
 			trackingNumber: command.payload.trackingNumber,
 			shippedAt: new Date(),
 		});
-		emit({
-			type: "OrderShipped",
-			data: { orderId: workflow.id, trackingNumber: command.payload.trackingNumber },
-		});
+		emit("OrderShipped", { orderId: workflow.id, trackingNumber: command.payload.trackingNumber });
 	});
 });
 
@@ -198,10 +191,7 @@ router.state("Shipped", ({ on }) => {
 			items: data.items,
 			deliveredAt: new Date(),
 		});
-		emit({
-			type: "OrderDelivered",
-			data: { orderId: workflow.id },
-		});
+		emit("OrderDelivered", { orderId: workflow.id });
 	});
 });
 

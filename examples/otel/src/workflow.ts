@@ -88,7 +88,7 @@ orderRouter
 	.state("Draft", ({ on }) => {
 		on("Place", ({ command, data, transition, emit, error, workflow }) => {
 			if (data.items.length === 0) {
-				error({ code: "EmptyCart", data: {} });
+				error("EmptyCart", {});
 			}
 
 			transition("Placed", {
@@ -97,10 +97,7 @@ orderRouter
 				placedAt: new Date(),
 			});
 
-			emit({
-				type: "OrderPlaced",
-				data: { orderId: workflow.id, customerEmail: command.payload.customerEmail },
-			});
+			emit("OrderPlaced", { orderId: workflow.id, customerEmail: command.payload.customerEmail });
 		});
 
 		on("Cancel", ({ command, data, transition, emit, workflow }) => {
@@ -111,10 +108,7 @@ orderRouter
 				reason: command.payload.reason,
 			});
 
-			emit({
-				type: "OrderCancelled",
-				data: { orderId: workflow.id, reason: command.payload.reason },
-			});
+			emit("OrderCancelled", { orderId: workflow.id, reason: command.payload.reason });
 		});
 	})
 	.state("Placed", ({ on }) => {
@@ -127,10 +121,7 @@ orderRouter
 				transactionId: command.payload.transactionId,
 			});
 
-			emit({
-				type: "OrderPaid",
-				data: { orderId: workflow.id, transactionId: command.payload.transactionId },
-			});
+			emit("OrderPaid", { orderId: workflow.id, transactionId: command.payload.transactionId });
 		});
 
 		on("Cancel", ({ command, data, transition, emit, workflow }) => {
@@ -141,10 +132,7 @@ orderRouter
 				reason: command.payload.reason,
 			});
 
-			emit({
-				type: "OrderCancelled",
-				data: { orderId: workflow.id, reason: command.payload.reason },
-			});
+			emit("OrderCancelled", { orderId: workflow.id, reason: command.payload.reason });
 		});
 	})
 	.state("Paid", ({ on }) => {
@@ -159,14 +147,14 @@ orderRouter
 				trackingNumber: command.payload.trackingNumber,
 			});
 
-			emit({
-				type: "OrderShipped",
-				data: { orderId: workflow.id, trackingNumber: command.payload.trackingNumber },
+			emit("OrderShipped", {
+				orderId: workflow.id,
+				trackingNumber: command.payload.trackingNumber,
 			});
 		});
 
 		on("Pay", ({ data, error }) => {
-			error({ code: "AlreadyPaid", data: { transactionId: data.transactionId } });
+			error("AlreadyPaid", { transactionId: data.transactionId });
 		});
 	});
 

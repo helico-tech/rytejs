@@ -16,7 +16,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				data.crewMembers.length,
 			);
 			if (!result.go) {
-				error({ code: "LaunchWindowClosed", data: {} });
+				error("LaunchWindowClosed", {});
 			}
 			transition("Countdown", {
 				...data,
@@ -24,10 +24,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				telemetryStatus: "go",
 				secondsRemaining: 10,
 			});
-			emit({
-				type: "CountdownStarted",
-				data: { missionId: workflow.id },
-			});
+			emit("CountdownStarted", { missionId: workflow.id });
 		});
 
 		on("CancelMission", ({ data, command, transition, emit, workflow }) => {
@@ -38,10 +35,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				cancelledAt: new Date(),
 				reason: command.payload.reason,
 			});
-			emit({
-				type: "MissionCancelled",
-				data: { missionId: workflow.id, reason: command.payload.reason },
-			});
+			emit("MissionCancelled", { missionId: workflow.id, reason: command.payload.reason });
 		});
 	});
 
@@ -51,12 +45,9 @@ export function createMissionRouter(deps: MissionDeps) {
 				...data,
 				secondsRemaining: command.payload.secondsRemaining,
 			});
-			emit({
-				type: "CountdownTick",
-				data: {
-					missionId: workflow.id,
-					secondsRemaining: command.payload.secondsRemaining,
-				},
+			emit("CountdownTick", {
+				missionId: workflow.id,
+				secondsRemaining: command.payload.secondsRemaining,
 			});
 		});
 
@@ -69,10 +60,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				heading: 90,
 				telemetryReadings: [],
 			});
-			emit({
-				type: "Launched",
-				data: { missionId: workflow.id },
-			});
+			emit("Launched", { missionId: workflow.id });
 		});
 
 		on("ScrubLaunch", ({ data, command, transition, emit, workflow }) => {
@@ -85,10 +73,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				reason: command.payload.reason,
 				attemptNumber: 1,
 			});
-			emit({
-				type: "LaunchScrubbed",
-				data: { missionId: workflow.id, reason: command.payload.reason },
-			});
+			emit("LaunchScrubbed", { missionId: workflow.id, reason: command.payload.reason });
 		});
 	});
 
@@ -99,7 +84,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				data.crewMembers.length,
 			);
 			if (!result.go) {
-				error({ code: "LaunchWindowClosed", data: {} });
+				error("LaunchWindowClosed", {});
 			}
 			transition("Countdown", {
 				name: data.name,
@@ -110,10 +95,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				telemetryStatus: "go",
 				secondsRemaining: 10,
 			});
-			emit({
-				type: "CountdownStarted",
-				data: { missionId: workflow.id },
-			});
+			emit("CountdownStarted", { missionId: workflow.id });
 		});
 	});
 
@@ -134,10 +116,7 @@ export function createMissionRouter(deps: MissionDeps) {
 					},
 				],
 			});
-			emit({
-				type: "TelemetryUpdated",
-				data: { missionId: workflow.id, altitude: command.payload.altitude },
-			});
+			emit("TelemetryUpdated", { missionId: workflow.id, altitude: command.payload.altitude });
 		});
 
 		on("AchieveOrbit", ({ data, transition, emit, workflow }) => {
@@ -146,10 +125,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				orbitAchievedAt: new Date(),
 				finalAltitude: data.altitude,
 			});
-			emit({
-				type: "OrbitAchieved",
-				data: { missionId: workflow.id, altitude: data.altitude },
-			});
+			emit("OrbitAchieved", { missionId: workflow.id, altitude: data.altitude });
 		});
 
 		on("TriggerAbort", ({ data, command, transition, emit, workflow }) => {
@@ -161,10 +137,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				reason: command.payload.reason,
 				lastKnownAltitude: data.altitude,
 			});
-			emit({
-				type: "MissionAborted",
-				data: { missionId: workflow.id, reason: command.payload.reason },
-			});
+			emit("MissionAborted", { missionId: workflow.id, reason: command.payload.reason });
 		});
 	});
 
@@ -174,10 +147,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				previousState: "OrbitAchieved" as const,
 				...data,
 			});
-			emit({
-				type: "MissionArchived",
-				data: { missionId: workflow.id, previousState: "OrbitAchieved" },
-			});
+			emit("MissionArchived", { missionId: workflow.id, previousState: "OrbitAchieved" });
 		});
 	});
 
@@ -187,10 +157,7 @@ export function createMissionRouter(deps: MissionDeps) {
 				previousState: "AbortSequence" as const,
 				...data,
 			});
-			emit({
-				type: "MissionArchived",
-				data: { missionId: workflow.id, previousState: "AbortSequence" },
-			});
+			emit("MissionArchived", { missionId: workflow.id, previousState: "AbortSequence" });
 		});
 	});
 
@@ -200,20 +167,14 @@ export function createMissionRouter(deps: MissionDeps) {
 				previousState: "Cancelled" as const,
 				...data,
 			});
-			emit({
-				type: "MissionArchived",
-				data: { missionId: workflow.id, previousState: "Cancelled" },
-			});
+			emit("MissionArchived", { missionId: workflow.id, previousState: "Cancelled" });
 		});
 	});
 
 	router.state("Archived", ({ on }) => {
 		on("Unarchive", ({ data, transition, emit, workflow }) => {
 			const { previousState, ...rest } = data;
-			emit({
-				type: "MissionUnarchived",
-				data: { missionId: workflow.id, restoredState: previousState },
-			});
+			emit("MissionUnarchived", { missionId: workflow.id, restoredState: previousState });
 			if (previousState === "OrbitAchieved") {
 				// biome-ignore lint/suspicious/noExplicitAny: Archived carries union of terminal data, previousState discriminates
 				transition("OrbitAchieved", rest as any);
