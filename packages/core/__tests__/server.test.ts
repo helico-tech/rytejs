@@ -215,3 +215,110 @@ describe("serializeForClient()", () => {
 		expect(client.data).toEqual(full.data);
 	});
 });
+
+describe("forClient()", () => {
+	const loanDef = defineWorkflow("loan", {
+		states: {
+			Review: z.object({
+				applicantName: z.string(),
+				ssn: server(z.string()),
+				internalScore: server(z.number()),
+			}),
+			Approved: z.object({
+				applicantName: z.string(),
+				approvedAmount: z.number(),
+				underwriterNotes: server(z.string()),
+			}),
+		},
+		commands: {
+			Approve: z.object({ amount: z.number() }),
+		},
+		events: {
+			LoanApproved: z.object({ loanId: z.string() }),
+		},
+		errors: {
+			CreditCheckFailed: z.object({ reason: z.string() }),
+		},
+	});
+
+	test("returns a client definition with name", () => {
+		const clientDef = loanDef.forClient();
+		expect(clientDef.name).toBe("loan");
+	});
+
+	test("is memoized — returns same instance", () => {
+		const a = loanDef.forClient();
+		const b = loanDef.forClient();
+		expect(a).toBe(b);
+	});
+
+	test("hasState() works for all states", () => {
+		const clientDef = loanDef.forClient();
+		expect(clientDef.hasState("Review")).toBe(true);
+		expect(clientDef.hasState("Approved")).toBe(true);
+		expect(clientDef.hasState("NonExistent")).toBe(false);
+	});
+
+	test("getStateSchema() returns client schema without server fields", () => {
+		const clientDef = loanDef.forClient();
+		const reviewSchema = clientDef.getStateSchema("Review");
+
+		expect(reviewSchema.safeParse({ applicantName: "Alice" }).success).toBe(true);
+		expect(reviewSchema.safeParse({ applicantName: "Alice", ssn: "123" }).success).toBe(false);
+	});
+
+	test("deserialize() validates against client schema", () => {
+		const clientDef = loanDef.forClient();
+
+		const result = clientDef.deserialize({
+			id: "loan-1",
+			definitionName: "loan",
+			state: "Review",
+			data: { applicantName: "Alice" },
+			createdAt: "2026-01-01T00:00:00.000Z",
+			updatedAt: "2026-01-01T00:00:00.000Z",
+			modelVersion: 1,
+			version: 1,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.workflow.state).toBe("Review");
+			expect(result.workflow.data).toEqual({ applicantName: "Alice" });
+		}
+	});
+
+	test("deserialize() rejects data with server fields", () => {
+		const clientDef = loanDef.forClient();
+
+		const result = clientDef.deserialize({
+			id: "loan-1",
+			definitionName: "loan",
+			state: "Review",
+			data: { applicantName: "Alice", ssn: "123-45-6789" },
+			createdAt: "2026-01-01T00:00:00.000Z",
+			updatedAt: "2026-01-01T00:00:00.000Z",
+			modelVersion: 1,
+			version: 1,
+		});
+
+		expect(result.ok).toBe(false);
+	});
+
+	test("deserialize() rejects unknown state", () => {
+		const clientDef = loanDef.forClient();
+
+		const result = clientDef.deserialize({
+			id: "loan-1",
+			definitionName: "loan",
+			state: "NonExistent",
+			data: {},
+			createdAt: "2026-01-01T00:00:00.000Z",
+			updatedAt: "2026-01-01T00:00:00.000Z",
+			modelVersion: 1,
+			version: 1,
+		});
+
+		expect(result.ok).toBe(false);
+	});
+});
