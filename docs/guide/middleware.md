@@ -50,4 +50,14 @@ Verified by test:
 
 <<< @/snippets/guide/middleware.ts#logging
 
+## State Matching
+
+Global middleware receives a union of all state data types. Use `ctx.match()` to narrow the data by state:
+
+<<< @/snippets/guide/middleware.ts#match
+
+For partial matching with a fallback:
+
+<<< @/snippets/guide/middleware.ts#match-partial
+
 See [Context Keys](/guide/context-keys) for the full `createKey` / `set` / `get` API.

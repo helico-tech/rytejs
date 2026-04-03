@@ -162,6 +162,49 @@ loggingRouter.use(async ({ workflow, command }, next) => {
 });
 // #endregion logging
 
+// ── #match ───────────────────────────────────────────────────────────────────
+
+const matchRouter = new WorkflowRouter(articleWorkflow);
+
+// #region match
+matchRouter.use(async (ctx, next) => {
+	ctx.match({
+		Draft: (data) => {
+			console.log("Draft title:", data.title); // data.title: string
+		},
+		Review: (data) => {
+			console.log("Reviewer:", data.reviewerId); // data.reviewerId: string
+		},
+		Published: (data) => {
+			console.log("Published at:", data.publishedAt); // data.publishedAt: Date
+		},
+	});
+	await next();
+});
+// #endregion match
+
+// ── #match-partial ───────────────────────────────────────────────────────────
+
+const partialMatchRouter = new WorkflowRouter(articleWorkflow);
+
+// #region match-partial
+partialMatchRouter.use(async (ctx, next) => {
+	ctx.match(
+		{
+			Published: (data) => {
+				console.log("Already published at:", data.publishedAt);
+			},
+		},
+		() => {
+			console.log("Not yet published");
+		},
+	);
+	await next();
+});
+// #endregion match-partial
+
 void inlineRouter;
 void authRouter;
 void loggingRouter;
+void matchRouter;
+void partialMatchRouter;
