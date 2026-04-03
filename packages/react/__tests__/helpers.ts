@@ -32,7 +32,7 @@ export function createTestRouter() {
 				title: "My Todo",
 				assignee: command.payload.assignee,
 			});
-			emit({ type: "TodoStarted", data: { assignee: command.payload.assignee } });
+			emit("TodoStarted", { assignee: command.payload.assignee });
 		});
 		on("Rename", ({ command, update }) => {
 			update({ title: command.payload.title });
@@ -45,7 +45,7 @@ export function createTestRouter() {
 				title: workflow.data.title,
 				completedAt: new Date(),
 			});
-			emit({ type: "TodoCompleted", data: { todoId: workflow.id } });
+			emit("TodoCompleted", { todoId: workflow.id });
 		});
 		on("Rename", ({ command, update }) => {
 			update({ title: command.payload.title });

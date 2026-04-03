@@ -52,7 +52,7 @@ export function createWorkflowStore<
 		isDispatching = true;
 		notify();
 
-		const result = await router.dispatch(workflow, { type: command, payload });
+		const result = await router.dispatch(workflow, command, payload);
 
 		if (result.ok) {
 			workflow = result.workflow;
