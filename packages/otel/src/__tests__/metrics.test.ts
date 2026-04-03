@@ -95,10 +95,7 @@ describe("otel metrics", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(result.ok).toBe(true);
 
 		await metricReader.forceFlush();
@@ -132,7 +129,7 @@ describe("otel metrics", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 
 		await metricReader.forceFlush();
 		const collected = metricExporter.getMetrics();
@@ -165,7 +162,7 @@ describe("otel metrics", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 
 		await metricReader.forceFlush();
 		const collected = metricExporter.getMetrics();
@@ -192,15 +189,12 @@ describe("otel metrics", () => {
 		);
 		router.state("Draft", (state) => {
 			state.on("Publish", (ctx) => {
-				ctx.error({ code: "TitleRequired", data: {} });
+				ctx.error("TitleRequired", {});
 			});
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(result.ok).toBe(false);
 
 		await metricReader.forceFlush();
@@ -226,10 +220,7 @@ describe("otel metrics", () => {
 		// No handlers registered — dispatch should return a router error
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(result.ok).toBe(false);
 
 		await metricReader.forceFlush();

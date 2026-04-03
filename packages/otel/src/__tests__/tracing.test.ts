@@ -68,7 +68,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		const result = await router.dispatch(wf, "Place", { total: 100 });
 
 		expect(result.ok).toBe(true);
 
@@ -99,7 +99,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		await router.dispatch(wf, "Place", { total: 100 });
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
@@ -120,7 +120,7 @@ describe("tracing plugin", () => {
 		router.state("Draft", ({ on }) => {
 			on("Place", ({ transition, command, emit, workflow }) => {
 				transition("Placed", { total: command.payload.total });
-				emit({ type: "OrderPlaced", data: { orderId: workflow.id } });
+				emit("OrderPlaced", { orderId: workflow.id });
 			});
 		});
 
@@ -128,7 +128,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		await router.dispatch(wf, "Place", { total: 100 });
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(1);
@@ -146,7 +146,7 @@ describe("tracing plugin", () => {
 		router.use(createOtelPlugin({ tracer }));
 		router.state("Draft", ({ on }) => {
 			on("Place", ({ error }) => {
-				error({ code: "OutOfStock", data: { item: "widget" } });
+				error("OutOfStock", { item: "widget" });
 			});
 		});
 
@@ -154,7 +154,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		const result = await router.dispatch(wf, "Place", { total: 100 });
 
 		expect(result.ok).toBe(false);
 
@@ -182,7 +182,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		const result = await router.dispatch(wf, "Place", { total: 100 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error.category).toBe("unexpected");
@@ -213,7 +213,7 @@ describe("tracing plugin", () => {
 			data: { items: [] },
 		});
 		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid payload
-		const result = await router.dispatch(wf, { type: "Place", payload: {} as any });
+		const result = await router.dispatch(wf, "Place", {} as any);
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error.category).toBe("validation");
@@ -249,7 +249,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		const result = await router.dispatch(wf, "Place", { total: 100 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error.category).toBe("dependency");
@@ -274,7 +274,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		const result = await router.dispatch(wf, "Place", { total: 100 });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -308,7 +308,7 @@ describe("tracing plugin", () => {
 			initialState: "Draft",
 			data: { items: [] },
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 100 } });
+		const result = await router.dispatch(wf, "Place", { total: 100 });
 
 		expect(result.ok).toBe(false);
 

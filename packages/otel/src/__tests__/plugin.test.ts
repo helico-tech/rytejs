@@ -50,7 +50,7 @@ describe("otel plugin integration", () => {
 			initialState: "Draft",
 			data: {},
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 42 } });
+		const result = await router.dispatch(wf, "Place", { total: 42 });
 
 		expect(result.ok).toBe(true);
 
@@ -73,7 +73,7 @@ describe("otel plugin integration", () => {
 			initialState: "Draft",
 			data: {},
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 42 } });
+		const result = await router.dispatch(wf, "Place", { total: 42 });
 
 		expect(result.ok).toBe(true);
 
@@ -101,8 +101,8 @@ describe("otel plugin integration", () => {
 			data: {},
 		});
 
-		await router.dispatch(wf1, { type: "Place", payload: { total: 10 } });
-		await router.dispatch(wf2, { type: "Place", payload: { total: 20 } });
+		await router.dispatch(wf1, "Place", { total: 10 });
+		await router.dispatch(wf2, "Place", { total: 20 });
 
 		const spans = exporter.getFinishedSpans();
 		expect(spans).toHaveLength(2);
@@ -135,7 +135,7 @@ describe("otel plugin integration", () => {
 			initialState: "Draft",
 			data: {},
 		});
-		const result = await router.dispatch(wf, { type: "Place", payload: { total: 42 } });
+		const result = await router.dispatch(wf, "Place", { total: 42 });
 
 		// Should not throw and should succeed
 		expect(result.ok).toBe(true);
