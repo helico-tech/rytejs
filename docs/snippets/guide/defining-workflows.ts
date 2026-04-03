@@ -48,7 +48,10 @@ const taskForDispatch = taskWorkflow.createWorkflow("task-dispatch", {
 
 // #region result-check
 (async () => {
-	const result = await router.dispatch(taskForDispatch, { type: "Start", payload: {} });
+	const result = await router.dispatch(taskForDispatch, {
+		type: "Start",
+		payload: { assignee: "alice" },
+	});
 
 	if (!result.ok && result.error.category === "domain") {
 		result.error.code; // "AlreadyAssigned" | "NotAssigned" | "DeadlinePassed"

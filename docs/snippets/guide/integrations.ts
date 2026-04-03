@@ -1,8 +1,8 @@
-import type { CommandNames } from "@rytejs/core";
+import type { Command } from "@rytejs/core";
 import { WorkflowRouter } from "@rytejs/core";
 import { taskWorkflow } from "../fixtures.js";
 
-type TaskCommand = { type: CommandNames<typeof taskWorkflow.config>; payload: unknown };
+type TaskCommand = Command<typeof taskWorkflow.config>;
 
 declare const store: {
 	get(id: string): Promise<unknown>;
