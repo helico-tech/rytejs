@@ -1,5 +1,4 @@
 import type { ZodType, z } from "zod";
-import type { ClientInfer } from "./server.js";
 
 /**
  * Shape of the configuration object passed to {@link defineWorkflow}.

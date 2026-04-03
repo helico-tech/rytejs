@@ -325,7 +325,7 @@ describe("forClient()", () => {
 });
 
 describe("client types", () => {
-	const loanDef = defineWorkflow("loan", {
+	const _loanDef = defineWorkflow("loan", {
 		states: {
 			Review: z.object({
 				applicantName: z.string(),
@@ -348,7 +348,7 @@ describe("client types", () => {
 		},
 	});
 
-	type LoanConfig = typeof loanDef.config;
+	type LoanConfig = typeof _loanDef.config;
 
 	test("ClientStateData excludes server fields", () => {
 		type ReviewClient = ClientStateData<LoanConfig, "Review">;

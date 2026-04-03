@@ -354,7 +354,6 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 
 					return {
 						ok: true,
-						// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
 						workflow: {
 							id: snap.id,
 							definitionName: snap.definitionName,
@@ -362,6 +361,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 							data: result.data,
 							createdAt: new Date(snap.createdAt),
 							updatedAt: new Date(snap.updatedAt),
+							// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
 						} as any,
 					};
 				},

@@ -27,7 +27,6 @@ export { SERVER_BRAND };
 type ServerBranded = { readonly [SERVER_BRAND]: true };
 
 /** Computes the client-safe inferred type from a Zod schema by filtering out server-branded fields. */
-// biome-ignore lint/suspicious/noExplicitAny: matching against any ZodObject shape regardless of config
 export type ClientInfer<T extends ZodType> = T extends {
 	shape: infer Shape extends Record<string, ZodType>;
 }
