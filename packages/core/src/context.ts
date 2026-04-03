@@ -33,6 +33,9 @@ export interface Context<
 	/** Dependencies injected via the router constructor. */
 	readonly deps: TDeps;
 
+	/** Validated command payload (shorthand for `command.payload`). */
+	readonly payload: CommandPayload<TConfig, TCommand>;
+
 	/** Current state data (reflects mutations from {@link update}). */
 	readonly data: StateData<TConfig, TState>;
 	/**
@@ -144,6 +147,10 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 			options?.wrapDeps !== false && deps != null && typeof deps === "object"
 				? (wrapDepsProxy(deps as object) as TDeps)
 				: deps,
+
+		get payload() {
+			return command.payload;
+		},
 
 		get state() {
 			return mutableState;
