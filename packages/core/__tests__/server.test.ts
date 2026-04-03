@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
+import { defineWorkflow } from "../src/definition.js";
 import { deriveClientSchema, isServerField, server, stripServerData } from "../src/server.js";
 
 describe("server()", () => {
@@ -119,5 +120,98 @@ describe("deriveClientSchema()", () => {
 
 		expect(clientSchema.safeParse({}).success).toBe(true);
 		expect(clientSchema.safeParse({ ssn: "123" }).success).toBe(false);
+	});
+});
+
+describe("serializeForClient()", () => {
+	const loanDef = defineWorkflow("loan", {
+		states: {
+			Review: z.object({
+				applicantName: z.string(),
+				ssn: server(z.string()),
+				internalScore: server(z.number()),
+			}),
+			Approved: z.object({
+				applicantName: z.string(),
+				approvedAmount: z.number(),
+				underwriterNotes: server(z.string()),
+			}),
+		},
+		commands: {
+			Approve: z.object({ amount: z.number() }),
+		},
+		events: {
+			LoanApproved: z.object({ loanId: z.string() }),
+		},
+		errors: {
+			CreditCheckFailed: z.object({ reason: z.string() }),
+		},
+	});
+
+	test("strips server fields from snapshot data", () => {
+		const wf = loanDef.createWorkflow("loan-1", {
+			initialState: "Review",
+			data: { applicantName: "Alice", ssn: "123-45-6789", internalScore: 95 },
+		});
+
+		const fullSnapshot = loanDef.serialize(wf);
+		const clientSnapshot = loanDef.serializeForClient(wf);
+
+		expect(fullSnapshot.data).toEqual({
+			applicantName: "Alice",
+			ssn: "123-45-6789",
+			internalScore: 95,
+		});
+		expect(clientSnapshot.data).toEqual({
+			applicantName: "Alice",
+		});
+	});
+
+	test("preserves all non-data snapshot fields", () => {
+		const wf = loanDef.createWorkflow("loan-1", {
+			initialState: "Review",
+			data: { applicantName: "Alice", ssn: "123-45-6789", internalScore: 95 },
+		});
+
+		const fullSnapshot = loanDef.serialize(wf);
+		const clientSnapshot = loanDef.serializeForClient(wf);
+
+		expect(clientSnapshot.id).toBe(fullSnapshot.id);
+		expect(clientSnapshot.definitionName).toBe(fullSnapshot.definitionName);
+		expect(clientSnapshot.state).toBe(fullSnapshot.state);
+		expect(clientSnapshot.createdAt).toBe(fullSnapshot.createdAt);
+		expect(clientSnapshot.updatedAt).toBe(fullSnapshot.updatedAt);
+		expect(clientSnapshot.modelVersion).toBe(fullSnapshot.modelVersion);
+		expect(clientSnapshot.version).toBe(fullSnapshot.version);
+	});
+
+	test("works with different states", () => {
+		const wf = loanDef.createWorkflow("loan-2", {
+			initialState: "Approved",
+			data: { applicantName: "Bob", approvedAmount: 50000, underwriterNotes: "Good credit" },
+		});
+
+		const clientSnapshot = loanDef.serializeForClient(wf);
+		expect(clientSnapshot.data).toEqual({
+			applicantName: "Bob",
+			approvedAmount: 50000,
+		});
+	});
+
+	test("returns same data as serialize() when no server fields", () => {
+		const simpleDef = defineWorkflow("simple", {
+			states: { Active: z.object({ name: z.string() }) },
+			commands: { DoThing: z.object({}) },
+			events: { ThingDone: z.object({}) },
+			errors: { Oops: z.object({}) },
+		});
+		const wf = simpleDef.createWorkflow("s-1", {
+			initialState: "Active",
+			data: { name: "test" },
+		});
+
+		const full = simpleDef.serialize(wf);
+		const client = simpleDef.serializeForClient(wf);
+		expect(client.data).toEqual(full.data);
 	});
 });

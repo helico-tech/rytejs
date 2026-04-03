@@ -1,4 +1,5 @@
 import type { ZodType, z } from "zod";
+import { deriveClientSchema, stripServerData } from "./server.js";
 import type { WorkflowSnapshot } from "./snapshot.js";
 import type {
 	StateData,
@@ -87,6 +88,31 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	deserialize(
 		snapshot: WorkflowSnapshot<TConfig>,
 	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
+	/**
+	 * Serializes a workflow into a client-safe snapshot with server-only fields stripped.
+	 *
+	 * @param workflow - The workflow instance to serialize
+	 * @returns A {@link WorkflowSnapshot} with server-only fields removed from `data`
+	 */
+	serializeForClient(workflow: Workflow<TConfig>): WorkflowSnapshot<TConfig>;
+	/**
+	 * Returns a client-safe projection of this definition.
+	 * Memoized — returns the same instance on repeated calls.
+	 */
+	forClient(): ClientWorkflowDefinition<TConfig>;
+}
+
+/**
+ * A client-safe projection of a workflow definition.
+ * State schemas have server-only fields removed. Returned by {@link WorkflowDefinition.forClient}.
+ */
+export interface ClientWorkflowDefinition<TConfig extends WorkflowConfig = WorkflowConfig> {
+	readonly name: string;
+	getStateSchema(stateName: string): ZodType;
+	hasState(stateName: string): boolean;
+	deserialize(
+		snapshot: WorkflowSnapshot<TConfig>,
+	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
 }
 
 /**
@@ -115,6 +141,9 @@ export function defineWorkflow<const TConfig extends WorkflowConfigInput>(
 >;
 // biome-ignore lint/suspicious/noExplicitAny: implementation overload — public signature above provides consumer-facing type safety; internally TConfig extends WorkflowConfigInput which lacks _resolved
 export function defineWorkflow(name: string, config: WorkflowConfigInput): WorkflowDefinition<any> {
+	// biome-ignore lint/suspicious/noExplicitAny: memoized client definition — typed via public interface ClientWorkflowDefinition
+	let cachedClientDef: any = null;
+
 	return {
 		config,
 		name,
@@ -239,6 +268,101 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				},
 				// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
 			} as any;
+		},
+
+		serializeForClient(workflow: {
+			id: string;
+			state: string;
+			data: unknown;
+			createdAt: Date;
+			updatedAt: Date;
+			version?: number;
+		}) {
+			const stateSchema = config.states[workflow.state];
+			const strippedData = stateSchema
+				? stripServerData(stateSchema, workflow.data as Record<string, unknown>)
+				: workflow.data;
+
+			return {
+				id: workflow.id,
+				definitionName: name,
+				state: workflow.state,
+				data: strippedData,
+				createdAt: workflow.createdAt.toISOString(),
+				updatedAt: workflow.updatedAt.toISOString(),
+				modelVersion: config.modelVersion ?? 1,
+				version: workflow.version ?? 1,
+			};
+		},
+
+		forClient() {
+			if (cachedClientDef) return cachedClientDef;
+
+			const clientSchemas: Record<string, ZodType> = {};
+			for (const [stateName, schema] of Object.entries(config.states)) {
+				clientSchemas[stateName] = deriveClientSchema(schema);
+			}
+
+			cachedClientDef = {
+				name,
+
+				getStateSchema(stateName: string): ZodType {
+					const schema = clientSchemas[stateName];
+					if (!schema) throw new Error(`Unknown state: ${stateName}`);
+					return schema;
+				},
+
+				hasState(stateName: string): boolean {
+					return stateName in clientSchemas;
+				},
+
+				deserialize(snap: {
+					id: string;
+					definitionName: string;
+					state: string;
+					data: unknown;
+					createdAt: string;
+					updatedAt: string;
+				}) {
+					const stateSchema = clientSchemas[snap.state];
+					if (!stateSchema) {
+						return {
+							ok: false,
+							error: new ValidationError("restore", [
+								{
+									code: "custom",
+									message: `Unknown state: ${snap.state}`,
+									input: snap.state,
+									path: ["state"],
+								},
+							]),
+						};
+					}
+
+					const result = stateSchema.safeParse(snap.data);
+					if (!result.success) {
+						return {
+							ok: false,
+							error: new ValidationError("restore", result.error.issues),
+						};
+					}
+
+					return {
+						ok: true,
+						// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
+						workflow: {
+							id: snap.id,
+							definitionName: snap.definitionName,
+							state: snap.state,
+							data: result.data,
+							createdAt: new Date(snap.createdAt),
+							updatedAt: new Date(snap.updatedAt),
+						} as any,
+					};
+				},
+			};
+
+			return cachedClientDef;
 		},
 	};
 }
