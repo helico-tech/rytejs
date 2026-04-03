@@ -6,7 +6,9 @@ import type { GenericPlugin, Plugin } from "./plugin.js";
 import { isPlugin } from "./plugin.js";
 import type { ReadonlyContext } from "./readonly-context.js";
 import type {
+	Command,
 	CommandNames,
+	CommandPayload,
 	DispatchResult,
 	ErrorCodes,
 	ErrorData,
@@ -219,16 +221,13 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	 */
 	on(
 		event: "dispatch:start",
-		callback: (
-			workflow: Workflow<TConfig>,
-			command: { type: CommandNames<TConfig>; payload: unknown },
-		) => void | Promise<void>,
+		callback: (workflow: Workflow<TConfig>, command: Command<TConfig>) => void | Promise<void>,
 	): this;
 	on(
 		event: "dispatch:end",
 		callback: (
 			workflow: Workflow<TConfig>,
-			command: { type: CommandNames<TConfig>; payload: unknown },
+			command: Command<TConfig>,
 			result: DispatchResult<TConfig>,
 		) => void | Promise<void>,
 	): this;
@@ -325,9 +324,9 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	 * @param command - The command with its type and payload
 	 * @returns A {@link DispatchResult} indicating success or failure with the updated workflow and events
 	 */
-	async dispatch(
+	async dispatch<C extends CommandNames<TConfig>>(
 		workflow: Workflow<TConfig>,
-		command: { type: CommandNames<TConfig>; payload: unknown },
+		command: { type: C; payload: CommandPayload<TConfig, C> },
 	): Promise<DispatchResult<TConfig>> {
 		// Hook: dispatch:start (fires before any validation)
 		await this.hookRegistry.emit("dispatch:start", this.onHookError, workflow, command);

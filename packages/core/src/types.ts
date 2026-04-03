@@ -46,6 +46,11 @@ export type ErrorCodes<T extends WorkflowConfig> = keyof T["errors"] & string;
 /** Forces TypeScript to flatten a type for better IDE autocomplete. */
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
+/** Discriminated union of all commands with typed payloads — narrows payload when checking type. */
+export type Command<T extends WorkflowConfig> = {
+	[C in CommandNames<T>]: { type: C; payload: CommandPayload<T, C> };
+}[CommandNames<T>];
+
 /** Resolves the data type for a given state from pre-computed types. */
 export type StateData<T extends WorkflowConfig, S extends StateNames<T>> = Prettify<
 	T["_resolved"]["states"][S]

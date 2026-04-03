@@ -26,6 +26,7 @@ export type {
 	ClientStateData,
 	ClientWorkflow,
 	ClientWorkflowOf,
+	Command,
 	CommandNames,
 	CommandPayload,
 	ConfigOf,
