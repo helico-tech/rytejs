@@ -1,7 +1,9 @@
 import type { ZodType, z } from "zod";
+import type { ClientInfer } from "./server.js";
 import { deriveClientSchema, stripServerData } from "./server.js";
 import type { WorkflowSnapshot } from "./snapshot.js";
 import type {
+	ClientWorkflow,
 	StateData,
 	StateNames,
 	Workflow,
@@ -112,7 +114,7 @@ export interface ClientWorkflowDefinition<TConfig extends WorkflowConfig = Workf
 	hasState(stateName: string): boolean;
 	deserialize(
 		snapshot: WorkflowSnapshot<TConfig>,
-	): { ok: true; workflow: Workflow<TConfig> } | { ok: false; error: ValidationError };
+	): { ok: true; workflow: ClientWorkflow<TConfig> } | { ok: false; error: ValidationError };
 }
 
 /**
@@ -136,6 +138,9 @@ export function defineWorkflow<const TConfig extends WorkflowConfigInput>(
 			commands: { [K in keyof TConfig["commands"]]: z.infer<TConfig["commands"][K]> };
 			events: { [K in keyof TConfig["events"]]: z.infer<TConfig["events"][K]> };
 			errors: { [K in keyof TConfig["errors"]]: z.infer<TConfig["errors"][K]> };
+		};
+		_clientResolved: {
+			states: { [K in keyof TConfig["states"]]: ClientInfer<TConfig["states"][K]> };
 		};
 	}
 >;

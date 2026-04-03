@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import { defineWorkflow } from "../src/definition.js";
 import { deriveClientSchema, isServerField, server, stripServerData } from "../src/server.js";
+import type { ClientStateData } from "../src/types.js";
 
 describe("server()", () => {
 	test("marks a schema as server-only", () => {
@@ -320,5 +321,51 @@ describe("forClient()", () => {
 		});
 
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe("client types", () => {
+	const loanDef = defineWorkflow("loan", {
+		states: {
+			Review: z.object({
+				applicantName: z.string(),
+				ssn: server(z.string()),
+				internalScore: server(z.number()),
+			}),
+			Approved: z.object({
+				applicantName: z.string(),
+				approvedAmount: z.number(),
+			}),
+		},
+		commands: {
+			Approve: z.object({ amount: z.number() }),
+		},
+		events: {
+			LoanApproved: z.object({ loanId: z.string() }),
+		},
+		errors: {
+			CreditCheckFailed: z.object({ reason: z.string() }),
+		},
+	});
+
+	type LoanConfig = typeof loanDef.config;
+
+	test("ClientStateData excludes server fields", () => {
+		type ReviewClient = ClientStateData<LoanConfig, "Review">;
+
+		const valid: ReviewClient = { applicantName: "Alice" };
+		expect(valid.applicantName).toBe("Alice");
+
+		// @ts-expect-error — ssn should not exist on client type
+		const _ssn: ReviewClient = { applicantName: "Alice", ssn: "123" };
+
+		// @ts-expect-error — internalScore should not exist on client type
+		const _score: ReviewClient = { applicantName: "Alice", internalScore: 95 };
+	});
+
+	test("ClientStateData preserves all fields when no server markers", () => {
+		type ApprovedClient = ClientStateData<LoanConfig, "Approved">;
+		const valid: ApprovedClient = { applicantName: "Bob", approvedAmount: 50000 };
+		expect(valid.approvedAmount).toBe(50000);
 	});
 });

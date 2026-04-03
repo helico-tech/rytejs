@@ -1,4 +1,5 @@
 import type { ZodType, z } from "zod";
+import type { ClientInfer } from "./server.js";
 
 /**
  * Shape of the configuration object passed to {@link defineWorkflow}.
@@ -33,6 +34,9 @@ export interface WorkflowConfig extends WorkflowConfigInput {
 		events: Record<string, unknown>;
 		errors: Record<string, unknown>;
 	};
+	_clientResolved: {
+		states: Record<string, unknown>;
+	};
 }
 
 export type StateNames<T extends WorkflowConfig> = keyof T["states"] & string;
@@ -47,6 +51,26 @@ type Prettify<T> = { [K in keyof T]: T[K] } & {};
 export type StateData<T extends WorkflowConfig, S extends StateNames<T>> = Prettify<
 	T["_resolved"]["states"][S]
 >;
+
+/** Resolves the client-safe data type for a given state (server fields stripped). */
+export type ClientStateData<T extends WorkflowConfig, S extends StateNames<T>> = Prettify<
+	T["_clientResolved"]["states"][S]
+>;
+
+/** Client-side workflow narrowed to a specific known state. */
+export interface ClientWorkflowOf<TConfig extends WorkflowConfig, S extends StateNames<TConfig>> {
+	readonly id: string;
+	readonly definitionName: string;
+	readonly state: S;
+	readonly data: ClientStateData<TConfig, S>;
+	readonly createdAt: Date;
+	readonly updatedAt: Date;
+}
+
+/** Discriminated union of all possible client-side workflow states. */
+export type ClientWorkflow<TConfig extends WorkflowConfig = WorkflowConfig> = {
+	[S in StateNames<TConfig>]: ClientWorkflowOf<TConfig, S>;
+}[StateNames<TConfig>];
 
 /** Resolves the payload type for a given command from pre-computed types. */
 export type CommandPayload<T extends WorkflowConfig, C extends CommandNames<T>> = Prettify<

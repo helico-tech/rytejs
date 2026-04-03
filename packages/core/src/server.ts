@@ -24,6 +24,22 @@ export function isServerField(schema: ZodType): boolean {
 
 export { SERVER_BRAND };
 
+type ServerBranded = { readonly [SERVER_BRAND]: true };
+
+/** Computes the client-safe inferred type from a Zod schema by filtering out server-branded fields. */
+// biome-ignore lint/suspicious/noExplicitAny: matching against any ZodObject shape regardless of config
+export type ClientInfer<T extends ZodType> = T extends {
+	shape: infer Shape extends Record<string, ZodType>;
+}
+	? {
+			[K in keyof Shape as Shape[K] extends ServerBranded ? never : K]: Shape[K] extends {
+				shape: Record<string, ZodType>;
+			}
+				? ClientInfer<Shape[K]>
+				: z.infer<Shape[K]>;
+		}
+	: z.infer<T>;
+
 /**
  * Strips server-only fields from workflow data based on the state's Zod schema.
  * Recursively processes nested z.object() schemas.
