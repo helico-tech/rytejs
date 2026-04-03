@@ -27,6 +27,13 @@ describe("server()", () => {
 		expect(isServerField(schema)).toBe(true);
 		expect(schema.safeParse({ a: 1, b: "x" }).success).toBe(true);
 	});
+
+	test("does not mutate the original schema", () => {
+		const original = z.string();
+		const branded = server(original);
+		expect(isServerField(branded)).toBe(true);
+		expect(isServerField(original)).toBe(false);
+	});
 });
 
 describe("stripServerData()", () => {

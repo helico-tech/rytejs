@@ -9,11 +9,15 @@ export type Server<T extends ZodType> = T & { readonly [SERVER_BRAND]: true };
 /**
  * Marks a Zod schema as server-only. Fields wrapped in `server()` are stripped
  * from client snapshots and excluded from client TypeScript types.
+ *
+ * Returns a new schema reference — the original is not mutated, so shared
+ * schemas can safely be used in both server and non-server positions.
  */
 export function server<T extends ZodType>(schema: T): Server<T> {
-	// biome-ignore lint/suspicious/noExplicitAny: attaching runtime brand to Zod schema for server field detection
-	(schema as any)[SERVER_BRAND] = true;
-	return schema as Server<T>;
+	// biome-ignore lint/suspicious/noExplicitAny: creating a branded proxy that inherits all Zod behavior via prototype
+	const branded = Object.create(schema) as any;
+	branded[SERVER_BRAND] = true;
+	return branded as Server<T>;
 }
 
 /** Returns `true` if the schema was wrapped with `server()`. */
@@ -21,8 +25,6 @@ export function isServerField(schema: ZodType): boolean {
 	// biome-ignore lint/suspicious/noExplicitAny: reading runtime brand from Zod schema
 	return (schema as any)[SERVER_BRAND] === true;
 }
-
-export { SERVER_BRAND };
 
 type ServerBranded = { readonly [SERVER_BRAND]: true };
 

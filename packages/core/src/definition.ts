@@ -109,6 +109,8 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
  * State schemas have server-only fields removed. Returned by {@link WorkflowDefinition.forClient}.
  */
 export interface ClientWorkflowDefinition<TConfig extends WorkflowConfig = WorkflowConfig> {
+	/** The raw Zod schema configuration. */
+	readonly config: TConfig;
 	readonly name: string;
 	getStateSchema(stateName: string): ZodType;
 	hasState(stateName: string): boolean;
@@ -309,6 +311,7 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			}
 
 			cachedClientDef = {
+				config,
 				name,
 
 				getStateSchema(stateName: string): ZodType {
