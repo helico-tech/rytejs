@@ -51,19 +51,24 @@ export interface Context<
 		data: StateData<TConfig, Target>,
 	): void;
 
+	/** Current state name (reflects mutations from {@link transition}). */
+	readonly state: TState;
+
 	/**
 	 * Emits a domain event. Validates event data against the event's Zod schema.
-	 * @param event - Event with type and data
+	 * @param type - Event type name
+	 * @param data - Event data matching the event's schema
 	 */
-	emit<E extends EventNames<TConfig>>(event: { type: E; data: EventData<TConfig, E> }): void;
+	emit<E extends EventNames<TConfig>>(type: E, data: EventData<TConfig, E>): void;
 	/** Accumulated events emitted during this dispatch. */
 	readonly events: ReadonlyArray<{ type: EventNames<TConfig>; data: unknown }>;
 
 	/**
 	 * Signals a domain error. Validates error data and throws internally (caught by the router).
-	 * @param err - Error with code and data
+	 * @param code - Error code
+	 * @param data - Error data matching the error code's schema
 	 */
-	error<C extends ErrorCodes<TConfig>>(err: { code: C; data: ErrorData<TConfig, C> }): never;
+	error<C extends ErrorCodes<TConfig>>(code: C, data: ErrorData<TConfig, C>): never;
 
 	/**
 	 * Pattern-matches on the current state, calling the matching callback with narrowed data.
@@ -140,6 +145,10 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 				? (wrapDepsProxy(deps as object) as TDeps)
 				: deps,
 
+		get state() {
+			return mutableState;
+		},
+
 		get data() {
 			return { ...mutableData } as StateData<TConfig, StateNames<TConfig>>;
 		},
@@ -156,7 +165,14 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 
 		transition(target: string, data: unknown) {
 			if (!definition.hasState(target)) {
-				throw new Error(`Unknown state: ${target}`);
+				throw new ValidationError("transition", [
+					{
+						code: "custom",
+						message: `Unknown state: ${target}`,
+						input: target,
+						path: ["state"],
+					},
+				]);
 			}
 			const schema = definition.getStateSchema(target);
 			const result = schema.safeParse(data);
@@ -167,28 +183,26 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 			mutableData = result.data as Record<string, unknown>;
 		},
 
-		emit(event: { type: string; data: unknown }) {
-			const schema = definition.getEventSchema(event.type);
-			const result = schema.safeParse(event.data);
+		emit(type: string, data: unknown) {
+			const schema = definition.getEventSchema(type);
+			const result = schema.safeParse(data);
 			if (!result.success) {
 				throw new ValidationError("event", result.error.issues);
 			}
-			accumulatedEvents.push({ type: event.type, data: result.data });
+			accumulatedEvents.push({ type, data: result.data });
 		},
 
 		get events() {
 			return [...accumulatedEvents];
 		},
 
-		error(err: { code: string; data: unknown }) {
-			const schema = definition.getErrorSchema(err.code);
-			const result = schema.safeParse(err.data);
+		error(code: string, data: unknown) {
+			const schema = definition.getErrorSchema(code);
+			const result = schema.safeParse(data);
 			if (!result.success) {
-				throw new Error(
-					`Invalid error data for '${err.code}': ${result.error.issues.map((i) => i.message).join(", ")}`,
-				);
+				throw new ValidationError("state", result.error.issues);
 			}
-			throw new DomainErrorSignal(err.code, result.data);
+			throw new DomainErrorSignal(code, result.data);
 		},
 
 		match(

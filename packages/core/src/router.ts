@@ -326,8 +326,10 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	 */
 	async dispatch<C extends CommandNames<TConfig>>(
 		workflow: Workflow<TConfig>,
-		command: { type: C; payload: CommandPayload<TConfig, C> },
+		type: C,
+		payload: CommandPayload<TConfig, C>,
 	): Promise<DispatchResult<TConfig>> {
+		const command = { type, payload };
 		// Hook: dispatch:start (fires before any validation)
 		await this.hookRegistry.emit("dispatch:start", this.onHookError, workflow, command);
 

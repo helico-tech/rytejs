@@ -145,7 +145,11 @@ export class WorkflowExecutor<TConfig extends WorkflowConfig> {
 
 			// as never: type erasure — executor holds WorkflowConfig base type,
 			// but dispatch validates commands against Zod schemas at runtime
-			const dispatchResult = await router.dispatch(restoreResult.workflow, ctx.command as never);
+			const dispatchResult = await router.dispatch(
+				restoreResult.workflow,
+				ctx.command.type as never,
+				ctx.command.payload as never,
+			);
 
 			// biome-ignore lint/suspicious/noExplicitAny: type erasure — DispatchResult<TConfig> assigned to DispatchResult<WorkflowConfig>
 			ctx.result = dispatchResult as any;
