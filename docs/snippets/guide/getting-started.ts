@@ -23,13 +23,13 @@ const taskWorkflow = defineWorkflow("task", {
 const router = new WorkflowRouter(taskWorkflow).state("Todo", ({ on }) => {
 	on("Complete", ({ data, error, transition, emit, workflow }) => {
 		if (!data.assignee) {
-			error({ code: "NotAssigned", data: {} });
+			error("NotAssigned", {});
 		}
 		transition("Done", {
 			title: data.title,
 			completedAt: new Date(),
 		});
-		emit({ type: "TaskCompleted", data: { taskId: workflow.id } });
+		emit("TaskCompleted", { taskId: workflow.id });
 	});
 });
 // #endregion router
@@ -41,10 +41,7 @@ const router = new WorkflowRouter(taskWorkflow).state("Todo", ({ on }) => {
 		data: { title: "Read the docs", assignee: "alice" },
 	});
 
-	const result = await router.dispatch(task, {
-		type: "Complete",
-		payload: {},
-	});
+	const result = await router.dispatch(task, "Complete", {});
 
 	if (result.ok) {
 		console.log(result.workflow.state); // "Done"

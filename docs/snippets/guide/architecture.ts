@@ -1,4 +1,4 @@
-import type { WorkflowSnapshot } from "@rytejs/core";
+import type { Command, WorkflowSnapshot } from "@rytejs/core";
 import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
 import { z } from "zod";
 
@@ -38,8 +38,7 @@ declare const db: {
 
 declare const workflowId: string;
 
-// command typed to match what router.dispatch() expects
-declare const command: Parameters<typeof router.dispatch>[1];
+declare const command: Command<typeof orderWorkflow.config>;
 
 declare const paymentService: {
 	charge(total: number): Promise<{ ok: boolean }>;
@@ -55,7 +54,7 @@ declare const paymentService: {
 	if (!restored.ok) throw new Error("Invalid workflow");
 
 	// 2. Domain — pure logic, no side effects
-	const result = await router.dispatch(restored.workflow, command);
+	const result = await router.dispatch(restored.workflow, command.type, command.payload);
 
 	// 3. IO out — persist + publish
 	if (result.ok) {
@@ -77,7 +76,7 @@ const badRouter = new WorkflowRouter(orderWorkflow);
 badRouter.state("Pending", ({ on }) => {
 	on("PlaceOrder", async ({ data, error, transition }) => {
 		const charge = await paymentService.charge(data.total); // IO in handler
-		if (!charge.ok) return error({ code: "PaymentFailed", data: {} });
+		if (!charge.ok) return error("PaymentFailed", {});
 		transition("Placed", { total: data.total, sku: data.sku });
 	});
 });
@@ -87,7 +86,7 @@ const goodRouter = new WorkflowRouter(orderWorkflow);
 goodRouter.state("Pending", ({ on }) => {
 	on("PlaceOrder", ({ data, transition, emit, workflow }) => {
 		transition("Placed", { total: data.total, sku: data.sku });
-		emit({ type: "OrderPlaced", data: { orderId: workflow.id, total: data.total } });
+		emit("OrderPlaced", { orderId: workflow.id, total: data.total });
 	});
 });
 // #endregion pure-handlers
@@ -98,10 +97,7 @@ const order = orderWorkflow.createWorkflow("order-1", {
 });
 
 (async () => {
-	const result = await goodRouter.dispatch(order, {
-		type: "PlaceOrder",
-		payload: {},
-	});
+	const result = await goodRouter.dispatch(order, "PlaceOrder", {});
 
 	// After dispatch, the IO layer processes events
 	if (result.ok) {
@@ -129,10 +125,10 @@ depsRouter.state("Pending", ({ on }) => {
 	on("PlaceOrder", async ({ deps, data, error, transition, emit, workflow }) => {
 		const inStock = await deps.inventory.check(data.sku);
 		if (!inStock) {
-			return error({ code: "OutOfStock", data: { sku: data.sku } });
+			return error("OutOfStock", { sku: data.sku });
 		}
 		transition("Placed", { total: data.total, sku: data.sku });
-		emit({ type: "OrderPlaced", data: { orderId: workflow.id, total: data.total } });
+		emit("OrderPlaced", { orderId: workflow.id, total: data.total });
 	});
 });
 // #endregion deps-reads

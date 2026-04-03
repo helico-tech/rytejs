@@ -33,17 +33,11 @@ taskRouter.state("Todo", ({ on }) => {
 			title: data.title,
 			assignee: command.payload.assignee,
 		});
-		emit({
-			type: "TaskStarted",
-			data: { taskId: workflow.id, assignee: command.payload.assignee },
-		});
+		emit("TaskStarted", { taskId: workflow.id, assignee: command.payload.assignee });
 	});
 	on("Rename", ({ command, update, emit, workflow }) => {
 		update({ title: command.payload.title });
-		emit({
-			type: "TaskRenamed",
-			data: { taskId: workflow.id, title: command.payload.title },
-		});
+		emit("TaskRenamed", { taskId: workflow.id, title: command.payload.title });
 	});
 });
 
@@ -53,10 +47,7 @@ taskRouter.state("InProgress", ({ on }) => {
 			title: data.title,
 			completedAt: new Date(),
 		});
-		emit({
-			type: "TaskCompleted",
-			data: { taskId: workflow.id },
-		});
+		emit("TaskCompleted", { taskId: workflow.id });
 	});
 });
 

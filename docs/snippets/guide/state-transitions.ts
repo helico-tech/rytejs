@@ -58,7 +58,7 @@ const rollbackRouter = new WorkflowRouter(taskWorkflow);
 rollbackRouter.state("Todo", ({ on }) => {
 	on("Start", ({ update, error }) => {
 		update({ title: "Modified" }); // provisional
-		error({ code: "NotAllowed", data: {} }); // throws -- update is discarded
+		error("NotAllowed", {}); // throws -- update is discarded
 	});
 });
 
@@ -68,7 +68,7 @@ const task = taskWorkflow.createWorkflow("task-1", {
 });
 
 (async () => {
-	const result = await rollbackRouter.dispatch(task, { type: "Start", payload: { assignee: "x" } });
+	const result = await rollbackRouter.dispatch(task, "Start", { assignee: "x" });
 	// result.ok === false
 	// task.data.title is still the original value
 	void result;

@@ -32,16 +32,13 @@ const orderRouter = new WorkflowRouter(orderWorkflow);
 orderRouter.state("Created", ({ on }) => {
 	on("Pay", ({ command, data, error, transition, emit, workflow }) => {
 		if (command.payload.amount < data.total) {
-			error({
-				code: "InsufficientPayment",
-				data: {
-					required: data.total,
-					received: command.payload.amount,
-				},
+			error("InsufficientPayment", {
+				required: data.total,
+				received: command.payload.amount,
 			});
 		}
 		transition("Paid", { total: data.total, paidAt: new Date() });
-		emit({ type: "OrderPaid", data: { orderId: workflow.id } });
+		emit("OrderPaid", { orderId: workflow.id });
 	});
 });
 // #endregion domain-handler
@@ -72,7 +69,7 @@ const taskRouter = new WorkflowRouter(taskWorkflow);
 		data: { title: "Original" },
 	});
 
-	const result = await taskRouter.dispatch(task, { type: "Start", payload: { assignee: "x" } });
+	const result = await taskRouter.dispatch(task, "Start", { assignee: "x" });
 
 	if (!result.ok) {
 		console.log(task.state); // still "Todo"

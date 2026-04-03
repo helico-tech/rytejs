@@ -73,7 +73,7 @@ accessRouter.state("Review", ({ on }) => {
 	on("Approve", async ({ deps, data, error, transition }) => {
 		const canApprove = deps.reviewService.canApprove(data.reviewerId);
 		if (!canApprove) {
-			error({ code: "NotReviewer", data: { expected: data.reviewerId } });
+			error("NotReviewer", { expected: data.reviewerId });
 		}
 
 		transition("Published", {
@@ -122,7 +122,7 @@ const router = new WorkflowRouter(articleWorkflow, {
 router.state("Draft", ({ on }) => {
 	on("Publish", async ({ data, deps, error, transition, emit, workflow }) => {
 		if (!data.body) {
-			error({ code: "BodyRequired", data: {} });
+			error("BodyRequired", {});
 		}
 
 		const count = await deps.notifier.notifySubscribers(workflow.id);
@@ -134,10 +134,7 @@ router.state("Draft", ({ on }) => {
 			publishedAt: new Date(),
 		});
 
-		emit({
-			type: "ArticlePublished",
-			data: { articleId: workflow.id, notifiedSubscribers: count },
-		});
+		emit("ArticlePublished", { articleId: workflow.id, notifiedSubscribers: count });
 	});
 });
 // #endregion complete

@@ -46,7 +46,8 @@ app.post("/workflows/:id/dispatch", async (req, res) => {
   const restored = taskWorkflow.deserialize(snapshot);
   if (!restored.ok) return res.status(500).json({ error: "Invalid data" });
 
-  const result = await router.dispatch(restored.workflow, req.body);
+  const { type, payload } = req.body;
+  const result = await router.dispatch(restored.workflow, type, payload);
 
   if (result.ok) {
     store.set(req.params.id, taskWorkflow.serialize(result.workflow));
@@ -104,7 +105,8 @@ app.post("/workflows/:id/dispatch", async (c) => {
   const restored = taskWorkflow.deserialize(snapshot);
   if (!restored.ok) return c.json({ error: "Invalid data" }, 500);
 
-  const result = await router.dispatch(restored.workflow, await c.req.json());
+  const { type, payload } = await c.req.json();
+  const result = await router.dispatch(restored.workflow, type, payload);
 
   if (result.ok) {
     store.set(c.req.param("id"), taskWorkflow.serialize(result.workflow));
@@ -163,7 +165,7 @@ await consumer.run({
       return;
     }
 
-    const result = await router.dispatch(restored.workflow, command);
+    const result = await router.dispatch(restored.workflow, command.type, command.payload);
 
     if (result.ok) {
       store.set(workflowId, taskWorkflow.serialize(result.workflow));

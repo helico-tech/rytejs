@@ -70,11 +70,11 @@ router.state("Draft", ({ on }) => {
 		const auth = get(AuthKey);
 
 		if (auth.role === "viewer") {
-			error({ code: "Unauthorized", data: { required: "editor" } });
+			error("Unauthorized", { required: "editor" });
 		}
 
 		if (!data.body) {
-			error({ code: "BodyRequired", data: {} });
+			error("BodyRequired", {});
 		}
 
 		transition("Published", {
@@ -84,10 +84,7 @@ router.state("Draft", ({ on }) => {
 			publishedAt: new Date(),
 		});
 
-		emit({
-			type: "ArticlePublished",
-			data: { articleId: workflow.id, publishedBy: auth.userId },
-		});
+		emit("ArticlePublished", { articleId: workflow.id, publishedBy: auth.userId });
 	});
 });
 // #endregion complete

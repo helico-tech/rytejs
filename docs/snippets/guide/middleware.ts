@@ -61,7 +61,7 @@ inlineRouter.state("Draft", ({ on }) => {
 		"Submit",
 		async ({ data, error }, next) => {
 			if (!data.body) {
-				error({ code: "BodyRequired", data: {} });
+				error("BodyRequired", {});
 			}
 			await next();
 		},
@@ -117,7 +117,7 @@ execRouter.state("Draft", ({ on, use }) => {
 });
 
 (async () => {
-	await execRouter.dispatch(workflow, { type: "SetTitle", payload: { title: "x" } });
+	await execRouter.dispatch(workflow, "SetTitle", { title: "x" });
 	// log: ["global-before", "state-before", "inline-before", "handler",
 	//        "inline-after", "state-after", "global-after"]
 })();
@@ -140,7 +140,7 @@ authRouter.state("Review", ({ on }) => {
 	on("Approve", ({ get, error, data, transition }) => {
 		const user = get(UserKey);
 		if (user.role !== "admin") {
-			error({ code: "Unauthorized", data: { required: "admin" } });
+			error("Unauthorized", { required: "admin" });
 		}
 		transition("Published", {
 			title: data.title,

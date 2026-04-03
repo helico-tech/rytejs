@@ -48,10 +48,7 @@ router.state("Todo", ({ on }) => {
 			title: data.title,
 			assignee: command.payload.assignee,
 		});
-		emit({
-			type: "TaskStarted",
-			data: { taskId: workflow.id, assignee: command.payload.assignee },
-		});
+		emit("TaskStarted", { taskId: workflow.id, assignee: command.payload.assignee });
 	});
 
 	on("Rename", ({ command, update }) => {
@@ -154,18 +151,12 @@ const task = taskWorkflow.createWorkflow("task-2", {
 });
 
 // #region dispatch
-const _result = await router.dispatch(workflow, {
-	type: "Start",
-	payload: { assignee: "alice" },
-});
+const _result = await router.dispatch(workflow, "Start", { assignee: "alice" });
 // #endregion dispatch
 
 // #region result-check
 (async () => {
-	const result = await router.dispatch(task, {
-		type: "Start",
-		payload: { assignee: "alice" },
-	});
+	const result = await router.dispatch(task, "Start", { assignee: "alice" });
 
 	if (result.ok) {
 		console.log(result.workflow.state); // narrowed to updated state

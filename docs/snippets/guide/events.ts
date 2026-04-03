@@ -35,10 +35,7 @@ router.state("Todo", ({ on }) => {
 			title: data.title,
 			completedAt: new Date(),
 		});
-		emit({
-			type: "TaskCompleted",
-			data: { taskId: workflow.id },
-		});
+		emit("TaskCompleted", { taskId: workflow.id });
 	});
 });
 // #endregion emit
@@ -52,11 +49,8 @@ router.state("Todo", ({ on }) => {
 			title: data.title,
 			assignee: command.payload.assignee,
 		});
-		emit({
-			type: "TaskStarted",
-			data: { taskId: workflow.id, assignee: command.payload.assignee },
-		});
-		emit({ type: "AssigneeNotified", data: { assignee: command.payload.assignee } });
+		emit("TaskStarted", { taskId: workflow.id, assignee: command.payload.assignee });
+		emit("AssigneeNotified", { assignee: command.payload.assignee });
 	});
 	// #endregion emit-multiple
 });
@@ -70,7 +64,7 @@ router.state("Todo", ({ on }) => {
 		data: { title: "Write docs" },
 	});
 
-	const result = await router.dispatch(task, { type: "Complete", payload: {} });
+	const result = await router.dispatch(task, "Complete", {});
 
 	if (result.ok) {
 		for (const event of result.events) {
@@ -104,7 +98,7 @@ validationRouter.state("Todo", ({ on }) => {
 	on("Complete", ({ data, transition, emit, workflow: _wf }) => {
 		transition("Done", { title: data.title, completedAt: new Date() });
 		// @ts-expect-error taskId must be a string, not a number
-		emit({ type: "TaskCompleted", data: { taskId: 123 } });
+		emit("TaskCompleted", { taskId: 123 });
 	});
 });
 // #endregion schema-validation
@@ -118,12 +112,12 @@ validationRouter.state("Todo", ({ on }) => {
 		data: { title: "Write more docs" },
 	});
 
-	const r1 = await router.dispatch(task, { type: "Start", payload: { assignee: "alice" } });
+	const r1 = await router.dispatch(task, "Start", { assignee: "alice" });
 	// r1.events: [{ type: "TaskStarted", ... }, { type: "AssigneeNotified", ... }]
 
 	if (!r1.ok) throw new Error("dispatch failed");
 
-	const _r2 = await router.dispatch(r1.workflow, { type: "Complete", payload: {} });
+	const _r2 = await router.dispatch(r1.workflow, "Complete", {});
 	// r2.events: [{ type: "TaskCompleted", ... }]
 	// TaskStarted is NOT in r2.events
 })();
@@ -141,8 +135,7 @@ declare const updateDashboard: (data: unknown) => Promise<void>;
 		data: { title: "Handle events" },
 	});
 
-	const command = { type: "Start" as const, payload: { assignee: "alice" } };
-	const result = await router.dispatch(task, command);
+	const result = await router.dispatch(task, "Start", { assignee: "alice" });
 
 	if (result.ok) {
 		for (const event of result.events) {

@@ -53,14 +53,14 @@ okRouter.state("Draft", ({ on }) => {
 			orderId: workflow.id,
 			items: [{ sku: "ABC", qty: 1 }],
 		});
-		emit({ type: "OrderPlaced", data: { orderId: workflow.id } });
+		emit("OrderPlaced", { orderId: workflow.id });
 	});
 });
 
 // #region expect-ok
 (async () => {
 	const draftWf = createTestWorkflow(orderWorkflow, "Draft", { items: [] });
-	const result = await okRouter.dispatch(draftWf, { type: "PlaceOrder", payload: {} });
+	const result = await okRouter.dispatch(draftWf, "PlaceOrder", {});
 
 	expectOk(result); // asserts ok, narrows type
 	expectOk(result, "Placed"); // also checks state
@@ -72,14 +72,14 @@ okRouter.state("Draft", ({ on }) => {
 const errRouter = new WorkflowRouter(orderWorkflow);
 errRouter.state("Draft", ({ on }) => {
 	on("PlaceOrder", ({ error }) => {
-		error({ code: "OutOfStock", data: {} });
+		error("OutOfStock", {});
 	});
 });
 
 // #region expect-error
 (async () => {
 	const draftWf = createTestWorkflow(orderWorkflow, "Draft", { items: [] });
-	const result = await errRouter.dispatch(draftWf, { type: "PlaceOrder", payload: {} });
+	const result = await errRouter.dispatch(draftWf, "PlaceOrder", {});
 
 	expectError(result, "domain"); // asserts domain error
 	expectError(result, "domain", "OutOfStock"); // also checks code

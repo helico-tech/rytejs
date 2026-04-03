@@ -28,20 +28,14 @@ const router = new WorkflowRouter(taskWorkflow)
 	.state("Todo", ({ on }) => {
 		on("Rename", ({ command, update, emit, workflow }) => {
 			update({ title: command.payload.title });
-			emit({
-				type: "TaskRenamed",
-				data: { taskId: workflow.id, title: command.payload.title },
-			});
+			emit("TaskRenamed", { taskId: workflow.id, title: command.payload.title });
 		});
 		on("Start", ({ data, command, transition, emit, workflow }) => {
 			transition("InProgress", {
 				title: data.title,
 				assignee: command.payload.assignee,
 			});
-			emit({
-				type: "TaskStarted",
-				data: { taskId: workflow.id, assignee: command.payload.assignee },
-			});
+			emit("TaskStarted", { taskId: workflow.id, assignee: command.payload.assignee });
 		});
 	})
 	.state("InProgress", ({ on }) => {
@@ -50,10 +44,7 @@ const router = new WorkflowRouter(taskWorkflow)
 				title: data.title,
 				completedAt: new Date(),
 			});
-			emit({
-				type: "TaskCompleted",
-				data: { taskId: workflow.id },
-			});
+			emit("TaskCompleted", { taskId: workflow.id });
 		});
 	});
 // #endregion router
@@ -71,10 +62,7 @@ const router = new WorkflowRouter(taskWorkflow)
 	// #endregion create
 
 	// #region rename
-	let result = await router.dispatch(task, {
-		type: "Rename",
-		payload: { title: "Write complete documentation" },
-	});
+	let result = await router.dispatch(task, "Rename", { title: "Write complete documentation" });
 
 	if (result.ok) {
 		task = result.workflow;
@@ -85,10 +73,7 @@ const router = new WorkflowRouter(taskWorkflow)
 	// #endregion rename
 
 	// #region start
-	result = await router.dispatch(task, {
-		type: "Start",
-		payload: { assignee: "alice" },
-	});
+	result = await router.dispatch(task, "Start", { assignee: "alice" });
 
 	if (result.ok) {
 		task = result.workflow;
@@ -99,10 +84,7 @@ const router = new WorkflowRouter(taskWorkflow)
 	// #endregion start
 
 	// #region complete
-	result = await router.dispatch(task, {
-		type: "Complete",
-		payload: {},
-	});
+	result = await router.dispatch(task, "Complete", {});
 
 	if (result.ok) {
 		task = result.workflow;

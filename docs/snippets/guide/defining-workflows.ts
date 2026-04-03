@@ -32,7 +32,7 @@ const router = new WorkflowRouter(taskWorkflow);
 router.state("Todo", ({ on }) => {
 	on("Start", ({ command, error, transition, data }) => {
 		if (!command.payload.assignee) {
-			error({ code: "NotAssigned", data: {} });
+			error("NotAssigned", {});
 		}
 		// only runs if no error was raised
 		transition("InProgress", { title: data.title, assignee: command.payload.assignee });
@@ -48,10 +48,7 @@ const taskForDispatch = taskWorkflow.createWorkflow("task-dispatch", {
 
 // #region result-check
 (async () => {
-	const result = await router.dispatch(taskForDispatch, {
-		type: "Start",
-		payload: { assignee: "alice" },
-	});
+	const result = await router.dispatch(taskForDispatch, "Start", { assignee: "alice" });
 
 	if (!result.ok && result.error.category === "domain") {
 		result.error.code; // "AlreadyAssigned" | "NotAssigned" | "DeadlinePassed"

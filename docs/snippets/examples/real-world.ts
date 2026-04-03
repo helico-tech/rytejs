@@ -75,12 +75,9 @@ router.state("Created", ({ on }) => {
 	on("Pay", ({ command, data, error, transition, emit, workflow }) => {
 		// Domain validation: check payment amount
 		if (command.payload.amount < data.total) {
-			error({
-				code: "InsufficientPayment",
-				data: {
-					required: data.total,
-					received: command.payload.amount,
-				},
+			error("InsufficientPayment", {
+				required: data.total,
+				received: command.payload.amount,
 			});
 		}
 
@@ -90,10 +87,7 @@ router.state("Created", ({ on }) => {
 			paidAt: new Date(),
 		});
 
-		emit({
-			type: "OrderPaid",
-			data: { orderId: workflow.id, amount: command.payload.amount },
-		});
+		emit("OrderPaid", { orderId: workflow.id, amount: command.payload.amount });
 	});
 });
 // #endregion state-created
@@ -108,12 +102,9 @@ router.state("Paid", ({ on }) => {
 			trackingNumber: command.payload.trackingNumber,
 		});
 
-		emit({
-			type: "OrderShipped",
-			data: {
-				orderId: workflow.id,
-				trackingNumber: command.payload.trackingNumber,
-			},
+		emit("OrderShipped", {
+			orderId: workflow.id,
+			trackingNumber: command.payload.trackingNumber,
 		});
 	});
 });
@@ -130,10 +121,7 @@ router.state("Shipped", ({ on }) => {
 			deliveredAt: new Date(),
 		});
 
-		emit({
-			type: "OrderDelivered",
-			data: { orderId: workflow.id },
-		});
+		emit("OrderDelivered", { orderId: workflow.id });
 	});
 });
 // #endregion state-shipped
@@ -146,12 +134,9 @@ router.state(["Created", "Paid"] as const, ({ on }) => {
 			cancelledAt: new Date(),
 		});
 
-		emit({
-			type: "OrderCancelled",
-			data: {
-				orderId: workflow.id,
-				reason: command.payload.reason,
-			},
+		emit("OrderCancelled", {
+			orderId: workflow.id,
+			reason: command.payload.reason,
 		});
 	});
 });
@@ -165,10 +150,7 @@ router.state(["Created", "Paid"] as const, ({ on }) => {
 	});
 
 	// Pay
-	let result = await router.dispatch(order, {
-		type: "Pay",
-		payload: { amount: 50 },
-	});
+	let result = await router.dispatch(order, "Pay", { amount: 50 });
 	// result.ok === true
 	// result.workflow.state === "Paid"
 	// result.events[0].type === "OrderPaid"
@@ -176,19 +158,13 @@ router.state(["Created", "Paid"] as const, ({ on }) => {
 	order = result.workflow;
 
 	// Ship
-	result = await router.dispatch(order, {
-		type: "Ship",
-		payload: { trackingNumber: "TRACK-123" },
-	});
+	result = await router.dispatch(order, "Ship", { trackingNumber: "TRACK-123" });
 	// result.workflow.state === "Shipped"
 	if (!result.ok) throw new Error("Unexpected error");
 	order = result.workflow;
 
 	// Deliver
-	result = await router.dispatch(order, {
-		type: "Deliver",
-		payload: {},
-	});
+	result = await router.dispatch(order, "Deliver", {});
 	// result.workflow.state === "Delivered"
 	// #endregion happy-path
 })();
@@ -201,10 +177,7 @@ router.state(["Created", "Paid"] as const, ({ on }) => {
 	});
 
 	// Attempt underpayment
-	let result = await router.dispatch(order, {
-		type: "Pay",
-		payload: { amount: 50 },
-	});
+	let result = await router.dispatch(order, "Pay", { amount: 50 });
 
 	if (!result.ok && result.error.category === "domain") {
 		console.log(result.error.code);
@@ -217,10 +190,7 @@ router.state(["Created", "Paid"] as const, ({ on }) => {
 	console.log(order.state); // still "Created"
 
 	// Retry with correct amount
-	result = await router.dispatch(order, {
-		type: "Pay",
-		payload: { amount: 100 },
-	});
+	result = await router.dispatch(order, "Pay", { amount: 100 });
 	// result.ok === true
 	// result.workflow.state === "Paid"
 	// #endregion error-recovery
@@ -233,10 +203,7 @@ router.state(["Created", "Paid"] as const, ({ on }) => {
 		initialState: "Created",
 		data: { items: ["x"], total: 20 },
 	});
-	await router.dispatch(order1, {
-		type: "Cancel",
-		payload: { reason: "changed mind" },
-	});
+	await router.dispatch(order1, "Cancel", { reason: "changed mind" });
 	// result.workflow.state === "Cancelled"
 
 	// Cancel from "Paid" also works (same handler)

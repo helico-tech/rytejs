@@ -156,16 +156,13 @@ const router = new WorkflowRouter(taskWorkflow)
 				title: data.title,
 				assignee: command.payload.assignee,
 			});
-			emit({
-				type: "TaskStarted",
-				data: { taskId: workflow.id, assignee: command.payload.assignee },
-			});
+			emit("TaskStarted", { taskId: workflow.id, assignee: command.payload.assignee });
 		});
 	})
 	.state("InProgress", ({ on }) => {
 		on("Complete", ({ data, transition, emit, workflow }) => {
 			transition("Done", { title: data.title, completedAt: new Date() });
-			emit({ type: "TaskCompleted", data: { taskId: workflow.id } });
+			emit("TaskCompleted", { taskId: workflow.id });
 		});
 	});
 

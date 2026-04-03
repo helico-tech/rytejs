@@ -27,7 +27,7 @@ declare const request: unknown;
 	if (!restored.ok) throw new Error("Invalid workflow data");
 
 	// 3. Dispatch the command
-	const result = await router.dispatch(restored.workflow, command);
+	const result = await router.dispatch(restored.workflow, command.type, command.payload);
 
 	// 4. Persist the updated workflow
 	if (result.ok) {
