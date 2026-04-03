@@ -66,6 +66,31 @@ export interface Context<
 	error<C extends ErrorCodes<TConfig>>(err: { code: C; data: ErrorData<TConfig, C> }): never;
 
 	/**
+	 * Pattern-matches on the current state, calling the matching callback with narrowed data.
+	 * All states must be handled (exhaustive).
+	 */
+	match<R>(
+		matchers: {
+			[S in StateNames<TConfig>]: (
+				data: StateData<TConfig, S>,
+				workflow: WorkflowOf<TConfig, S>,
+			) => R;
+		},
+	): R;
+	/**
+	 * Pattern-matches on the current state with a fallback for unhandled states.
+	 */
+	match<R>(
+		matchers: Partial<{
+			[S in StateNames<TConfig>]: (
+				data: StateData<TConfig, S>,
+				workflow: WorkflowOf<TConfig, S>,
+			) => R;
+		}>,
+		fallback: () => R,
+	): R;
+
+	/**
 	 * Stores a value in context-scoped middleware state.
 	 * @param key - A {@link ContextKey} created via {@link createKey}
 	 * @param value - The value to store
@@ -164,6 +189,16 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 				);
 			}
 			throw new DomainErrorSignal(err.code, result.data);
+		},
+
+		match(
+			matchers: Record<string, (data: unknown, workflow: unknown) => unknown>,
+			fallback?: () => unknown,
+		) {
+			const matcher = matchers[originalWorkflow.state];
+			if (matcher) return matcher(ctx.data, originalWorkflow);
+			if (fallback) return fallback();
+			throw new Error(`No matcher for state: ${originalWorkflow.state}`);
 		},
 
 		set<T>(key: ContextKey<T>, value: T) {
