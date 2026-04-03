@@ -25,7 +25,7 @@ function setupRouter() {
 			ctx.transition("Published", { title: ctx.command.payload.title });
 		});
 		state.on("Fail", (ctx) => {
-			ctx.error({ code: "NotAllowed", data: { reason: "test" } });
+			ctx.error("NotAllowed", { reason: "test" });
 		});
 	});
 	return router;
@@ -35,28 +35,28 @@ describe("expectOk", () => {
 	test("passes on ok result", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hi" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hi" });
 		expectOk(result);
 	});
 
 	test("throws on error result", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
+		const result = await router.dispatch(wf, "Fail", {});
 		expect(() => expectOk(result)).toThrow("Expected ok result");
 	});
 
 	test("checks specific state when provided", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hi" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hi" });
 		expectOk(result, "Published");
 	});
 
 	test("throws when state does not match", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hi" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hi" });
 		expect(() => expectOk(result, "Draft")).toThrow("Expected state 'Draft' but got 'Published'");
 	});
 });
@@ -65,28 +65,28 @@ describe("expectError", () => {
 	test("passes on error result with matching category", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
+		const result = await router.dispatch(wf, "Fail", {});
 		expectError(result, "domain");
 	});
 
 	test("throws on ok result", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hi" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hi" });
 		expect(() => expectError(result, "domain")).toThrow("Expected error result");
 	});
 
 	test("checks specific error code when provided", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
+		const result = await router.dispatch(wf, "Fail", {});
 		expectError(result, "domain", "NotAllowed");
 	});
 
 	test("throws when error code does not match", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
+		const result = await router.dispatch(wf, "Fail", {});
 		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid error code to test assertion
 		expect(() => expectError(result, "domain", "WrongCode" as any)).toThrow(
 			"Expected error code 'WrongCode'",
@@ -96,7 +96,7 @@ describe("expectError", () => {
 	test("throws when category does not match", async () => {
 		const router = setupRouter();
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Fail", payload: {} });
+		const result = await router.dispatch(wf, "Fail", {});
 		expect(() => expectError(result, "validation")).toThrow("Expected error category 'validation'");
 	});
 

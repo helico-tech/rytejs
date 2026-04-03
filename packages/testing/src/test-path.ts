@@ -52,10 +52,7 @@ export async function testPath<TConfig extends WorkflowConfig, TDeps>(
 		const step = steps[i];
 		if (step === undefined) continue;
 
-		const result = await router.dispatch(workflow, {
-			type: step.command,
-			payload: step.payload,
-		});
+		const result = await router.dispatch(workflow, step.command, step.payload);
 
 		if (!result.ok) {
 			throw new Error(
