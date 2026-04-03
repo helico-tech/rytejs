@@ -1,4 +1,5 @@
 import type { ZodType } from "zod";
+import { z } from "zod";
 
 const SERVER_BRAND: unique symbol = Symbol("ryte.server");
 
@@ -22,3 +23,35 @@ export function isServerField(schema: ZodType): boolean {
 }
 
 export { SERVER_BRAND };
+
+/**
+ * Strips server-only fields from workflow data based on the state's Zod schema.
+ * Recursively processes nested z.object() schemas.
+ */
+export function stripServerData(
+	schema: ZodType,
+	data: Record<string, unknown>,
+): Record<string, unknown> {
+	// biome-ignore lint/suspicious/noExplicitAny: accessing Zod v4 internal _zod.def.shape for schema introspection
+	const def = (schema as any)._zod?.def;
+	if (def?.type !== "object" || !def.shape) return data;
+
+	const result: Record<string, unknown> = {};
+	for (const key of Object.keys(data)) {
+		const fieldSchema = def.shape[key] as ZodType | undefined;
+		if (fieldSchema && isServerField(fieldSchema)) continue;
+
+		if (
+			fieldSchema &&
+			// biome-ignore lint/suspicious/noExplicitAny: checking Zod v4 internal def.type for nested object detection
+			(fieldSchema as any)._zod?.def?.type === "object" &&
+			data[key] !== null &&
+			typeof data[key] === "object"
+		) {
+			result[key] = stripServerData(fieldSchema, data[key] as Record<string, unknown>);
+		} else {
+			result[key] = data[key];
+		}
+	}
+	return result;
+}

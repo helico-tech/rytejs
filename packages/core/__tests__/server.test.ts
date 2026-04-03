@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { isServerField, server } from "../src/server.js";
+import { isServerField, server, stripServerData } from "../src/server.js";
 
 describe("server()", () => {
 	test("marks a schema as server-only", () => {
@@ -24,5 +24,49 @@ describe("server()", () => {
 		const schema = server(z.object({ a: z.number(), b: z.string() }));
 		expect(isServerField(schema)).toBe(true);
 		expect(schema.safeParse({ a: 1, b: "x" }).success).toBe(true);
+	});
+});
+
+describe("stripServerData()", () => {
+	test("strips top-level server fields", () => {
+		const schema = z.object({
+			name: z.string(),
+			ssn: server(z.string()),
+		});
+		const data = { name: "Alice", ssn: "123-45-6789" };
+		expect(stripServerData(schema, data)).toEqual({ name: "Alice" });
+	});
+
+	test("strips nested server fields", () => {
+		const schema = z.object({
+			applicant: z.object({
+				name: z.string(),
+				ssn: server(z.string()),
+			}),
+			total: z.number(),
+		});
+		const data = { applicant: { name: "Alice", ssn: "123-45-6789" }, total: 100 };
+		expect(stripServerData(schema, data)).toEqual({
+			applicant: { name: "Alice" },
+			total: 100,
+		});
+	});
+
+	test("returns identical data when no server fields", () => {
+		const schema = z.object({
+			name: z.string(),
+			age: z.number(),
+		});
+		const data = { name: "Alice", age: 30 };
+		expect(stripServerData(schema, data)).toEqual({ name: "Alice", age: 30 });
+	});
+
+	test("returns empty object when all fields are server-only", () => {
+		const schema = z.object({
+			ssn: server(z.string()),
+			secret: server(z.number()),
+		});
+		const data = { ssn: "123-45-6789", secret: 42 };
+		expect(stripServerData(schema, data)).toEqual({});
 	});
 });
