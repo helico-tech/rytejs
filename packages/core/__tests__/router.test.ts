@@ -58,13 +58,10 @@ describe("WorkflowRouter", () => {
 			app.state("Draft", (state) => {
 				state.on("SetTitle", (ctx) => {
 					ctx.update({ title: ctx.command.payload.title });
-					ctx.emit({ type: "TitleSet", data: { title: ctx.command.payload.title } });
+					ctx.emit("TitleSet", { title: ctx.command.payload.title });
 				});
 			});
-			const result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				payload: { title: "Hello" },
-			});
+			const result = await app.dispatch(wf.Draft(), "SetTitle", { title: "Hello" });
 			expect(result.ok).toBe(true);
 			if (!result.ok) throw new Error();
 			expect(result.workflow.state).toBe("Draft");
@@ -82,12 +79,11 @@ describe("WorkflowRouter", () => {
 						title: ctx.data.title ?? "untitled",
 						submittedBy: ctx.command.payload.submittedBy,
 					});
-					ctx.emit({ type: "Submitted", data: { id: ctx.workflow.id } });
+					ctx.emit("Submitted", { id: ctx.workflow.id });
 				});
 			});
-			const result = await app.dispatch(wf.Draft({ title: "Test" }), {
-				type: "Submit",
-				payload: { submittedBy: "user-1" },
+			const result = await app.dispatch(wf.Draft({ title: "Test" }), "Submit", {
+				submittedBy: "user-1",
 			});
 			expect(result.ok).toBe(true);
 			if (!result.ok) throw new Error();
@@ -100,11 +96,8 @@ describe("WorkflowRouter", () => {
 		test("invalid command payload returns validation error", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
 			app.state("Draft", (s) => s.on("SetTitle", () => {}));
-			const result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid payload to test validation
-				payload: {} as any,
-			});
+			// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid payload to test validation
+			const result = await app.dispatch(wf.Draft(), "SetTitle", {} as any);
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("validation");
@@ -115,10 +108,7 @@ describe("WorkflowRouter", () => {
 	describe("router errors", () => {
 		test("NO_HANDLER when no handler registered for state/command", async () => {
 			const app = new WorkflowRouter(definition, createDeps());
-			const result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				payload: { title: "x" },
-			});
+			const result = await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("router");
@@ -136,10 +126,7 @@ describe("WorkflowRouter", () => {
 				updatedAt: new Date(),
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally creating invalid workflow to test UNKNOWN_STATE
 			} as any;
-			const result = await app.dispatch(badWf, {
-				type: "SetTitle",
-				payload: { title: "x" },
-			});
+			const result = await app.dispatch(badWf, "SetTitle", { title: "x" });
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("router");
@@ -152,13 +139,10 @@ describe("WorkflowRouter", () => {
 			const app = new WorkflowRouter(definition, createDeps());
 			app.state("Draft", (state) => {
 				state.on("Submit", (ctx) => {
-					if (!ctx.data.title) ctx.error({ code: "TitleRequired", data: {} });
+					if (!ctx.data.title) ctx.error("TitleRequired", {});
 				});
 			});
-			const result = await app.dispatch(wf.Draft(), {
-				type: "Submit",
-				payload: { submittedBy: "user-1" },
-			});
+			const result = await app.dispatch(wf.Draft(), "Submit", { submittedBy: "user-1" });
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("domain");
@@ -174,10 +158,7 @@ describe("WorkflowRouter", () => {
 					throw new TypeError("something broke");
 				});
 			});
-			const result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				payload: { title: "x" },
-			});
+			const result = await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("unexpected");
@@ -194,10 +175,7 @@ describe("WorkflowRouter", () => {
 					throw "string error";
 				});
 			});
-			const result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				payload: { title: "x" },
-			});
+			const result = await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(result.ok).toBe(false);
 			if (result.ok) throw new Error();
 			expect(result.error.category).toBe("unexpected");
@@ -216,7 +194,7 @@ describe("WorkflowRouter", () => {
 					throw new Error("boom");
 				});
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(endHook).toHaveBeenCalledOnce();
 		});
 	});
@@ -227,14 +205,11 @@ describe("WorkflowRouter", () => {
 			app.state("Draft", (state) => {
 				state.on("Submit", (ctx) => {
 					ctx.update({ title: "modified" });
-					ctx.error({ code: "TitleRequired", data: {} });
+					ctx.error("TitleRequired", {});
 				});
 			});
 			const original = wf.Draft({ title: "original" });
-			const result = await app.dispatch(original, {
-				type: "Submit",
-				payload: { submittedBy: "user-1" },
-			});
+			const result = await app.dispatch(original, "Submit", { submittedBy: "user-1" });
 			expect(result.ok).toBe(false);
 			if (original.state === "Draft") {
 				expect(original.data.title).toBe("original");
@@ -257,7 +232,7 @@ describe("WorkflowRouter", () => {
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(log).toEqual(["before:SetTitle", "handler", "after:SetTitle"]);
 		});
 	});
@@ -283,13 +258,10 @@ describe("WorkflowRouter", () => {
 					});
 				});
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(log).toEqual(["draft-middleware"]);
 			log.length = 0;
-			await app.dispatch(wf.Review({ title: "Test", submittedBy: "u" }), {
-				type: "Publish",
-				payload: {},
-			});
+			await app.dispatch(wf.Review({ title: "Test", submittedBy: "u" }), "Publish", {});
 			expect(log).toEqual([]);
 		});
 
@@ -309,7 +281,7 @@ describe("WorkflowRouter", () => {
 				log.push("wildcard-handler");
 				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), "Archive", { reason: "x" });
 			expect(log).toEqual(["wildcard-handler"]);
 		});
 
@@ -332,7 +304,7 @@ describe("WorkflowRouter", () => {
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(log).toEqual(["mw-1", "mw-2", "handler"]);
 		});
 	});
@@ -354,7 +326,7 @@ describe("WorkflowRouter", () => {
 					},
 				);
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(log).toEqual(["inline", "handler"]);
 		});
 	});
@@ -365,15 +337,11 @@ describe("WorkflowRouter", () => {
 			app.on("*", "Archive", (ctx) => {
 				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			let result = await app.dispatch(wf.Draft(), {
-				type: "Archive",
-				payload: { reason: "x" },
-			});
+			let result = await app.dispatch(wf.Draft(), "Archive", { reason: "x" });
 			expect(result.ok).toBe(true);
 			if (result.ok) expect(result.workflow.state).toBe("Archived");
-			result = await app.dispatch(wf.Review({ title: "T", submittedBy: "u" }), {
-				type: "Archive",
-				payload: { reason: "x" },
+			result = await app.dispatch(wf.Review({ title: "T", submittedBy: "u" }), "Archive", {
+				reason: "x",
 			});
 			expect(result.ok).toBe(true);
 			if (result.ok) expect(result.workflow.state).toBe("Archived");
@@ -392,7 +360,7 @@ describe("WorkflowRouter", () => {
 				log.push("wildcard");
 				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), "Archive", { reason: "x" });
 			expect(log).toEqual(["specific"]);
 		});
 	});
@@ -405,15 +373,11 @@ describe("WorkflowRouter", () => {
 					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			let result = await app.dispatch(wf.Draft(), {
-				type: "Archive",
-				payload: { reason: "x" },
-			});
+			let result = await app.dispatch(wf.Draft(), "Archive", { reason: "x" });
 			expect(result.ok).toBe(true);
 			if (result.ok) expect(result.workflow.state).toBe("Archived");
-			result = await app.dispatch(wf.Review({ title: "T", submittedBy: "u" }), {
-				type: "Archive",
-				payload: { reason: "x" },
+			result = await app.dispatch(wf.Review({ title: "T", submittedBy: "u" }), "Archive", {
+				reason: "x",
 			});
 			expect(result.ok).toBe(true);
 			if (result.ok) expect(result.workflow.state).toBe("Archived");
@@ -434,7 +398,7 @@ describe("WorkflowRouter", () => {
 					ctx.transition("Archived", { reason: ctx.command.payload.reason });
 				});
 			});
-			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), "Archive", { reason: "x" });
 			expect(log).toEqual(["specific"]);
 		});
 
@@ -451,7 +415,7 @@ describe("WorkflowRouter", () => {
 				log.push("wildcard");
 				ctx.transition("Archived", { reason: ctx.command.payload.reason });
 			});
-			await app.dispatch(wf.Draft(), { type: "Archive", payload: { reason: "x" } });
+			await app.dispatch(wf.Draft(), "Archive", { reason: "x" });
 			expect(log).toEqual(["multi"]);
 		});
 	});
@@ -472,15 +436,9 @@ describe("WorkflowRouter", () => {
 					});
 				});
 			});
-			let result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				payload: { title: "Test" },
-			});
+			let result = await app.dispatch(wf.Draft(), "SetTitle", { title: "Test" });
 			expect(result.ok).toBe(true);
-			result = await app.dispatch(wf.Draft({ title: "Test" }), {
-				type: "Submit",
-				payload: { submittedBy: "user-1" },
-			});
+			result = await app.dispatch(wf.Draft({ title: "Test" }), "Submit", { submittedBy: "user-1" });
 			expect(result.ok).toBe(true);
 			if (result.ok) expect(result.workflow.state).toBe("Review");
 		});
@@ -498,7 +456,7 @@ describe("WorkflowRouter", () => {
 					log.push("second");
 				});
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(log).toEqual(["second"]);
 		});
 	});
@@ -531,7 +489,7 @@ describe("WorkflowRouter", () => {
 					},
 				);
 			});
-			await app.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+			await app.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 			expect(log).toEqual([
 				"global-before",
 				"state-before",
@@ -553,10 +511,7 @@ describe("WorkflowRouter", () => {
 					ctx.update({ title: ctx.command.payload.title });
 				});
 			});
-			const result = await app.dispatch(wf.Draft(), {
-				type: "SetTitle",
-				payload: { title: "async-title" },
-			});
+			const result = await app.dispatch(wf.Draft(), "SetTitle", { title: "async-title" });
 			expect(result.ok).toBe(true);
 			if (result.ok && result.workflow.state === "Draft") {
 				expect(result.workflow.data.title).toBe("async-title");
@@ -580,7 +535,7 @@ describe("WorkflowRouter", () => {
 				});
 			});
 
-			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			const result = await router.dispatch(wf.Draft(), "Publish", {});
 			expect(result.ok).toBe(false);
 			if (!result.ok) {
 				expect(result.error.category).toBe("dependency");
@@ -607,7 +562,7 @@ describe("WorkflowRouter", () => {
 				});
 			});
 
-			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			const result = await router.dispatch(wf.Draft(), "Publish", {});
 			expect(result.ok).toBe(false);
 			if (!result.ok) {
 				expect(result.error.category).toBe("dependency");
@@ -634,7 +589,7 @@ describe("WorkflowRouter", () => {
 				});
 			});
 
-			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			const result = await router.dispatch(wf.Draft(), "Publish", {});
 			expect(result.ok).toBe(false);
 			if (!result.ok && result.error.category === "dependency") {
 				expect(result.error.name).toBe("db");
@@ -650,7 +605,7 @@ describe("WorkflowRouter", () => {
 				});
 			});
 
-			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			const result = await router.dispatch(wf.Draft(), "Publish", {});
 			expect(result.ok).toBe(false);
 			if (!result.ok) {
 				expect(result.error.category).toBe("unexpected");
@@ -672,7 +627,7 @@ describe("WorkflowRouter", () => {
 				});
 			});
 
-			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			const result = await router.dispatch(wf.Draft(), "Publish", {});
 			expect(result.ok).toBe(false);
 			if (!result.ok) {
 				expect(result.error.category).toBe("unexpected");
@@ -698,7 +653,7 @@ describe("WorkflowRouter", () => {
 				hookFired = true;
 			});
 
-			await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			await router.dispatch(wf.Draft(), "Publish", {});
 			expect(hookFired).toBe(true);
 		});
 
@@ -721,7 +676,7 @@ describe("WorkflowRouter", () => {
 				receivedError = error;
 			});
 
-			await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			await router.dispatch(wf.Draft(), "Publish", {});
 			expect(receivedError).not.toBeNull();
 			expect((receivedError as { category: string }).category).toBe("dependency");
 		});
@@ -740,12 +695,12 @@ describe("WorkflowRouter", () => {
 					try {
 						ctx.deps.db.check();
 					} catch {
-						ctx.error({ code: "TitleRequired", data: {} });
+						ctx.error("TitleRequired", {});
 					}
 				});
 			});
 
-			const result = await router.dispatch(wf.Draft(), { type: "Publish", payload: {} });
+			const result = await router.dispatch(wf.Draft(), "Publish", {});
 			expect(result.ok).toBe(false);
 			if (!result.ok) {
 				expect(result.error.category).toBe("domain");

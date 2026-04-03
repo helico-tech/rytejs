@@ -56,9 +56,9 @@ describe("Order Fulfillment Integration", () => {
 		router.state("Created", (state) => {
 			state.on("Pay", (ctx) => {
 				if (ctx.command.payload.amount < ctx.data.total) {
-					ctx.error({
-						code: "InsufficientPayment",
-						data: { required: ctx.data.total, received: ctx.command.payload.amount },
+					ctx.error("InsufficientPayment", {
+						required: ctx.data.total,
+						received: ctx.command.payload.amount,
 					});
 				}
 				ctx.transition("Paid", {
@@ -66,10 +66,7 @@ describe("Order Fulfillment Integration", () => {
 					total: ctx.data.total,
 					paidAt: new Date(),
 				});
-				ctx.emit({
-					type: "OrderPaid",
-					data: { orderId: ctx.workflow.id, amount: ctx.command.payload.amount },
-				});
+				ctx.emit("OrderPaid", { orderId: ctx.workflow.id, amount: ctx.command.payload.amount });
 			});
 		});
 
@@ -81,9 +78,9 @@ describe("Order Fulfillment Integration", () => {
 					paidAt: ctx.data.paidAt,
 					trackingNumber: ctx.command.payload.trackingNumber,
 				});
-				ctx.emit({
-					type: "OrderShipped",
-					data: { orderId: ctx.workflow.id, trackingNumber: ctx.command.payload.trackingNumber },
+				ctx.emit("OrderShipped", {
+					orderId: ctx.workflow.id,
+					trackingNumber: ctx.command.payload.trackingNumber,
 				});
 			});
 		});
@@ -97,7 +94,7 @@ describe("Order Fulfillment Integration", () => {
 					trackingNumber: ctx.data.trackingNumber,
 					deliveredAt: new Date(),
 				});
-				ctx.emit({ type: "OrderDelivered", data: { orderId: ctx.workflow.id } });
+				ctx.emit("OrderDelivered", { orderId: ctx.workflow.id });
 			});
 		});
 
@@ -107,9 +104,9 @@ describe("Order Fulfillment Integration", () => {
 					reason: ctx.command.payload.reason,
 					cancelledAt: new Date(),
 				});
-				ctx.emit({
-					type: "OrderCancelled",
-					data: { orderId: ctx.workflow.id, reason: ctx.command.payload.reason },
+				ctx.emit("OrderCancelled", {
+					orderId: ctx.workflow.id,
+					reason: ctx.command.payload.reason,
 				});
 			});
 		});
@@ -124,7 +121,7 @@ describe("Order Fulfillment Integration", () => {
 			data: { items: ["widget"], total: 50 },
 		});
 
-		let result = await router.dispatch(wf, { type: "Pay", payload: { amount: 50 } });
+		let result = await router.dispatch(wf, "Pay", { amount: 50 });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Paid");
@@ -132,16 +129,13 @@ describe("Order Fulfillment Integration", () => {
 		expect(result.events[0]?.type).toBe("OrderPaid");
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
-			type: "Ship",
-			payload: { trackingNumber: "TRACK-123" },
-		});
+		result = await router.dispatch(wf, "Ship", { trackingNumber: "TRACK-123" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Shipped");
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, { type: "Deliver", payload: {} });
+		result = await router.dispatch(wf, "Deliver", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Delivered");
@@ -154,7 +148,7 @@ describe("Order Fulfillment Integration", () => {
 			data: { items: ["widget"], total: 100 },
 		});
 
-		let result = await router.dispatch(wf, { type: "Pay", payload: { amount: 50 } });
+		let result = await router.dispatch(wf, "Pay", { amount: 50 });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
 		expect(result.error.category).toBe("domain");
@@ -164,7 +158,7 @@ describe("Order Fulfillment Integration", () => {
 
 		expect(wf.state).toBe("Created");
 
-		result = await router.dispatch(wf, { type: "Pay", payload: { amount: 100 } });
+		result = await router.dispatch(wf, "Pay", { amount: 100 });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Paid");
@@ -177,16 +171,13 @@ describe("Order Fulfillment Integration", () => {
 			data: { items: ["a"], total: 10 },
 		});
 
-		const result1 = await router.dispatch(wf, { type: "Pay", payload: { amount: 10 } });
+		const result1 = await router.dispatch(wf, "Pay", { amount: 10 });
 		expect(result1.ok).toBe(true);
 		if (!result1.ok) throw new Error();
 		expect(result1.events).toHaveLength(1);
 		wf = result1.workflow;
 
-		const result2 = await router.dispatch(wf, {
-			type: "Ship",
-			payload: { trackingNumber: "T1" },
-		});
+		const result2 = await router.dispatch(wf, "Ship", { trackingNumber: "T1" });
 		expect(result2.ok).toBe(true);
 		if (!result2.ok) throw new Error();
 		expect(result2.events).toHaveLength(1);
@@ -200,7 +191,7 @@ describe("Order Fulfillment Integration", () => {
 			data: { items: ["x"], total: 5 },
 		});
 
-		await router.dispatch(wf, { type: "Pay", payload: { amount: 5 } });
+		await router.dispatch(wf, "Pay", { amount: 5 });
 		expect(deps.auditLog).toEqual(["admin:Pay"]);
 	});
 
@@ -211,10 +202,7 @@ describe("Order Fulfillment Integration", () => {
 			data: { items: ["y"], total: 20 },
 		});
 
-		const result = await router.dispatch(wf, {
-			type: "Cancel",
-			payload: { reason: "changed mind" },
-		});
+		const result = await router.dispatch(wf, "Cancel", { reason: "changed mind" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Cancelled");

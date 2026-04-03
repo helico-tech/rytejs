@@ -117,7 +117,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(order).toEqual(["hook:start", "handler"]);
 	});
 
@@ -137,10 +137,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(capturedResult).toEqual(result);
 	});
 
@@ -160,7 +157,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(captured).toEqual({ from: "Draft", to: "Published" });
 	});
 
@@ -175,7 +172,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Update", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Update", { title: "Hello" });
 		expect(transitionHook).not.toHaveBeenCalled();
 	});
 
@@ -191,12 +188,12 @@ describe("router hook integration", () => {
 					title: ctx.command.payload.title,
 					publishedAt: new Date(),
 				});
-				ctx.emit({ type: "Published", data: { id: ctx.workflow.id } });
+				ctx.emit("Published", { id: ctx.workflow.id });
 			});
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(events).toEqual([{ type: "Published", data: { id: "wf-1" } }]);
 	});
 
@@ -208,15 +205,12 @@ describe("router hook integration", () => {
 		});
 		router.state("Draft", (state) => {
 			state.on("Publish", (ctx) => {
-				ctx.error({ code: "TitleRequired", data: {} });
+				ctx.error("TitleRequired", {});
 			});
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(capturedError).toEqual(result.error);
@@ -237,10 +231,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Update",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Update", { title: "Hello" });
 		expect(result.ok).toBe(true);
 		expect(errors).toEqual([hookError]);
 	});
@@ -251,10 +242,7 @@ describe("router hook integration", () => {
 		router.on("pipeline:start", startHook);
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(result.ok).toBe(false);
 		expect(startHook).not.toHaveBeenCalled();
 	});
@@ -267,7 +255,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(captured).toBeDefined();
 		// biome-ignore lint/style/noNonNullAssertion: guarded by toBeDefined check above
 		expect(captured!.workflow).toBe(wf);
@@ -283,7 +271,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(capturedResult).toEqual(result);
 		expect(result.ok).toBe(false);
 	});
@@ -304,7 +292,7 @@ describe("router hook integration", () => {
 			updatedAt: new Date(),
 			// biome-ignore lint/suspicious/noExplicitAny: intentionally creating invalid workflow
 		} as any;
-		await router.dispatch(badWf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(badWf, "Publish", { title: "Hello" });
 		expect(hookFired).toBe(true);
 	});
 
@@ -322,7 +310,7 @@ describe("router hook integration", () => {
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
 		// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid payload
-		await router.dispatch(wf, { type: "Publish", payload: {} as any });
+		await router.dispatch(wf, "Publish", {} as any);
 		expect(hookFired).toBe(true);
 	});
 
@@ -339,7 +327,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(capturedResult).toEqual(result);
 		expect(result.ok).toBe(true);
 	});
@@ -357,7 +345,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		const result = await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(capturedResult).toEqual(result);
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error.category).toBe("unexpected");
@@ -375,7 +363,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(order).toEqual(["dispatch:start", "pipeline:start"]);
 	});
 
@@ -391,7 +379,7 @@ describe("router hook integration", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(order).toEqual(["pipeline:end", "dispatch:end"]);
 	});
 });

@@ -44,10 +44,7 @@ describe("Composable Routers", () => {
 		const parent = new WorkflowRouter(definition);
 		parent.use(child);
 
-		const result = await parent.dispatch(wf.Draft(), {
-			type: "SetTitle",
-			payload: { title: "Hello" },
-		});
+		const result = await parent.dispatch(wf.Draft(), "SetTitle", { title: "Hello" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Draft");
@@ -86,7 +83,7 @@ describe("Composable Routers", () => {
 		});
 		parent.use(child);
 
-		await parent.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+		await parent.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 		expect(log).toEqual(["parent"]);
 	});
 
@@ -108,10 +105,7 @@ describe("Composable Routers", () => {
 			});
 		});
 
-		const result = await parent.dispatch(wf.Draft(), {
-			type: "SetTitle",
-			payload: { title: "x" },
-		});
+		const result = await parent.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		if (result.workflow.state === "Draft") {
@@ -133,14 +127,8 @@ describe("Composable Routers", () => {
 		const parent2 = new WorkflowRouter(definition);
 		parent2.use(child);
 
-		const r1 = await parent1.dispatch(wf.Draft(), {
-			type: "SetTitle",
-			payload: { title: "p1" },
-		});
-		const r2 = await parent2.dispatch(wf.Draft(), {
-			type: "SetTitle",
-			payload: { title: "p2" },
-		});
+		const r1 = await parent1.dispatch(wf.Draft(), "SetTitle", { title: "p1" });
+		const r2 = await parent2.dispatch(wf.Draft(), "SetTitle", { title: "p2" });
 		expect(r1.ok).toBe(true);
 		expect(r2.ok).toBe(true);
 		if (r1.ok && r1.workflow.state === "Draft") expect(r1.workflow.data.title).toBe("p1");
@@ -168,7 +156,7 @@ describe("Composable Routers", () => {
 		});
 		parent.use(child);
 
-		await parent.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+		await parent.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 		expect(log).toEqual(["parent-global", "child-global", "handler"]);
 	});
 
@@ -195,7 +183,7 @@ describe("Composable Routers", () => {
 		});
 		parent.use(child);
 
-		await parent.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+		await parent.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 		expect(log).toEqual(["parent-state", "child-state", "handler"]);
 	});
 
@@ -208,10 +196,7 @@ describe("Composable Routers", () => {
 		const parent = new WorkflowRouter(definition);
 		parent.use(child);
 
-		const result = await parent.dispatch(wf.Draft(), {
-			type: "Archive",
-			payload: { reason: "done" },
-		});
+		const result = await parent.dispatch(wf.Draft(), "Archive", { reason: "done" });
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.workflow.state).toBe("Archived");
 	});
@@ -227,16 +212,12 @@ describe("Composable Routers", () => {
 		const parent = new WorkflowRouter(definition);
 		parent.use(child);
 
-		const r1 = await parent.dispatch(wf.Draft(), {
-			type: "Archive",
-			payload: { reason: "x" },
-		});
+		const r1 = await parent.dispatch(wf.Draft(), "Archive", { reason: "x" });
 		expect(r1.ok).toBe(true);
 		if (r1.ok) expect(r1.workflow.state).toBe("Archived");
 
-		const r2 = await parent.dispatch(wf.Review({ title: "T", reviewer: "r" }), {
-			type: "Archive",
-			payload: { reason: "y" },
+		const r2 = await parent.dispatch(wf.Review({ title: "T", reviewer: "r" }), "Archive", {
+			reason: "y",
 		});
 		expect(r2.ok).toBe(true);
 		if (r2.ok) expect(r2.workflow.state).toBe("Archived");
@@ -256,10 +237,7 @@ describe("Composable Routers", () => {
 		const parent = new WorkflowRouter(definition);
 		parent.use(a);
 
-		const result = await parent.dispatch(wf.Draft(), {
-			type: "SetTitle",
-			payload: { title: "nested" },
-		});
+		const result = await parent.dispatch(wf.Draft(), "SetTitle", { title: "nested" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		if (result.workflow.state === "Draft") {
@@ -289,16 +267,10 @@ describe("Composable Routers", () => {
 		parent.use(draftRouter);
 		parent.use(reviewRouter);
 
-		const r1 = await parent.dispatch(wf.Draft(), {
-			type: "SetTitle",
-			payload: { title: "composed" },
-		});
+		const r1 = await parent.dispatch(wf.Draft(), "SetTitle", { title: "composed" });
 		expect(r1.ok).toBe(true);
 
-		const r2 = await parent.dispatch(wf.Review({ title: "T", reviewer: "r" }), {
-			type: "Approve",
-			payload: {},
-		});
+		const r2 = await parent.dispatch(wf.Review({ title: "T", reviewer: "r" }), "Approve", {});
 		expect(r2.ok).toBe(true);
 		if (r2.ok) expect(r2.workflow.state).toBe("Published");
 	});
@@ -331,7 +303,7 @@ describe("Composable Routers", () => {
 		parent.use(childA);
 		parent.use(childB);
 
-		await parent.dispatch(wf.Draft(), { type: "SetTitle", payload: { title: "x" } });
+		await parent.dispatch(wf.Draft(), "SetTitle", { title: "x" });
 		expect(log).toEqual(["parent", "A", "B", "handler"]);
 	});
 });

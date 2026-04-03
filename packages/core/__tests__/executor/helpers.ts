@@ -25,10 +25,10 @@ function createTestRouter() {
 	router.state("Draft", ({ on }) => {
 		on("Place", ({ data, transition, emit, error, workflow }) => {
 			if (data.items.length === 0) {
-				error({ code: "EmptyOrder", data: {} });
+				error("EmptyOrder", {});
 			}
 			transition("Placed", { items: data.items, placedAt: new Date() });
-			emit({ type: "OrderPlaced", data: { orderId: workflow.id } });
+			emit("OrderPlaced", { orderId: workflow.id });
 		});
 
 		on("AddItem", ({ data, update, command }) => {

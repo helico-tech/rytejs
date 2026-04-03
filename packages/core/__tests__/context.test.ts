@@ -111,8 +111,8 @@ describe("createContext", () => {
 		test("ctx.emit accumulates events", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
-			ctx.emit({ type: "Saved", data: { id: "1" } });
-			ctx.emit({ type: "Submitted", data: { id: "1" } });
+			ctx.emit("Saved", { id: "1" });
+			ctx.emit("Submitted", { id: "1" });
 			expect(ctx.events).toHaveLength(2);
 			expect(ctx.events[0]).toEqual({ type: "Saved", data: { id: "1" } });
 		});
@@ -121,15 +121,15 @@ describe("createContext", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
 			// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
-			expect(() => ctx.emit({ type: "Saved", data: {} as any })).toThrow();
+			expect(() => ctx.emit("Saved", {} as any)).toThrow();
 		});
 
 		test("ctx.events returns a copy (not mutable)", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
-			ctx.emit({ type: "Saved", data: { id: "1" } });
+			ctx.emit("Saved", { id: "1" });
 			const events1 = ctx.events;
-			ctx.emit({ type: "Submitted", data: { id: "1" } });
+			ctx.emit("Submitted", { id: "1" });
 			const events2 = ctx.events;
 			expect(events1).toHaveLength(1);
 			expect(events2).toHaveLength(2);
@@ -140,9 +140,7 @@ describe("createContext", () => {
 		test("ctx.error throws DomainErrorSignal", () => {
 			const wf = create.Draft();
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
-			expect(() => ctx.error({ code: "Incomplete", data: { missing: ["body"] } })).toThrow(
-				DomainErrorSignal,
-			);
+			expect(() => ctx.error("Incomplete", { missing: ["body"] })).toThrow(DomainErrorSignal);
 		});
 
 		test("ctx.error validates error data against schema", () => {
@@ -150,7 +148,7 @@ describe("createContext", () => {
 			const ctx = createContext(definition, wf, { type: "Save", payload: { title: "x" } }, deps);
 			expect(() =>
 				// biome-ignore lint/suspicious/noExplicitAny: intentionally passing invalid data to test validation
-				ctx.error({ code: "Incomplete", data: { missing: "not-an-array" } as any }),
+				ctx.error("Incomplete", { missing: "not-an-array" } as any),
 			).toThrow();
 		});
 	});

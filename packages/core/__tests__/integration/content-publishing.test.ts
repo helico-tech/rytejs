@@ -41,13 +41,13 @@ describe("Content Publishing Integration", () => {
 				if (ctx.command.payload.title) updates.title = ctx.command.payload.title;
 				if (ctx.command.payload.body) updates.body = ctx.command.payload.body;
 				ctx.update(updates);
-				ctx.emit({ type: "DraftUpdated", data: { contentId: ctx.workflow.id } });
+				ctx.emit("DraftUpdated", { contentId: ctx.workflow.id });
 			});
 
 			state.on("SubmitForReview", (ctx) => {
 				const { body } = ctx.data;
 				if (!body) {
-					ctx.error({ code: "BodyRequired", data: {} });
+					ctx.error("BodyRequired", {});
 					return;
 				}
 				ctx.transition("Review", {
@@ -55,9 +55,9 @@ describe("Content Publishing Integration", () => {
 					body,
 					reviewerId: ctx.command.payload.reviewerId,
 				});
-				ctx.emit({
-					type: "SubmittedForReview",
-					data: { contentId: ctx.workflow.id, reviewerId: ctx.command.payload.reviewerId },
+				ctx.emit("SubmittedForReview", {
+					contentId: ctx.workflow.id,
+					reviewerId: ctx.command.payload.reviewerId,
 				});
 			});
 		});
@@ -65,14 +65,14 @@ describe("Content Publishing Integration", () => {
 		router.state("Review", (state) => {
 			state.on("Approve", (ctx) => {
 				if (!ctx.deps.reviewService.canApprove(ctx.data.reviewerId)) {
-					ctx.error({ code: "NotReviewer", data: { expected: ctx.data.reviewerId } });
+					ctx.error("NotReviewer", { expected: ctx.data.reviewerId });
 				}
 				ctx.transition("Published", {
 					title: ctx.data.title,
 					body: ctx.data.body,
 					publishedAt: new Date(),
 				});
-				ctx.emit({ type: "Approved", data: { contentId: ctx.workflow.id } });
+				ctx.emit("Approved", { contentId: ctx.workflow.id });
 			});
 
 			state.on("Reject", (ctx) => {
@@ -81,10 +81,7 @@ describe("Content Publishing Integration", () => {
 					body: ctx.data.body,
 					reason: ctx.command.payload.reason,
 				});
-				ctx.emit({
-					type: "Rejected",
-					data: { contentId: ctx.workflow.id, reason: ctx.command.payload.reason },
-				});
+				ctx.emit("Rejected", { contentId: ctx.workflow.id, reason: ctx.command.payload.reason });
 			});
 		});
 
@@ -94,7 +91,7 @@ describe("Content Publishing Integration", () => {
 					title: ctx.data.title,
 					body: ctx.data.body,
 				});
-				ctx.emit({ type: "Revised", data: { contentId: ctx.workflow.id } });
+				ctx.emit("Revised", { contentId: ctx.workflow.id });
 			});
 		});
 
@@ -108,24 +105,18 @@ describe("Content Publishing Integration", () => {
 			data: { title: "Hello World" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "UpdateDraft",
-			payload: { body: "Content here" },
-		});
+		let result = await router.dispatch(wf, "UpdateDraft", { body: "Content here" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
-			type: "SubmitForReview",
-			payload: { reviewerId: "reviewer-1" },
-		});
+		result = await router.dispatch(wf, "SubmitForReview", { reviewerId: "reviewer-1" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Review");
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, { type: "Approve", payload: {} });
+		result = await router.dispatch(wf, "Approve", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Published");
@@ -138,24 +129,18 @@ describe("Content Publishing Integration", () => {
 			data: { title: "Draft", body: "Initial" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "SubmitForReview",
-			payload: { reviewerId: "r1" },
-		});
+		let result = await router.dispatch(wf, "SubmitForReview", { reviewerId: "r1" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, {
-			type: "Reject",
-			payload: { reason: "needs work" },
-		});
+		result = await router.dispatch(wf, "Reject", { reason: "needs work" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Rejected");
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, { type: "Revise", payload: {} });
+		result = await router.dispatch(wf, "Revise", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Draft");
@@ -168,15 +153,12 @@ describe("Content Publishing Integration", () => {
 			data: { title: "T", body: "B" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "SubmitForReview",
-			payload: { reviewerId: "r1" },
-		});
+		let result = await router.dispatch(wf, "SubmitForReview", { reviewerId: "r1" });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		wf = result.workflow;
 
-		result = await router.dispatch(wf, { type: "Approve", payload: {} });
+		result = await router.dispatch(wf, "Approve", {});
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
 		expect(result.error.category).toBe("domain");
@@ -192,19 +174,13 @@ describe("Content Publishing Integration", () => {
 			data: { title: "T", body: "B" },
 		});
 
-		const r1 = await router.dispatch(wf, {
-			type: "SubmitForReview",
-			payload: { reviewerId: "r1" },
-		});
+		const r1 = await router.dispatch(wf, "SubmitForReview", { reviewerId: "r1" });
 		expect(r1.ok).toBe(true);
 		if (!r1.ok) throw new Error();
 		expect(r1.events).toHaveLength(1);
 		expect(r1.events[0]?.type).toBe("SubmittedForReview");
 
-		const r2 = await router.dispatch(r1.workflow, {
-			type: "Approve",
-			payload: {},
-		});
+		const r2 = await router.dispatch(r1.workflow, "Approve", {});
 		expect(r2.ok).toBe(true);
 		if (!r2.ok) throw new Error();
 		expect(r2.events).toHaveLength(1);

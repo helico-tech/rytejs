@@ -59,7 +59,7 @@ describe("router.use() with plugins", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(log).toEqual(["plugin:start", "plugin:end"]);
 	});
 
@@ -82,7 +82,7 @@ describe("router.use() with plugins", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(log).toEqual(["auth-middleware", "handler"]);
 	});
 
@@ -101,7 +101,7 @@ describe("router.use() with plugins", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(log).toEqual(["global", "handler"]);
 	});
 
@@ -127,7 +127,7 @@ describe("router.use() with plugins", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(log).toEqual(["generic:start", "generic:end"]);
 	});
 
@@ -151,7 +151,7 @@ describe("router.use() with plugins", () => {
 		});
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		await router.dispatch(wf, { type: "Publish", payload: { title: "Hello" } });
+		await router.dispatch(wf, "Publish", { title: "Hello" });
 		expect(log).toEqual(["before", "handler", "after"]);
 	});
 
@@ -167,10 +167,7 @@ describe("router.use() with plugins", () => {
 		parent.use(child);
 
 		const wf = definition.createWorkflow("wf-1", { initialState: "Draft", data: {} });
-		const result = await parent.dispatch(wf, {
-			type: "Publish",
-			payload: { title: "Hello" },
-		});
+		const result = await parent.dispatch(wf, "Publish", { title: "Hello" });
 		expect(result.ok).toBe(true);
 	});
 });
