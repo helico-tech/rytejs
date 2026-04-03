@@ -55,3 +55,27 @@ export function stripServerData(
 	}
 	return result;
 }
+
+/**
+ * Derives a client-safe Zod schema by removing server-only fields.
+ * Recursively processes nested z.object() schemas.
+ * Returns the original schema unchanged for non-object schemas.
+ */
+export function deriveClientSchema(schema: ZodType): ZodType {
+	// biome-ignore lint/suspicious/noExplicitAny: accessing Zod v4 internal _zod.def.shape for schema introspection
+	const def = (schema as any)._zod?.def;
+	if (def?.type !== "object" || !def.shape) return schema;
+
+	const clientShape: Record<string, ZodType> = {};
+	for (const [key, fieldSchema] of Object.entries(def.shape as Record<string, ZodType>)) {
+		if (isServerField(fieldSchema)) continue;
+
+		// biome-ignore lint/suspicious/noExplicitAny: checking Zod v4 internal def.type for nested object detection
+		if ((fieldSchema as any)._zod?.def?.type === "object") {
+			clientShape[key] = deriveClientSchema(fieldSchema);
+		} else {
+			clientShape[key] = fieldSchema;
+		}
+	}
+	return z.object(clientShape).strict();
+}

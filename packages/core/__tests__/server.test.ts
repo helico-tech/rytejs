@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { isServerField, server, stripServerData } from "../src/server.js";
+import { deriveClientSchema, isServerField, server, stripServerData } from "../src/server.js";
 
 describe("server()", () => {
 	test("marks a schema as server-only", () => {
@@ -68,5 +68,56 @@ describe("stripServerData()", () => {
 		});
 		const data = { ssn: "123-45-6789", secret: 42 };
 		expect(stripServerData(schema, data)).toEqual({});
+	});
+});
+
+describe("deriveClientSchema()", () => {
+	test("derives schema without server fields", () => {
+		const schema = z.object({
+			name: z.string(),
+			ssn: server(z.string()),
+		});
+		const clientSchema = deriveClientSchema(schema);
+
+		expect(clientSchema.safeParse({ name: "Alice" }).success).toBe(true);
+		expect(clientSchema.safeParse({ name: "Alice", ssn: "123" }).success).toBe(false);
+	});
+
+	test("derives schema with nested server fields", () => {
+		const schema = z.object({
+			applicant: z.object({
+				name: z.string(),
+				ssn: server(z.string()),
+			}),
+			total: z.number(),
+		});
+		const clientSchema = deriveClientSchema(schema);
+
+		expect(clientSchema.safeParse({ applicant: { name: "Alice" }, total: 100 }).success).toBe(true);
+		expect(
+			clientSchema.safeParse({ applicant: { name: "Alice", ssn: "123" }, total: 100 }).success,
+		).toBe(false);
+	});
+
+	test("returns equivalent schema when no server fields", () => {
+		const schema = z.object({
+			name: z.string(),
+			age: z.number(),
+		});
+		const clientSchema = deriveClientSchema(schema);
+
+		expect(clientSchema.safeParse({ name: "Alice", age: 30 }).success).toBe(true);
+		expect(clientSchema.safeParse({ name: "Alice" }).success).toBe(false);
+	});
+
+	test("returns empty object schema when all fields are server-only", () => {
+		const schema = z.object({
+			ssn: server(z.string()),
+			secret: server(z.number()),
+		});
+		const clientSchema = deriveClientSchema(schema);
+
+		expect(clientSchema.safeParse({}).success).toBe(true);
+		expect(clientSchema.safeParse({ ssn: "123" }).success).toBe(false);
 	});
 });
