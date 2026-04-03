@@ -36,4 +36,6 @@ When your state schemas change, bump the `modelVersion`. Before restoring old sn
 
 <<< @/snippets/guide/serialization.ts#version-check
 
+To strip sensitive fields before sending snapshots to clients, see [Server Fields](/guide/server-fields).
+
 For migrating old snapshots to the current schema version, see the [Migrations](/guide/migrations) guide. The core provides `defineMigrations()` and `migrate()` for building migration pipelines.
