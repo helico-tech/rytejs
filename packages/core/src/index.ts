@@ -1,6 +1,8 @@
 export type { Context } from "./context.js";
 export type { ClientWorkflowDefinition, WorkflowDefinition } from "./definition.js";
 export { defineWorkflow } from "./definition.js";
+export type { StateGroup } from "./group.js";
+export { defineGroup } from "./group.js";
 export type { Handler } from "./handler.js";
 export type { HookEvent } from "./hooks.js";
 export type { ContextKey } from "./key.js";

@@ -63,3 +63,7 @@ All mutations are provisional. If a handler throws or calls `error()`, the origi
 <<< @/snippets/guide/state-transitions.ts#rollback
 
 The dispatch operates on internal copies. The workflow object you passed in is never mutated.
+
+## See Also
+
+- [State Groups](./state-groups.md) — for defining related sub-states that share a base schema and handlers
