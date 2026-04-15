@@ -109,20 +109,20 @@ describe("defineGroup() types", () => {
 	});
 
 	test("states record keys are the fully-qualified names", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
+		const _group = defineGroup("Payment", z.object({ amount: z.number() }), {
 			Pending: z.object({ attempt: z.number() }),
 		});
 
-		type Keys = keyof typeof group.states;
+		type Keys = keyof typeof _group.states;
 		expectTypeOf<Keys>().toEqualTypeOf<"Payment.Pending">();
 	});
 
 	test("each state schema infers to the merged shape", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
+		const _group = defineGroup("Payment", z.object({ amount: z.number() }), {
 			Pending: z.object({ attempt: z.number() }),
 		});
 
-		type Inferred = z.infer<(typeof group.states)["Payment.Pending"]>;
+		type Inferred = z.infer<(typeof _group.states)["Payment.Pending"]>;
 		expectTypeOf<Inferred>().toEqualTypeOf<{ amount: number; attempt: number }>();
 	});
 });
@@ -252,7 +252,7 @@ describe("defineGroup() integration with defineWorkflow + WorkflowRouter", () =>
 	});
 
 	test("transition to a sub-state validates against the merged schema", async () => {
-		const { Payment, definition } = buildOrderWorkflow();
+		const { definition } = buildOrderWorkflow();
 		const router = new WorkflowRouter(definition);
 
 		router.state("Draft", ({ on }) => {
