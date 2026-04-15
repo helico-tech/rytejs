@@ -27,6 +27,7 @@ export default defineConfig({
 						{ text: "Defining Workflows", link: "/guide/defining-workflows" },
 						{ text: "Routing Commands", link: "/guide/routing-commands" },
 						{ text: "State Transitions", link: "/guide/state-transitions" },
+						{ text: "State Groups", link: "/guide/state-groups" },
 						{ text: "Architecture Patterns", link: "/guide/architecture" },
 					],
 				},
