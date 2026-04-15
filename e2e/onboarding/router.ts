@@ -28,10 +28,7 @@ export function createOnboardingRouter() {
 				fullName: data.fullName,
 				identityRequestId: requestId,
 			});
-			emit({
-				type: "IdentityCheckRequested",
-				data: { email: data.email, identityRequestId: requestId },
-			});
+			emit("IdentityCheckRequested", { email: data.email, identityRequestId: requestId });
 		});
 	});
 
@@ -46,10 +43,7 @@ export function createOnboardingRouter() {
 					identityRequestId: data.identityRequestId,
 					verifiedAt,
 				});
-				emit({
-					type: "IdentityVerified",
-					data: { email: data.email, verifiedAt },
-				});
+				emit("IdentityVerified", { email: data.email, verifiedAt });
 			} else {
 				const reason = command.payload.reason ?? "unknown";
 				transition("IdentityFailed", {
@@ -58,10 +52,7 @@ export function createOnboardingRouter() {
 					identityRequestId: data.identityRequestId,
 					failureReason: reason,
 				});
-				emit({
-					type: "IdentityFailed",
-					data: { email: data.email, reason },
-				});
+				emit("IdentityFailed", { email: data.email, reason });
 			}
 		});
 	});
@@ -82,18 +73,15 @@ export function createOnboardingRouter() {
 				bankAccountId: command.payload.bankAccountId,
 				microDepositId: depositId,
 			});
-			emit({
-				type: "MicroDepositInitiated",
-				data: {
-					email: data.email,
-					bankAccountId: command.payload.bankAccountId,
-					microDepositId: depositId,
-				},
+			emit("MicroDepositInitiated", {
+				email: data.email,
+				bankAccountId: command.payload.bankAccountId,
+				microDepositId: depositId,
 			});
 		});
 
 		on("ReceiveIdentityResult", ({ error }) => {
-			error({ code: "AlreadyVerified", data: {} });
+			error("AlreadyVerified", {});
 		});
 	});
 
@@ -111,12 +99,9 @@ export function createOnboardingRouter() {
 					microDepositId: data.microDepositId,
 					bankVerifiedAt,
 				});
-				emit({
-					type: "BankVerified",
-					data: {
-						email: data.email,
-						bankAccountId: data.bankAccountId,
-					},
+				emit("BankVerified", {
+					email: data.email,
+					bankAccountId: data.bankAccountId,
 				});
 			} else {
 				const reason = command.payload.reason ?? "unknown";
@@ -128,10 +113,7 @@ export function createOnboardingRouter() {
 					bankAccountId: data.bankAccountId,
 					failureReason: reason,
 				});
-				emit({
-					type: "BankFailed",
-					data: { email: data.email, reason },
-				});
+				emit("BankFailed", { email: data.email, reason });
 			}
 		});
 	});
@@ -150,10 +132,7 @@ export function createOnboardingRouter() {
 				bankVerifiedAt: data.bankVerifiedAt,
 				reviewRequestedAt,
 			});
-			emit({
-				type: "BackofficeReviewRequested",
-				data: { email: data.email, reviewRequestedAt },
-			});
+			emit("BackofficeReviewRequested", { email: data.email, reviewRequestedAt });
 		});
 	});
 
@@ -173,17 +152,11 @@ export function createOnboardingRouter() {
 				approvedBy: command.payload.approvedBy,
 				approvedAt,
 			});
-			emit({
-				type: "OnboardingApproved",
-				data: {
-					email: data.email,
-					approvedBy: command.payload.approvedBy,
-				},
+			emit("OnboardingApproved", {
+				email: data.email,
+				approvedBy: command.payload.approvedBy,
 			});
-			emit({
-				type: "WelcomeEmailSent",
-				data: { email: data.email },
-			});
+			emit("WelcomeEmailSent", { email: data.email });
 		});
 
 		on("RejectOnboarding", ({ data, command, transition, emit }) => {
@@ -198,13 +171,10 @@ export function createOnboardingRouter() {
 				rejectedBy: command.payload.rejectedBy,
 				rejectionReason: command.payload.reason,
 			});
-			emit({
-				type: "OnboardingRejected",
-				data: {
-					email: data.email,
-					rejectedBy: command.payload.rejectedBy,
-					reason: command.payload.reason,
-				},
+			emit("OnboardingRejected", {
+				email: data.email,
+				rejectedBy: command.payload.rejectedBy,
+				reason: command.payload.reason,
 			});
 		});
 	});
@@ -226,10 +196,7 @@ export function createOnboardingRouter() {
 				approvedAt: data.approvedAt,
 				activatedAt,
 			});
-			emit({
-				type: "AccountActivated",
-				data: { email: data.email, activatedAt },
-			});
+			emit("AccountActivated", { email: data.email, activatedAt });
 		});
 	});
 

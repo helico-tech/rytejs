@@ -26,7 +26,7 @@ pnpm biome check --fix .                  # autofix
 
 ## Architecture
 
-- **Command dispatch pattern**: `router.dispatch(workflow, { type, payload })` returns `DispatchResult` (never throws)
+- **Command dispatch pattern**: `router.dispatch(workflow, type, payload)` returns `DispatchResult` (never throws). Handlers use `emit(type, data)` and `error(code, data)` — all positional args.
 - **Koa-style middleware**: global → state-scoped → inline → handler (onion model)
 - **Discriminated unions**: `DispatchResult` on `ok`, `PipelineError` on `category`, `Workflow` on `state`
 - **Zod-driven types**: all type inference flows from Zod schemas — no manual type annotations

@@ -4,19 +4,16 @@ import { taskWorkflow } from "./definition.ts";
 const todoRouter = new WorkflowRouter(taskWorkflow).state("Todo", ({ on }) => {
 	on("Assign", ({ command, update, emit, workflow }) => {
 		update({ assignee: command.payload.assignee });
-		emit({
-			type: "TaskAssigned",
-			data: {
-				taskId: workflow.id,
-				assignee: command.payload.assignee,
-			},
+		emit("TaskAssigned", {
+			taskId: workflow.id,
+			assignee: command.payload.assignee,
 		});
 	});
 
 	on("Start", ({ data, error, transition, emit, workflow }) => {
 		const { assignee } = data;
 		if (!assignee) {
-			error({ code: "NotAssigned", data: {} });
+			error("NotAssigned", {});
 			return;
 		}
 		transition("InProgress", {
@@ -24,7 +21,7 @@ const todoRouter = new WorkflowRouter(taskWorkflow).state("Todo", ({ on }) => {
 			assignee,
 			startedAt: new Date(),
 		});
-		emit({ type: "TaskStarted", data: { taskId: workflow.id } });
+		emit("TaskStarted", { taskId: workflow.id });
 	});
 });
 
@@ -35,10 +32,7 @@ const inProgressRouter = new WorkflowRouter(taskWorkflow).state("InProgress", ({
 			assignee: data.assignee,
 			completedAt: new Date(),
 		});
-		emit({
-			type: "TaskCompleted",
-			data: { taskId: workflow.id },
-		});
+		emit("TaskCompleted", { taskId: workflow.id });
 	});
 });
 

@@ -10,10 +10,7 @@ describe("@rytejs/core E2E", () => {
 			data: { title: "Write docs" },
 		});
 
-		const result = await router.dispatch(task, {
-			type: "Assign",
-			payload: { assignee: "alice" },
-		});
+		const result = await router.dispatch(task, "Assign", { assignee: "alice" });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -29,10 +26,7 @@ describe("@rytejs/core E2E", () => {
 			data: { title: "Ship it" },
 		});
 
-		const result = await router.dispatch(task, {
-			type: "Assign",
-			payload: { assignee: "bob" },
-		});
+		const result = await router.dispatch(task, "Assign", { assignee: "bob" });
 
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -46,10 +40,7 @@ describe("@rytejs/core E2E", () => {
 			data: { title: "No assignee" },
 		});
 
-		const result = await router.dispatch(task, {
-			type: "Start",
-			payload: {},
-		});
+		const result = await router.dispatch(task, "Start", {});
 
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
@@ -67,18 +58,12 @@ describe("@rytejs/core E2E", () => {
 			data: { title: "Full lifecycle", assignee: "alice" },
 		});
 
-		let result = await router.dispatch(task, {
-			type: "Start",
-			payload: {},
-		});
+		let result = await router.dispatch(task, "Start", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("InProgress");
 
-		result = await router.dispatch(result.workflow, {
-			type: "Complete",
-			payload: {},
-		});
+		result = await router.dispatch(result.workflow, "Complete", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Done");
@@ -91,10 +76,7 @@ describe("@rytejs/core E2E", () => {
 		});
 
 		// Handler from todoRouter
-		const r1 = await router.dispatch(task, {
-			type: "Assign",
-			payload: { assignee: "charlie" },
-		});
+		const r1 = await router.dispatch(task, "Assign", { assignee: "charlie" });
 		expect(r1.ok).toBe(true);
 
 		// Handler from inProgressRouter
@@ -102,10 +84,7 @@ describe("@rytejs/core E2E", () => {
 			initialState: "InProgress",
 			data: { title: "Started", assignee: "charlie", startedAt: new Date() },
 		});
-		const r2 = await router.dispatch(started, {
-			type: "Complete",
-			payload: {},
-		});
+		const r2 = await router.dispatch(started, "Complete", {});
 		expect(r2.ok).toBe(true);
 		if (r2.ok) expect(r2.workflow.state).toBe("Done");
 	});
@@ -125,10 +104,7 @@ describe("@rytejs/core E2E", () => {
 			data: { title: "With middleware" },
 		});
 
-		const result = await authedRouter.dispatch(task, {
-			type: "Assign",
-			payload: { assignee: "dave" },
-		});
+		const result = await authedRouter.dispatch(task, "Assign", { assignee: "dave" });
 		expect(result.ok).toBe(true);
 	});
 });

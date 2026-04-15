@@ -12,9 +12,8 @@ describe("onboarding workflow", () => {
 		});
 
 		// 1. Submit identity documents
-		let result = await router.dispatch(wf, {
-			type: "SubmitIdentity",
-			payload: { documentUrl: "https://docs.example.com/passport.pdf" },
+		let result = await router.dispatch(wf, "SubmitIdentity", {
+			documentUrl: "https://docs.example.com/passport.pdf",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -25,19 +24,15 @@ describe("onboarding workflow", () => {
 		expect(result.events[0]?.type).toBe("IdentityCheckRequested");
 
 		// 2. Identity provider calls back with success
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveIdentityResult",
-			payload: { success: true },
-		});
+		result = await router.dispatch(result.workflow, "ReceiveIdentityResult", { success: true });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("IdentityVerified");
 		expect(result.events[0]?.type).toBe("IdentityVerified");
 
 		// 3. Initiate bank verification
-		result = await router.dispatch(result.workflow, {
-			type: "InitiateBankVerification",
-			payload: { bankAccountId: "ACC-123" },
+		result = await router.dispatch(result.workflow, "InitiateBankVerification", {
+			bankAccountId: "ACC-123",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -49,29 +44,22 @@ describe("onboarding workflow", () => {
 		expect(result.events[0]?.type).toBe("MicroDepositInitiated");
 
 		// 4. Bank calls back with success
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveBankResult",
-			payload: { success: true },
-		});
+		result = await router.dispatch(result.workflow, "ReceiveBankResult", { success: true });
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("BankVerified");
 		expect(result.events[0]?.type).toBe("BankVerified");
 
 		// 5. Submit for backoffice review
-		result = await router.dispatch(result.workflow, {
-			type: "SubmitForReview",
-			payload: {},
-		});
+		result = await router.dispatch(result.workflow, "SubmitForReview", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("BackofficeReview");
 		expect(result.events[0]?.type).toBe("BackofficeReviewRequested");
 
 		// 6. Backoffice approves
-		result = await router.dispatch(result.workflow, {
-			type: "ApproveOnboarding",
-			payload: { approvedBy: "admin@company.com" },
+		result = await router.dispatch(result.workflow, "ApproveOnboarding", {
+			approvedBy: "admin@company.com",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -79,10 +67,7 @@ describe("onboarding workflow", () => {
 		expect(result.events.map((e) => e.type)).toEqual(["OnboardingApproved", "WelcomeEmailSent"]);
 
 		// 7. Activate account
-		result = await router.dispatch(result.workflow, {
-			type: "ActivateAccount",
-			payload: {},
-		});
+		result = await router.dispatch(result.workflow, "ActivateAccount", {});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("Active");
@@ -135,16 +120,15 @@ describe("onboarding workflow", () => {
 			data: { email: "bob@example.com", fullName: "Bob Jones" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "SubmitIdentity",
-			payload: { documentUrl: "https://docs.example.com/id.pdf" },
+		let result = await router.dispatch(wf, "SubmitIdentity", {
+			documentUrl: "https://docs.example.com/id.pdf",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveIdentityResult",
-			payload: { success: false, reason: "document_expired" },
+		result = await router.dispatch(result.workflow, "ReceiveIdentityResult", {
+			success: false,
+			reason: "document_expired",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -167,27 +151,22 @@ describe("onboarding workflow", () => {
 			data: { email: "carol@example.com", fullName: "Carol White" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "SubmitIdentity",
-			payload: { documentUrl: "https://docs.example.com/id.pdf" },
+		let result = await router.dispatch(wf, "SubmitIdentity", {
+			documentUrl: "https://docs.example.com/id.pdf",
 		});
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveIdentityResult",
-			payload: { success: true },
+		result = await router.dispatch(result.workflow, "ReceiveIdentityResult", { success: true });
+		if (!result.ok) throw new Error();
+
+		result = await router.dispatch(result.workflow, "InitiateBankVerification", {
+			bankAccountId: "ACC-BAD",
 		});
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "InitiateBankVerification",
-			payload: { bankAccountId: "ACC-BAD" },
-		});
-		if (!result.ok) throw new Error();
-
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveBankResult",
-			payload: { success: false, reason: "account_closed" },
+		result = await router.dispatch(result.workflow, "ReceiveBankResult", {
+			success: false,
+			reason: "account_closed",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -212,42 +191,28 @@ describe("onboarding workflow", () => {
 			data: { email: "dave@example.com", fullName: "Dave Brown" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "SubmitIdentity",
-			payload: { documentUrl: "https://docs.example.com/id.pdf" },
+		let result = await router.dispatch(wf, "SubmitIdentity", {
+			documentUrl: "https://docs.example.com/id.pdf",
 		});
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveIdentityResult",
-			payload: { success: true },
+		result = await router.dispatch(result.workflow, "ReceiveIdentityResult", { success: true });
+		if (!result.ok) throw new Error();
+
+		result = await router.dispatch(result.workflow, "InitiateBankVerification", {
+			bankAccountId: "ACC-456",
 		});
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "InitiateBankVerification",
-			payload: { bankAccountId: "ACC-456" },
-		});
+		result = await router.dispatch(result.workflow, "ReceiveBankResult", { success: true });
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveBankResult",
-			payload: { success: true },
-		});
+		result = await router.dispatch(result.workflow, "SubmitForReview", {});
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "SubmitForReview",
-			payload: {},
-		});
-		if (!result.ok) throw new Error();
-
-		result = await router.dispatch(result.workflow, {
-			type: "RejectOnboarding",
-			payload: {
-				rejectedBy: "compliance@company.com",
-				reason: "suspicious activity",
-			},
+		result = await router.dispatch(result.workflow, "RejectOnboarding", {
+			rejectedBy: "compliance@company.com",
+			reason: "suspicious activity",
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error();
@@ -273,16 +238,12 @@ describe("onboarding workflow", () => {
 			data: { email: "eve@example.com", fullName: "Eve Green" },
 		});
 
-		let result = await router.dispatch(wf, {
-			type: "SubmitIdentity",
-			payload: { documentUrl: "https://docs.example.com/id.pdf" },
+		let result = await router.dispatch(wf, "SubmitIdentity", {
+			documentUrl: "https://docs.example.com/id.pdf",
 		});
 		if (!result.ok) throw new Error();
 
-		result = await router.dispatch(result.workflow, {
-			type: "ReceiveIdentityResult",
-			payload: { success: true },
-		});
+		result = await router.dispatch(result.workflow, "ReceiveIdentityResult", { success: true });
 		if (!result.ok) throw new Error();
 		expect(result.workflow.state).toBe("IdentityVerified");
 
@@ -290,10 +251,7 @@ describe("onboarding workflow", () => {
 		const verifiedWf = result.workflow;
 
 		// Duplicate webhook arrives
-		result = await router.dispatch(verifiedWf, {
-			type: "ReceiveIdentityResult",
-			payload: { success: true },
-		});
+		result = await router.dispatch(verifiedWf, "ReceiveIdentityResult", { success: true });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
 		expect(result.error.category).toBe("domain");
@@ -313,10 +271,7 @@ describe("onboarding workflow", () => {
 			data: { email: "frank@example.com", fullName: "Frank Black" },
 		});
 
-		const result = await router.dispatch(wf, {
-			type: "SubmitIdentity",
-			payload: { documentUrl: "not-a-url" },
-		});
+		const result = await router.dispatch(wf, "SubmitIdentity", { documentUrl: "not-a-url" });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error();
 		expect(result.error.category).toBe("validation");
