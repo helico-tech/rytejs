@@ -249,6 +249,7 @@ describe("defineGroup() integration with defineWorkflow + WorkflowRouter", () =>
 		});
 		await router.dispatch(wf, "CancelPayment", {});
 		expect(tag).toEqual(["specific"]);
+		expect(tag).not.toContain("group");
 	});
 
 	test("transition to a sub-state validates against the merged schema", async () => {

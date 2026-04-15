@@ -22,6 +22,8 @@ export type StateGroup<
 > = {
 	readonly name: TName;
 	readonly states: {
+		// `any` in the constraint is the upper bound only — TS infers the concrete TBase/TChildren[K]
+		// at the call site, so `TBase["shape"]` resolves to the actual shape, not `any`.
 		[K in keyof TChildren as `${TName}.${K & string}`]: z.ZodObject<
 			TBase["shape"] & TChildren[K]["shape"]
 		>;
