@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "vitest";
 import { z } from "zod";
 import { defineGroup } from "../src/group.js";
 
@@ -83,5 +83,44 @@ describe("defineGroup()", () => {
 		expect(Object.isFrozen(group)).toBe(true);
 		expect(Object.isFrozen(group.states)).toBe(true);
 		expect(Object.isFrozen(group.names)).toBe(true);
+	});
+});
+
+describe("defineGroup() types", () => {
+	test("accessors are string-literal types, not widened to string", () => {
+		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
+			Pending: z.object({ attempt: z.number() }),
+			Failed: z.object({ reason: z.string() }),
+		});
+
+		expectTypeOf(group.Pending).toEqualTypeOf<"Payment.Pending">();
+		expectTypeOf(group.Failed).toEqualTypeOf<"Payment.Failed">();
+	});
+
+	test("names is a readonly array of the union of sub-state names", () => {
+		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
+			Pending: z.object({ attempt: z.number() }),
+			Failed: z.object({ reason: z.string() }),
+		});
+
+		expectTypeOf(group.names).toEqualTypeOf<ReadonlyArray<"Payment.Pending" | "Payment.Failed">>();
+	});
+
+	test("states record keys are the fully-qualified names", () => {
+		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
+			Pending: z.object({ attempt: z.number() }),
+		});
+
+		type Keys = keyof typeof group.states;
+		expectTypeOf<Keys>().toEqualTypeOf<"Payment.Pending">();
+	});
+
+	test("each state schema infers to the merged shape", () => {
+		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
+			Pending: z.object({ attempt: z.number() }),
+		});
+
+		type Inferred = z.infer<(typeof group.states)["Payment.Pending"]>;
+		expectTypeOf<Inferred>().toEqualTypeOf<{ amount: number; attempt: number }>();
 	});
 });
