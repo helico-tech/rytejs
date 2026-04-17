@@ -1,5 +1,6 @@
 import type { WorkflowDefinition } from "./definition.js";
 import type { ContextKey } from "./key.js";
+import { validateSchema } from "./standard.js";
 import type {
 	CommandNames,
 	CommandPayload,
@@ -163,40 +164,35 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 		update(data: Record<string, unknown>) {
 			const merged = { ...mutableData, ...data };
 			const schema = definition.getStateSchema(mutableState);
-			const result = schema.safeParse(merged);
-			if (!result.success) {
-				throw new ValidationError("state", result.error.issues);
+			const result = validateSchema(schema, merged);
+			if (!result.ok) {
+				throw new ValidationError("state", result.issues);
 			}
-			mutableData = result.data as Record<string, unknown>;
+			mutableData = result.value as Record<string, unknown>;
 		},
 
 		transition(target: string, data: unknown) {
 			if (!definition.hasState(target)) {
 				throw new ValidationError("transition", [
-					{
-						code: "custom",
-						message: `Unknown state: ${target}`,
-						input: target,
-						path: ["state"],
-					},
+					{ message: `Unknown state: ${target}`, path: ["state"] },
 				]);
 			}
 			const schema = definition.getStateSchema(target);
-			const result = schema.safeParse(data);
-			if (!result.success) {
-				throw new ValidationError("transition", result.error.issues);
+			const result = validateSchema(schema, data);
+			if (!result.ok) {
+				throw new ValidationError("transition", result.issues);
 			}
 			mutableState = target;
-			mutableData = result.data as Record<string, unknown>;
+			mutableData = result.value as Record<string, unknown>;
 		},
 
 		emit(type: string, data: unknown) {
 			const schema = definition.getEventSchema(type);
-			const result = schema.safeParse(data);
-			if (!result.success) {
-				throw new ValidationError("event", result.error.issues);
+			const result = validateSchema(schema, data);
+			if (!result.ok) {
+				throw new ValidationError("event", result.issues);
 			}
-			accumulatedEvents.push({ type, data: result.data });
+			accumulatedEvents.push({ type, data: result.value });
 		},
 
 		get events() {
@@ -205,11 +201,11 @@ export function createContext<TConfig extends WorkflowConfig, TDeps>(
 
 		error(code: string, data: unknown) {
 			const schema = definition.getErrorSchema(code);
-			const result = schema.safeParse(data);
-			if (!result.success) {
-				throw new ValidationError("state", result.error.issues);
+			const result = validateSchema(schema, data);
+			if (!result.ok) {
+				throw new ValidationError("state", result.issues);
 			}
-			throw new DomainErrorSignal(code, result.data);
+			throw new DomainErrorSignal(code, result.value);
 		},
 
 		match(

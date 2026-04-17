@@ -23,7 +23,7 @@ export type ExecutorMiddleware = (ctx: ExecutorContext, next: () => Promise<void
 export type ExecutorError =
 	| { category: "not_found"; id: string }
 	| { category: "conflict"; id: string; expectedVersion: number; actualVersion: number }
-	| { category: "restore"; id: string; issues: unknown[] }
+	| { category: "restore"; id: string; issues: readonly unknown[] }
 	| { category: "unexpected"; error: unknown; message: string };
 
 // ── Result ──

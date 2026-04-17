@@ -1,5 +1,5 @@
 import type { ClientStateData } from "@rytejs/core";
-import { defineWorkflow, server } from "@rytejs/core";
+import { defineWorkflow, state } from "@rytejs/core";
 import { z } from "zod";
 
 // ── Loan workflow with server-only fields ───────────────────────────────────
@@ -7,15 +7,21 @@ import { z } from "zod";
 // #region marking
 const loanDef = defineWorkflow("loan", {
 	states: {
-		Review: z.object({
-			applicantName: z.string(),
-			ssn: server(z.string()),
-			creditScore: server(z.number()),
+		Review: state({
+			schema: z.object({
+				applicantName: z.string(),
+				ssn: z.string(),
+				creditScore: z.number(),
+			}),
+			server: ["ssn", "creditScore"],
 		}),
-		Approved: z.object({
-			applicantName: z.string(),
-			approvedAmount: z.number(),
-			underwriterNotes: server(z.string()),
+		Approved: state({
+			schema: z.object({
+				applicantName: z.string(),
+				approvedAmount: z.number(),
+				underwriterNotes: z.string(),
+			}),
+			server: ["underwriterNotes"],
 		}),
 	},
 	commands: {
@@ -39,7 +45,7 @@ const wf = loanDef.createWorkflow("loan-1", {
 });
 
 // Full snapshot — for server-side persistence
-const full = loanDef.serialize(wf);
+const _full = loanDef.serialize(wf);
 // full.data = { applicantName: "Alice", ssn: "123-45-6789", creditScore: 780 }
 
 // Client snapshot — server fields stripped
@@ -52,7 +58,7 @@ const client = loanDef.serializeForClient(wf);
 // #region client-definition
 const clientDef = loanDef.forClient();
 
-// Client schemas have server fields removed
+// No schema rebuild — snapshots are accepted from trusted sources as-is.
 const result = clientDef.deserialize(client);
 if (result.ok) {
 	result.workflow.state; // "Review"
