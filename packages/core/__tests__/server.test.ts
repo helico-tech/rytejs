@@ -3,17 +3,18 @@ import { z } from "zod";
 import { defineWorkflow, state } from "../src/index.js";
 import type { ClientStateData } from "../src/types.js";
 
-describe("state() — server field declaration", () => {
-	test("returns a state config carrying schema + server keys", () => {
+describe("state() — schema + optional clientSchema", () => {
+	test("returns a state config carrying both schemas", () => {
 		const schema = z.object({ name: z.string(), ssn: z.string() });
-		const cfg = state({ schema, server: ["ssn"] });
+		const clientSchema = z.object({ name: z.string() });
+		const cfg = state({ schema, clientSchema });
 		expect(cfg.schema).toBe(schema);
-		expect(cfg.server).toEqual(["ssn"]);
+		expect(cfg.clientSchema).toBe(clientSchema);
 	});
 
-	test("server keys default to undefined when not provided", () => {
+	test("clientSchema defaults to undefined when not provided", () => {
 		const cfg = state({ schema: z.object({ name: z.string() }) });
-		expect(cfg.server).toBeUndefined();
+		expect(cfg.clientSchema).toBeUndefined();
 	});
 });
 
@@ -26,7 +27,7 @@ describe("serializeForClient()", () => {
 					ssn: z.string(),
 					internalScore: z.number(),
 				}),
-				server: ["ssn", "internalScore"],
+				clientSchema: z.object({ applicantName: z.string() }),
 			}),
 			Approved: state({
 				schema: z.object({
@@ -34,7 +35,10 @@ describe("serializeForClient()", () => {
 					approvedAmount: z.number(),
 					underwriterNotes: z.string(),
 				}),
-				server: ["underwriterNotes"],
+				clientSchema: z.object({
+					applicantName: z.string(),
+					approvedAmount: z.number(),
+				}),
 			}),
 		},
 		commands: { Approve: z.object({ amount: z.number() }) },
@@ -42,7 +46,7 @@ describe("serializeForClient()", () => {
 		errors: { CreditCheckFailed: z.object({ reason: z.string() }) },
 	});
 
-	test("strips declared server fields from snapshot data", () => {
+	test("strips fields absent from clientSchema (via validator default strip)", () => {
 		const wf = loanDef.createWorkflow("loan-1", {
 			initialState: "Review",
 			data: { applicantName: "Alice", ssn: "123-45-6789", internalScore: 95 },
@@ -77,7 +81,7 @@ describe("serializeForClient()", () => {
 		expect(clientSnapshot.version).toBe(fullSnapshot.version);
 	});
 
-	test("works with different states", () => {
+	test("uses per-state clientSchema", () => {
 		const wf = loanDef.createWorkflow("loan-2", {
 			initialState: "Approved",
 			data: { applicantName: "Bob", approvedAmount: 50000, underwriterNotes: "Good credit" },
@@ -90,7 +94,7 @@ describe("serializeForClient()", () => {
 		});
 	});
 
-	test("returns same data as serialize() when no server fields declared", () => {
+	test("returns same data as serialize() when no clientSchema declared", () => {
 		const simpleDef = defineWorkflow("simple", {
 			states: { Active: z.object({ name: z.string() }) },
 			commands: { DoThing: z.object({}) },
@@ -106,6 +110,22 @@ describe("serializeForClient()", () => {
 		const client = simpleDef.serializeForClient(wf);
 		expect(client.data).toEqual(full.data);
 	});
+
+	test("throws if server data doesn't conform to clientSchema", () => {
+		const badDef = defineWorkflow("bad", {
+			states: {
+				S: state({
+					schema: z.object({ a: z.string() }),
+					clientSchema: z.object({ a: z.string(), b: z.string() }),
+				}),
+			},
+			commands: { C: z.object({}) },
+			events: {},
+			errors: {},
+		});
+		const wf = badDef.createWorkflow("b", { initialState: "S", data: { a: "hi" } });
+		expect(() => badDef.serializeForClient(wf)).toThrow(/clientSchema validation/);
+	});
 });
 
 describe("forClient()", () => {
@@ -115,15 +135,15 @@ describe("forClient()", () => {
 				schema: z.object({
 					applicantName: z.string(),
 					ssn: z.string(),
-					internalScore: z.number(),
 				}),
-				server: ["ssn", "internalScore"],
+				clientSchema: z.object({ applicantName: z.string() }),
 			}),
 			Approved: state({
 				schema: z.object({
 					applicantName: z.string(),
 					approvedAmount: z.number(),
 				}),
+				// No clientSchema — full shape visible to client
 			}),
 		},
 		commands: { Approve: z.object({ amount: z.number() }) },
@@ -149,7 +169,7 @@ describe("forClient()", () => {
 		expect(clientDef.hasState("NonExistent")).toBe(false);
 	});
 
-	test("deserialize() constructs a workflow from a trusted client snapshot", () => {
+	test("deserialize() validates client snapshot against clientSchema", () => {
 		const clientDef = loanDef.forClient();
 
 		const result = clientDef.deserialize({
@@ -170,6 +190,47 @@ describe("forClient()", () => {
 		}
 	});
 
+	test("deserialize() rejects snapshot data that fails clientSchema", () => {
+		const clientDef = loanDef.forClient();
+
+		const result = clientDef.deserialize({
+			id: "loan-1",
+			definitionName: "loan",
+			state: "Review",
+			// Missing applicantName, and ssn is a server-only field (not in clientSchema).
+			data: { ssn: "leaked" },
+			createdAt: "2026-01-01T00:00:00.000Z",
+			updatedAt: "2026-01-01T00:00:00.000Z",
+			modelVersion: 1,
+			version: 1,
+		});
+
+		expect(result.ok).toBe(false);
+	});
+
+	test("deserialize() passes through data when no clientSchema declared", () => {
+		const clientDef = loanDef.forClient();
+
+		const result = clientDef.deserialize({
+			id: "loan-2",
+			definitionName: "loan",
+			state: "Approved",
+			data: { applicantName: "Bob", approvedAmount: 50000 },
+			createdAt: "2026-01-01T00:00:00.000Z",
+			updatedAt: "2026-01-01T00:00:00.000Z",
+			modelVersion: 1,
+			version: 1,
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.workflow.data).toEqual({
+				applicantName: "Bob",
+				approvedAmount: 50000,
+			});
+		}
+	});
+
 	test("deserialize() rejects unknown state", () => {
 		const clientDef = loanDef.forClient();
 
@@ -186,24 +247,6 @@ describe("forClient()", () => {
 
 		expect(result.ok).toBe(false);
 	});
-
-	test("deserialize() does NOT re-validate data shape", () => {
-		// Snapshots from the trusted server are accepted as-is — this is the
-		// explicit semantic of the validator-agnostic client projection.
-		// Defence-in-depth is the caller's responsibility.
-		const clientDef = loanDef.forClient();
-		const result = clientDef.deserialize({
-			id: "loan-1",
-			definitionName: "loan",
-			state: "Review",
-			data: { applicantName: 42, extra: "surprise" } as unknown as { applicantName: string },
-			createdAt: "2026-01-01T00:00:00.000Z",
-			updatedAt: "2026-01-01T00:00:00.000Z",
-			modelVersion: 1,
-			version: 1,
-		});
-		expect(result.ok).toBe(true);
-	});
 });
 
 describe("client types", () => {
@@ -215,7 +258,7 @@ describe("client types", () => {
 					ssn: z.string(),
 					internalScore: z.number(),
 				}),
-				server: ["ssn", "internalScore"],
+				clientSchema: z.object({ applicantName: z.string() }),
 			}),
 			Approved: z.object({
 				applicantName: z.string(),
@@ -229,20 +272,20 @@ describe("client types", () => {
 
 	type LoanConfig = typeof _loanDef.config;
 
-	test("ClientStateData excludes declared server fields", () => {
+	test("ClientStateData narrows to clientSchema output when declared", () => {
 		type ReviewClient = ClientStateData<LoanConfig, "Review">;
 
 		const valid: ReviewClient = { applicantName: "Alice" };
 		expect(valid.applicantName).toBe("Alice");
 
-		// @ts-expect-error — ssn should not exist on client type
+		// @ts-expect-error — ssn is only in the server schema
 		const _ssn: ReviewClient = { applicantName: "Alice", ssn: "123" };
 
-		// @ts-expect-error — internalScore should not exist on client type
+		// @ts-expect-error — internalScore is only in the server schema
 		const _score: ReviewClient = { applicantName: "Alice", internalScore: 95 };
 	});
 
-	test("ClientStateData preserves all fields for plain-schema states", () => {
+	test("ClientStateData equals StateData when no clientSchema declared (plain schema)", () => {
 		type ApprovedClient = ClientStateData<LoanConfig, "Approved">;
 		const valid: ApprovedClient = { applicantName: "Bob", approvedAmount: 50000 };
 		expect(valid.approvedAmount).toBe(50000);

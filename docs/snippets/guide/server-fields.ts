@@ -13,7 +13,9 @@ const loanDef = defineWorkflow("loan", {
 				ssn: z.string(),
 				creditScore: z.number(),
 			}),
-			server: ["ssn", "creditScore"],
+			clientSchema: z.object({
+				applicantName: z.string(),
+			}),
 		}),
 		Approved: state({
 			schema: z.object({
@@ -21,7 +23,10 @@ const loanDef = defineWorkflow("loan", {
 				approvedAmount: z.number(),
 				underwriterNotes: z.string(),
 			}),
-			server: ["underwriterNotes"],
+			clientSchema: z.object({
+				applicantName: z.string(),
+				approvedAmount: z.number(),
+			}),
 		}),
 	},
 	commands: {
@@ -48,7 +53,7 @@ const wf = loanDef.createWorkflow("loan-1", {
 const _full = loanDef.serialize(wf);
 // full.data = { applicantName: "Alice", ssn: "123-45-6789", creditScore: 780 }
 
-// Client snapshot — server fields stripped
+// Client snapshot — data passes through the client schema; unknown keys are stripped
 const client = loanDef.serializeForClient(wf);
 // client.data = { applicantName: "Alice" }
 // #endregion serialize
@@ -58,7 +63,7 @@ const client = loanDef.serializeForClient(wf);
 // #region client-definition
 const clientDef = loanDef.forClient();
 
-// No schema rebuild — snapshots are accepted from trusted sources as-is.
+// Re-validates against the declared clientSchema for defence-in-depth
 const result = clientDef.deserialize(client);
 if (result.ok) {
 	result.workflow.state; // "Review"
@@ -77,16 +82,16 @@ type LoanConfig = typeof loanDef.config;
 // Server-side: full data type
 // StateData<LoanConfig, "Review"> = { applicantName: string, ssn: string, creditScore: number }
 
-// Client-side: server fields excluded
+// Client-side: the clientSchema's inferred output
 type ReviewClient = ClientStateData<LoanConfig, "Review">;
 // { applicantName: string }
 
 const data: ReviewClient = { applicantName: "Alice" };
 data.applicantName; // ✅ string
 
-// @ts-expect-error — ssn does not exist on client type
+// @ts-expect-error — ssn is only in the server schema
 data.ssn;
 
-// @ts-expect-error — creditScore does not exist on client type
+// @ts-expect-error — creditScore is only in the server schema
 data.creditScore;
 // #endregion type-safety

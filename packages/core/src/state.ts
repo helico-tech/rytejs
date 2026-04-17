@@ -1,52 +1,65 @@
 import type { StandardSchemaV1 } from "./standard.js";
 
 /**
- * State configuration with an optional list of server-only field keys.
+ * State configuration — a server-side schema plus an optional client-side schema.
  *
- * Declared keys are stripped from the data by `serializeForClient()` and
- * excluded from the `ClientStateData` TypeScript type. Stripping is a
- * validator-agnostic key filter — no schema introspection involved.
+ * When `clientSchema` is provided, `serializeForClient()` runs data through it and
+ * returns the validator's stripped result (Zod / Valibot default-strip; ArkType
+ * users should use loose `type({...})`). `ClientStateData<TConfig, S>` is typed
+ * as the `clientSchema`'s inferred output — fields absent from `clientSchema` are
+ * not visible to client TypeScript code.
+ *
+ * If `clientSchema` is omitted, server and client share the same shape and no
+ * stripping happens at serialization time.
  */
 export interface StateConfig<
 	TSchema extends StandardSchemaV1 = StandardSchemaV1,
-	TServer extends readonly string[] = readonly string[],
+	TClientSchema extends StandardSchemaV1 = TSchema,
 > {
 	readonly schema: TSchema;
-	readonly server?: TServer;
+	readonly clientSchema?: TClientSchema;
 }
 
 /**
- * Declares a state with its schema and optional server-only field keys.
+ * Declares a state with a primary (server-side) schema and an optional
+ * client-side schema. Keeping schemas as the unit of declaration makes the
+ * API validator-agnostic — we never inspect schema shape.
  *
  * @example
  * state({
  *     schema: z.object({ applicantName: z.string(), ssn: z.string() }),
- *     server: ["ssn"],
+ *     clientSchema: z.object({ applicantName: z.string() }),
  * })
  */
 export function state<
 	TSchema extends StandardSchemaV1,
-	const TServer extends readonly (keyof StandardSchemaV1.InferOutput<TSchema> &
-		string)[] = readonly [],
->(config: { schema: TSchema; server?: TServer }): StateConfig<TSchema, TServer> {
-	return { schema: config.schema, server: config.server };
+	TClientSchema extends StandardSchemaV1 = TSchema,
+>(config: { schema: TSchema; clientSchema?: TClientSchema }): StateConfig<TSchema, TClientSchema> {
+	return { schema: config.schema, clientSchema: config.clientSchema };
 }
 
-/** Extracts the schema from a state entry (plain schema or `state()` config). */
+/** Extracts the server-side schema from a state entry (plain schema or `state()` config). */
 export type StateSchema<E> = E extends { schema: infer S extends StandardSchemaV1 }
 	? S
 	: E extends StandardSchemaV1
 		? E
 		: never;
 
-/** Extracts the declared server keys from a state entry, or `never` if none. */
-export type StateServerKeys<E> = E extends { readonly server?: infer K }
-	? K extends readonly string[]
-		? K[number]
-		: never
-	: never;
+/**
+ * Extracts the client-side schema from a state entry:
+ * - `state({ schema, clientSchema })` → `clientSchema`
+ * - `state({ schema })` (no clientSchema) → `schema`
+ * - plain schema → itself
+ */
+export type StateClientSchema<E> = E extends {
+	readonly clientSchema?: infer C;
+}
+	? C extends StandardSchemaV1
+		? C
+		: StateSchema<E>
+	: StateSchema<E>;
 
-/** Runtime: pulls the schema from a state entry of either form. */
+/** Runtime: pulls the server-side schema from a state entry of either form. */
 export function resolveSchema(entry: unknown): StandardSchemaV1 {
 	if (typeof entry === "object" && entry !== null && "schema" in entry) {
 		return (entry as StateConfig).schema;
@@ -54,10 +67,11 @@ export function resolveSchema(entry: unknown): StandardSchemaV1 {
 	return entry as StandardSchemaV1;
 }
 
-/** Runtime: pulls the server-key list from a state entry, or empty array. */
-export function resolveServerKeys(entry: unknown): readonly string[] {
-	if (typeof entry === "object" && entry !== null && "server" in entry) {
-		return (entry as StateConfig).server ?? [];
+/** Runtime: pulls the client-side schema if the entry declares one; otherwise `undefined`. */
+export function resolveClientSchema(entry: unknown): StandardSchemaV1 | undefined {
+	if (typeof entry === "object" && entry !== null && "clientSchema" in entry) {
+		const cs = (entry as StateConfig).clientSchema;
+		return cs;
 	}
-	return [];
+	return undefined;
 }

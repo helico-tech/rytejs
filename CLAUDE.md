@@ -68,15 +68,14 @@ pnpm biome check --fix .                  # autofix
 - Vitest with `describe`, `test`, `expect`
 - Test files in `__tests__/` directories, colocated with source
 - Use `@rytejs/testing` utilities: `createTestWorkflow`, `expectOk`, `expectError`, `testPath`, `createTestDeps`
-- Zod v4 is required (peer dep) — only because `defineGroup` types against `z.ZodObject` and calls `.merge()` at runtime. All other features (router/context/dispatch/server fields) are validator-agnostic.
+- Zod is an **optional** peer dep — install only if you use Zod schemas. Core works equally with Valibot or ArkType. No runtime or type reference to Zod in `packages/core/src`.
 
 ## Supported validators
 
 Any validator that implements Standard Schema v1 works for state/command/event/error schemas: **Zod v4**, **Valibot**, **ArkType** (all three covered by `packages/core/__tests__/validators.test.ts`).
 
-- **Server-only fields** are declared as a top-level list on `state({ schema, server: [...] })` — **validator-agnostic**. Runtime stripping is a key filter; client types use `Omit`. No schema introspection involved. See `docs/guide/server-fields.md`.
-- **`forClient().deserialize()` does not re-validate** the data shape. Snapshots come from a trusted server (already validated + stripped). Callers wanting defence-in-depth should validate with their own client schema before calling `deserialize`.
-- **`defineGroup`** currently requires Zod (uses `.merge()` for base/child composition). Non-Zod users can still build equivalent state maps manually — this is an opt-in helper, not a core primitive.
+- **Server/client schema split** — a state with sensitive fields is declared via `state({ schema, clientSchema })`. `serializeForClient()` runs data through `clientSchema.validate()`; unknown keys are stripped via the validator's default behaviour (Zod/Valibot strip by default; ArkType users need a loose schema). `forClient().deserialize()` re-validates against `clientSchema` for defence-in-depth. See `docs/guide/server-fields.md`.
+- **Groups are validator-agnostic** — `defineGroup(name, children)` is a pure namespacing helper. Shared base fields are spread into each child schema by the consumer in native style (Zod `z.object({ ...base, ... })`, Valibot `v.object({ ...base, ... })`, ArkType `type({...})`). The framework never merges schemas itself.
 - `ValidationError.issues` and `PipelineError.issues` are typed as `readonly StandardSchemaV1.Issue[]` — validator-agnostic `{ message, path? }` shape. Don't cast to `ZodIssue[]`; use Standard Schema fields only.
 
 ## Package Structure
@@ -125,4 +124,5 @@ These are errors that have actually happened in this codebase. Read before writi
 - **Don't constrain a library generic to `ZodType`.** Use `StandardSchemaV1` (from `./standard.js`) if you need any constraint; prefer `unknown` at config slot positions (see `WorkflowConfigInput`). Constraining to `ZodType` drags Zod's variance chain into every consumer file.
 - **Never call `.safeParse()` or `.parse()` in router/context/definition code.** Use `validateSchema(schema, value)` from `./standard.js` — returns `{ ok: true, value } | { ok: false, issues }` via the `["~standard"].validate()` protocol.
 - **Async validators are rejected at the boundary.** `validateSchema` throws if `.validate()` returns a Promise. Zod and ArkType are sync by default; Valibot users must not use `*Async` schemas.
-- **Server fields are declared, not branded.** Use `state({ schema, server: ["key1", "key2"] })` for states with server-only fields. The server key list is type-checked against `keyof InferOutput<schema>`. Runtime stripping is a key-delete loop (no schema introspection). See `docs/guide/server-fields.md`.
+- **Server/client schema split, not field branding.** Use `state({ schema, clientSchema })` when server and client should see different shapes. `clientSchema` is a second validator-native schema; its inferred output is what `ClientStateData<Config, State>` resolves to. Stripping at runtime happens via `clientSchema.validate()` leveraging the validator's default strip behaviour.
+- **Groups do not merge schemas.** `defineGroup(name, children)` namespaces children under `name.*` and provides typed accessors/names. Shared base fields are expressed by the consumer: `{ ...baseShape, ...childShape }` in validator-native style. No `z.ZodObject` / `.merge()` inside core.

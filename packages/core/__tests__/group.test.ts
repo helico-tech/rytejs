@@ -4,30 +4,33 @@ import { defineWorkflow } from "../src/definition.js";
 import { defineGroup } from "../src/group.js";
 import { WorkflowRouter } from "../src/router.js";
 
+// Shared base shape — spread into each child by the consumer, validator-native.
+const basePayment = { amount: z.number() };
+
 describe("defineGroup()", () => {
 	test("produces states record with dot-prefixed keys", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-			Failed: z.object({ reason: z.string() }),
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
+			Failed: z.object({ ...basePayment, reason: z.string() }),
 		});
 
 		expect(Object.keys(group.states)).toEqual(["Payment.Pending", "Payment.Failed"]);
 	});
 
 	test("names array contains all fully-qualified state names", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-			Failed: z.object({ reason: z.string() }),
-			Retrying: z.object({ nextRetryAt: z.date() }),
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
+			Failed: z.object({ ...basePayment, reason: z.string() }),
+			Retrying: z.object({ ...basePayment, nextRetryAt: z.date() }),
 		});
 
 		expect(group.names).toEqual(["Payment.Pending", "Payment.Failed", "Payment.Retrying"]);
 	});
 
 	test("dynamic accessors return the fully-qualified name", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-			Failed: z.object({ reason: z.string() }),
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
+			Failed: z.object({ ...basePayment, reason: z.string() }),
 		});
 
 		// biome-ignore lint/suspicious/noExplicitAny: dynamic property access for runtime check
@@ -36,50 +39,27 @@ describe("defineGroup()", () => {
 		expect((group as any).Failed).toBe("Payment.Failed");
 	});
 
-	test("merged schema validates combined parent + child fields", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
+	test("child schema validates both consumer-merged base and child fields", () => {
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
 		});
 
-		const schema = group.states["Payment.Pending"];
+		// biome-ignore lint/suspicious/noExplicitAny: test accesses the raw schema's safeParse
+		const schema = group.states["Payment.Pending"] as any;
 		expect(schema.safeParse({ amount: 100, attempt: 1 }).success).toBe(true);
-	});
-
-	test("merged schema rejects data missing parent fields", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-		});
-
-		expect(group.states["Payment.Pending"].safeParse({ attempt: 1 }).success).toBe(false);
-	});
-
-	test("merged schema rejects data missing child fields", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-		});
-
-		expect(group.states["Payment.Pending"].safeParse({ amount: 100 }).success).toBe(false);
-	});
-
-	test("child fields override parent fields on key collision (Zod merge semantics)", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Refund: z.object({ amount: z.string() }), // child narrows amount to string
-		});
-
-		const schema = group.states["Payment.Refund"];
-		expect(schema.safeParse({ amount: "full" }).success).toBe(true);
+		expect(schema.safeParse({ attempt: 1 }).success).toBe(false);
 		expect(schema.safeParse({ amount: 100 }).success).toBe(false);
 	});
 
 	test("empty children record produces empty states and names", () => {
-		const group = defineGroup("Empty", z.object({ x: z.number() }), {});
+		const group = defineGroup("Empty", {});
 		expect(group.states).toEqual({});
 		expect(group.names).toEqual([]);
 	});
 
 	test("group, states, and names are frozen", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
 		});
 
 		expect(Object.isFrozen(group)).toBe(true);
@@ -90,9 +70,9 @@ describe("defineGroup()", () => {
 
 describe("defineGroup() types", () => {
 	test("accessors are string-literal types, not widened to string", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-			Failed: z.object({ reason: z.string() }),
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
+			Failed: z.object({ ...basePayment, reason: z.string() }),
 		});
 
 		expectTypeOf(group.Pending).toEqualTypeOf<"Payment.Pending">();
@@ -100,26 +80,26 @@ describe("defineGroup() types", () => {
 	});
 
 	test("names is a readonly array of the union of sub-state names", () => {
-		const group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-			Failed: z.object({ reason: z.string() }),
+		const group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
+			Failed: z.object({ ...basePayment, reason: z.string() }),
 		});
 
 		expectTypeOf(group.names).toEqualTypeOf<ReadonlyArray<"Payment.Pending" | "Payment.Failed">>();
 	});
 
 	test("states record keys are the fully-qualified names", () => {
-		const _group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
+		const _group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
 		});
 
 		type Keys = keyof typeof _group.states;
 		expectTypeOf<Keys>().toEqualTypeOf<"Payment.Pending">();
 	});
 
-	test("each state schema infers to the merged shape", () => {
-		const _group = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
+	test("each child schema infers to its consumer-written shape", () => {
+		const _group = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
 		});
 
 		type Inferred = z.infer<(typeof _group.states)["Payment.Pending"]>;
@@ -129,10 +109,10 @@ describe("defineGroup() types", () => {
 
 describe("defineGroup() integration with defineWorkflow + WorkflowRouter", () => {
 	function buildOrderWorkflow() {
-		const Payment = defineGroup("Payment", z.object({ amount: z.number() }), {
-			Pending: z.object({ attempt: z.number() }),
-			Failed: z.object({ reason: z.string() }),
-			Retrying: z.object({ attempt: z.number(), nextRetryAt: z.date() }),
+		const Payment = defineGroup("Payment", {
+			Pending: z.object({ ...basePayment, attempt: z.number() }),
+			Failed: z.object({ ...basePayment, reason: z.string() }),
+			Retrying: z.object({ ...basePayment, attempt: z.number(), nextRetryAt: z.date() }),
 		});
 
 		const definition = defineWorkflow("order", {
@@ -252,7 +232,7 @@ describe("defineGroup() integration with defineWorkflow + WorkflowRouter", () =>
 		expect(tag).not.toContain("group");
 	});
 
-	test("transition to a sub-state validates against the merged schema", async () => {
+	test("transition to a sub-state validates against the consumer-written schema", async () => {
 		const { definition } = buildOrderWorkflow();
 		const router = new WorkflowRouter(definition);
 

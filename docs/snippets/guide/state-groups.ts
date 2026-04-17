@@ -2,10 +2,15 @@ import { defineGroup, defineWorkflow, WorkflowRouter } from "@rytejs/core";
 import { z } from "zod";
 
 // #region define-group
-const Payment = defineGroup("Payment", z.object({ amount: z.number(), currency: z.string() }), {
-	Pending: z.object({ attempt: z.number() }),
-	Failed: z.object({ reason: z.string() }),
-	Retrying: z.object({ attempt: z.number(), nextRetryAt: z.date() }),
+// Shared base fields — expressed as a plain object and spread into each child
+// schema. `defineGroup` itself does no schema merging, so the same pattern
+// works with Valibot or ArkType instead of Zod.
+const basePayment = { amount: z.number(), currency: z.string() };
+
+const Payment = defineGroup("Payment", {
+	Pending: z.object({ ...basePayment, attempt: z.number() }),
+	Failed: z.object({ ...basePayment, reason: z.string() }),
+	Retrying: z.object({ ...basePayment, attempt: z.number(), nextRetryAt: z.date() }),
 });
 // #endregion define-group
 

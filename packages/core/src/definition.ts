@@ -1,8 +1,8 @@
 import type { WorkflowSnapshot } from "./snapshot.js";
 import type { StandardSchemaV1 } from "./standard.js";
 import { validateSchema } from "./standard.js";
-import type { StateSchema, StateServerKeys } from "./state.js";
-import { resolveSchema, resolveServerKeys } from "./state.js";
+import type { StateClientSchema, StateSchema } from "./state.js";
+import { resolveClientSchema, resolveSchema } from "./state.js";
 import type {
 	ClientWorkflow,
 	StateData,
@@ -131,8 +131,8 @@ export interface ClientWorkflowDefinition<TConfig extends WorkflowConfig = Workf
  */
 // Type inference flows through Standard Schema's `~standard.types.output`
 // rather than validator-specific helpers (z.infer, Valibot InferOutput, etc.).
-// A state entry can be either a plain schema or a `state({ schema, server })`
-// config — the `StateSchema` helper normalises both forms.
+// A state entry can be either a plain schema or a `state({ schema, clientSchema? })`
+// config — the `StateSchema`/`StateClientSchema` helpers normalise both forms.
 /** Extracts the inferred output type of a schema, structural and non-recursive. */
 type InferOut<T> = T extends {
 	readonly "~standard": { readonly types?: { readonly output: infer O } | undefined };
@@ -142,8 +142,8 @@ type InferOut<T> = T extends {
 
 /** Full inferred data for a state entry (schema or config). */
 type StateFullData<E> = InferOut<StateSchema<E>>;
-/** Client-safe inferred data — server keys removed. */
-type StateClientData<E> = Omit<StateFullData<E>, StateServerKeys<E>>;
+/** Client-safe inferred data — `clientSchema` output if declared, else full data. */
+type StateClientData<E> = InferOut<StateClientSchema<E>>;
 
 export function defineWorkflow<const TConfig extends WorkflowConfigInput>(
 	name: string,
@@ -291,19 +291,28 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			version?: number;
 		}) {
 			const entry = config.states[workflow.state];
-			const serverKeys = entry ? resolveServerKeys(entry) : [];
-			let strippedData: unknown = workflow.data;
-			if (serverKeys.length > 0 && workflow.data && typeof workflow.data === "object") {
-				const copy: Record<string, unknown> = { ...(workflow.data as Record<string, unknown>) };
-				for (const key of serverKeys) delete copy[key];
-				strippedData = copy;
+			const clientSchema = entry ? resolveClientSchema(entry) : undefined;
+			let clientData: unknown = workflow.data;
+			if (clientSchema) {
+				// Running the full data through the client schema strips unknown
+				// keys via the validator's default behaviour (Zod/Valibot strip by
+				// default; ArkType users need a loose schema). A failure here
+				// means the server-produced data doesn't conform to the declared
+				// client contract — a programming error, not a user-input problem.
+				const result = validateSchema(clientSchema, workflow.data);
+				if (!result.ok) {
+					throw new Error(
+						`serializeForClient: data for state '${workflow.state}' failed clientSchema validation: ${result.issues.map((i) => i.message).join(", ")}`,
+					);
+				}
+				clientData = result.value;
 			}
 
 			return {
 				id: workflow.id,
 				definitionName: name,
 				state: workflow.state,
-				data: strippedData,
+				data: clientData,
 				createdAt: workflow.createdAt.toISOString(),
 				updatedAt: workflow.updatedAt.toISOString(),
 				modelVersion: config.modelVersion ?? 1,
@@ -330,7 +339,8 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 					createdAt: string;
 					updatedAt: string;
 				}) {
-					if (!(snap.state in config.states)) {
+					const entry = config.states[snap.state];
+					if (!entry) {
 						return {
 							ok: false,
 							error: new ValidationError("restore", [
@@ -338,17 +348,29 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 							]),
 						};
 					}
-					// No schema re-validation on the client side — snapshots are
-					// produced by a trusted server (already validated + stripped).
-					// Users who want defence-in-depth should validate separately
-					// against their own client schema before calling deserialize.
+					// Defence-in-depth: when a clientSchema is declared we
+					// re-validate the incoming snapshot against it. When no
+					// clientSchema is declared, server and client share the same
+					// shape and we trust the snapshot as-is (state name check only).
+					const clientSchema = resolveClientSchema(entry);
+					let data: unknown = snap.data;
+					if (clientSchema) {
+						const result = validateSchema(clientSchema, snap.data);
+						if (!result.ok) {
+							return {
+								ok: false,
+								error: new ValidationError("restore", result.issues),
+							};
+						}
+						data = result.value;
+					}
 					return {
 						ok: true,
 						workflow: {
 							id: snap.id,
 							definitionName: snap.definitionName,
 							state: snap.state,
-							data: snap.data,
+							data,
 							createdAt: new Date(snap.createdAt),
 							updatedAt: new Date(snap.updatedAt),
 							// biome-ignore lint/suspicious/noExplicitAny: runtime narrow to ClientWorkflow<TConfig>
