@@ -16,7 +16,7 @@ npm install -D @rytejs/testing
 
 <<< @/snippets/guide/testing.ts#create-test-workflow
 
-Data is validated against the state's Zod schema — invalid data throws.
+Data is validated against the state's schema — invalid data throws.
 
 You can provide a custom ID:
 

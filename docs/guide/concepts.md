@@ -1,6 +1,6 @@
 # Concepts
 
-Ryte is a state machine engine where Zod schemas define the shape of everything. Here's how the pieces fit together.
+Ryte is a state machine engine where [Standard Schema](https://standardschema.dev) validators define the shape of everything. The examples on this page use Zod, but Valibot and ArkType work identically. Here's how the pieces fit together.
 
 ## Workflow
 
@@ -11,7 +11,7 @@ An immutable snapshot of a stateful entity. Every workflow has:
 | `id`             | Unique identifier (you provide this)     |
 | `definitionName` | Name of the workflow definition          |
 | `state`          | Current state name (e.g. `"Todo"`)       |
-| `data`           | State-specific data, validated by Zod    |
+| `data`           | State-specific data, schema-validated    |
 | `createdAt`      | Creation timestamp                       |
 | `updatedAt`      | Last modification timestamp              |
 
@@ -19,7 +19,7 @@ Workflows are never mutated directly. You dispatch commands and get back a new s
 
 ## States
 
-Each state has a Zod schema that defines its data shape. Different states can have entirely different data.
+Each state has a Standard Schema validator that defines its data shape. Different states can have entirely different data.
 
 ```ts
 states: {
@@ -32,7 +32,7 @@ When you check `workflow.state`, TypeScript narrows `workflow.data` to the match
 
 ## Commands
 
-Commands are intents dispatched to a workflow. Each command has a payload validated by its Zod schema before any handler runs.
+Commands are intents dispatched to a workflow. Each command has a payload validated by its schema before any handler runs.
 
 ```ts
 commands: {
@@ -57,7 +57,7 @@ Handlers emit events with `emit("TaskCompleted", { taskId: "..." })`. Events are
 
 ## Errors
 
-Errors are typed domain failures declared upfront in the workflow definition. Each error has a code and a Zod schema for its data.
+Errors are typed domain failures declared upfront in the workflow definition. Each error has a code and a schema for its data.
 
 ```ts
 errors: {
@@ -127,7 +127,7 @@ If any step throws or returns a domain error, all mutations are discarded and th
 | Concept    | Role                                    |
 | ---------- | --------------------------------------- |
 | Workflow   | Immutable state snapshot                |
-| State      | Zod schema defining data shape          |
+| State      | Schema defining data shape              |
 | Command    | Intent dispatched to trigger logic      |
 | Event      | Side effect emitted during dispatch     |
 | Error      | Typed domain failure with rollback      |

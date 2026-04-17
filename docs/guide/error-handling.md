@@ -19,7 +19,7 @@ if (result.ok) {
 
 ### Validation Errors
 
-Zod validation failed. The `source` field tells you where:
+Schema validation failed. The `source` field tells you where:
 
 | Source         | When                                           |
 | -------------- | ---------------------------------------------- |
@@ -34,14 +34,16 @@ Zod validation failed. The `source` field tells you where:
 ```ts
 if (!result.ok && result.error.category === "validation") {
   console.log(result.error.source);  // "command" | "state" | "event" | "transition"
-  console.log(result.error.issues);  // z.core.$ZodIssue[]
+  console.log(result.error.issues);  // readonly StandardSchemaV1.Issue[]
   console.log(result.error.message); // human-readable summary
 }
 ```
 
+Issues follow the [Standard Schema](https://standardschema.dev) shape — `{ message: string; path?: readonly (PropertyKey | PathSegment)[] }`. They are validator-agnostic and do not leak Zod-specific fields. If you need richer diagnostics, validate with your validator directly before dispatching.
+
 ### Domain Errors
 
-Business rule violations defined upfront in the workflow definition. Each error code has a Zod schema, making your failure modes part of the workflow's contract:
+Business rule violations defined upfront in the workflow definition. Each error code has a schema, making your failure modes part of the workflow's contract:
 
 <<< @/snippets/guide/error-handling.ts#domain-definition
 

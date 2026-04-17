@@ -30,7 +30,7 @@ All methods return `this`, so you can chain `.state()` calls fluently:
 
 ## What's Happening
 
-1. `defineWorkflow()` creates a definition with Zod schemas for states, commands, events, and errors.
+1. `defineWorkflow()` creates a definition with schemas for states, commands, events, and errors. Zod is used here, but any [Standard Schema](https://standardschema.dev) validator works.
 2. `createWorkflow()` instantiates a workflow in an initial state, validating the data.
 3. `WorkflowRouter` maps state + command pairs to handlers.
 4. `update()` modifies data within the current state (validated).

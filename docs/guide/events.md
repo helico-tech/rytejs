@@ -4,7 +4,7 @@ Events are side effects emitted during dispatch. They are schema-validated, accu
 
 ## Emitting Events
 
-Use `emit()` inside a handler. The event data is validated against the event's Zod schema.
+Use `emit()` inside a handler. The event data is validated against the event's schema.
 
 <<< @/snippets/guide/events.ts#emit
 
