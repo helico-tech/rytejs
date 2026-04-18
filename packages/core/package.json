@@ -1,6 +1,6 @@
 {
 	"name": "@rytejs/core",
-	"version": "0.10.0",
+	"version": "0.11.0",
 	"description": "Type-safe workflow engine with Standard Schema validation (Zod, Valibot, ArkType) and middleware pipelines",
 	"license": "MIT",
 	"type": "module",
