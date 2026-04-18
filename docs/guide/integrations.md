@@ -8,7 +8,7 @@ Every integration is five steps:
 
 <<< @/snippets/guide/integrations.ts#pattern
 
-The `serialize()` and `deserialize()` methods handle serialization -- dates become ISO strings, data is validated against Zod schemas on deserialize. You can store snapshots in any JSON-compatible database.
+The `serialize()` and `deserialize()` methods handle serialization -- dates become ISO strings, data is validated against the state's schema on deserialize. You can store snapshots in any JSON-compatible database.
 
 ## Express
 
@@ -199,4 +199,4 @@ Snapshots are plain JSON objects. Store them anywhere:
 | DynamoDB | Store as item, partition key on `id` |
 | File system | `JSON.stringify` / `JSON.parse`, good for prototyping |
 
-The `deserialize()` method validates data against Zod schemas on load, so you always get a valid workflow regardless of what's in storage.
+The `deserialize()` method validates data against the state's schema on load, so you always get a valid workflow regardless of what's in storage.

@@ -6,7 +6,7 @@ hero:
   image:
     src: /logo.svg
     alt: Ryte
-  tagline: Define states with Zod. Route commands through middleware. Ship with confidence.
+  tagline: Define states with any Standard Schema validator. Route commands through middleware. Ship with confidence.
   actions:
     - theme: brand
       text: Get Started
@@ -16,7 +16,7 @@ hero:
       link: /api/
 features:
   - title: Fully Typed, Zero Annotations
-    details: Zod schemas define your states, commands, events, and errors. TypeScript infers everything — state names, payload types, error codes — with full autocompletion. No manual type annotations needed.
+    details: Any Standard Schema validator (Zod, Valibot, ArkType) defines your states, commands, events, and errors. TypeScript infers everything — state names, payload types, error codes — with full autocompletion. No manual type annotations needed.
   - title: Discriminated Unions
     details: Checking workflow.state narrows workflow.data automatically. error() only accepts error codes from your definition. Every handler argument is precisely typed.
   - title: Middleware Pipelines
@@ -24,7 +24,7 @@ features:
   - title: Composable Routers
     details: Split handlers across files and compose them with .use(). Routers can be nested arbitrarily. Parent handlers take priority.
   - title: Domain Errors as Contract
-    details: Define error codes and their data shapes upfront with Zod. Errors are part of the workflow contract, not hidden inside handlers.
-  - title: Zero Platform Lock-in
-    details: Pure logic with no runtime dependencies beyond Zod. Works on Node.js, Bun, and Deno.
+    details: Define error codes and their data shapes upfront. Errors are part of the workflow contract, not hidden inside handlers.
+  - title: Zero Validator Lock-in
+    details: Pick Zod, Valibot, or ArkType — or swap between them. Core has no runtime dependency on any validator. Works on Node.js, Bun, and Deno.
 ---

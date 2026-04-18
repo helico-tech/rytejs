@@ -1,6 +1,6 @@
 # Defining Workflows
 
-`defineWorkflow()` creates a workflow definition from a name and Zod schema configuration.
+`defineWorkflow()` creates a workflow definition from a name and a schema configuration. Any [Standard Schema](https://standardschema.dev) validator (Zod, Valibot, ArkType) is supported; the examples on this page use Zod.
 
 ## Basic Definition
 
@@ -10,7 +10,7 @@ All four config keys -- `states`, `commands`, `events`, `errors` -- are required
 
 ## Defining Errors
 
-Errors represent domain failures that handlers can raise. Define them upfront with Zod schemas so both the error code and its data are type-safe:
+Errors represent domain failures that handlers can raise. Define them upfront with schemas so both the error code and its data are type-safe:
 
 ```ts
 errors: {
@@ -36,7 +36,7 @@ Defining errors upfront makes your workflow's failure modes explicit and discove
 
 <<< @/snippets/guide/defining-workflows.ts#create
 
-Zod defaults apply -- `priority` defaults to `0` since we used `.default(0)` in the schema.
+Validator defaults apply — e.g. Zod's `.default(0)` makes `priority` default to `0`.
 
 If the data doesn't match the schema, `createWorkflow()` throws:
 

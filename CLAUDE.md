@@ -13,8 +13,8 @@ Use `pnpm` for all commands.
 pnpm run check                            # typecheck + test + lint
 
 # Per-package (use --filter from workspace root)
-pnpm --filter @rytejs/core vitest run     # 149 tests
-pnpm --filter @rytejs/testing vitest run  # 29 tests
+pnpm --filter @rytejs/core vitest run     # 257 tests (includes Valibot + ArkType interop)
+pnpm --filter @rytejs/testing vitest run  # 31 tests
 pnpm --filter @rytejs/core tsc --noEmit   # typecheck
 pnpm --filter @rytejs/core tsup           # build dist (REQUIRED before testing package tests)
 pnpm --filter @rytejs/docs typecheck     # typecheck doc snippets
@@ -29,7 +29,7 @@ pnpm biome check --fix .                  # autofix
 - **Command dispatch pattern**: `router.dispatch(workflow, type, payload)` returns `DispatchResult` (never throws). Handlers use `emit(type, data)` and `error(code, data)` — all positional args.
 - **Koa-style middleware**: global → state-scoped → inline → handler (onion model)
 - **Discriminated unions**: `DispatchResult` on `ok`, `PipelineError` on `category`, `Workflow` on `state`
-- **Zod-driven types**: all type inference flows from Zod schemas — no manual type annotations
+- **Standard Schema-driven types**: type inference flows from any Standard Schema v1 validator (Zod v4, Valibot, ArkType). Runtime validation uses the `["~standard"].validate()` protocol — no validator-specific APIs in router/context/definition.
 - **Result pattern everywhere**: `dispatch()`, `restore()`, `migrate()` all return `{ ok: true, ... } | { ok: false, error }`
 - **IO / Domain / IO**: handlers are pure (no IO). Reads via `deps`, writes via events processed after dispatch
 
@@ -68,7 +68,15 @@ pnpm biome check --fix .                  # autofix
 - Vitest with `describe`, `test`, `expect`
 - Test files in `__tests__/` directories, colocated with source
 - Use `@rytejs/testing` utilities: `createTestWorkflow`, `expectOk`, `expectError`, `testPath`, `createTestDeps`
-- Zod v4 is required (peer dependency)
+- Zod is an **optional** peer dep — install only if you use Zod schemas. Core works equally with Valibot or ArkType. No runtime or type reference to Zod in `packages/core/src`.
+
+## Supported validators
+
+Any validator that implements Standard Schema v1 works for state/command/event/error schemas: **Zod v4**, **Valibot**, **ArkType** (all three covered by `packages/core/__tests__/validators.test.ts`).
+
+- **Server/client schema split** — a state with sensitive fields is declared via `state({ schema, clientSchema })`. `serializeForClient()` runs data through `clientSchema.validate()`; unknown keys are stripped via the validator's default behaviour (Zod/Valibot strip by default; ArkType users need a loose schema). `forClient().deserialize()` re-validates against `clientSchema` for defence-in-depth. See `docs/guide/server-fields.md`.
+- **Groups are validator-agnostic** — `defineGroup(name, children)` is a pure namespacing helper. Shared base fields are spread into each child schema by the consumer in native style (Zod `z.object({ ...base, ... })`, Valibot `v.object({ ...base, ... })`, ArkType `type({...})`). The framework never merges schemas itself.
+- `ValidationError.issues` and `PipelineError.issues` are typed as `readonly StandardSchemaV1.Issue[]` — validator-agnostic `{ message, path? }` shape. Don't cast to `ZodIssue[]`; use Standard Schema fields only.
 
 ## Package Structure
 
@@ -110,3 +118,11 @@ These are errors that have actually happened in this codebase. Read before writi
 ### IDE autocomplete and variadic tuples
 - **JetBrains IDEs (WebStorm/IntelliJ) can't infer generic parameters on arrow function class properties with variadic tuple rest params.** The fix: convert to regular methods (WebStorm uses a faster generic inference path for methods) and add a non-variadic overload for the common case (e.g. handler-only, no middleware). Use `this.method = this.method.bind(this)` in the constructor to preserve destructuring support.
 - **Always add a simple overload above variadic ones.** IDEs try overloads in order — a trivial `(command, handler)` signature resolves instantly without variadic inference.
+
+### Standard Schema type inference
+- **Don't use `z.infer<T>` in public types or internal generics.** Inference flows through the structural `InferOut<T>` helper in `definition.ts`, which matches `T["~standard"]["types"]["output"]`. Using `z.infer` forces TypeScript through Zod's deep variance chain and breaks validator-agnostic support.
+- **Don't constrain a library generic to `ZodType`.** Use `StandardSchemaV1` (from `./standard.js`) if you need any constraint; prefer `unknown` at config slot positions (see `WorkflowConfigInput`). Constraining to `ZodType` drags Zod's variance chain into every consumer file.
+- **Never call `.safeParse()` or `.parse()` in router/context/definition code.** Use `validateSchema(schema, value)` from `./standard.js` — returns `{ ok: true, value } | { ok: false, issues }` via the `["~standard"].validate()` protocol.
+- **Async validators are rejected at the boundary.** `validateSchema` throws if `.validate()` returns a Promise. Zod and ArkType are sync by default; Valibot users must not use `*Async` schemas.
+- **Server/client schema split, not field branding.** Use `state({ schema, clientSchema })` when server and client should see different shapes. `clientSchema` is a second validator-native schema; its inferred output is what `ClientStateData<Config, State>` resolves to. Stripping at runtime happens via `clientSchema.validate()` leveraging the validator's default strip behaviour.
+- **Groups do not merge schemas.** `defineGroup(name, children)` namespaces children under `name.*` and provides typed accessors/names. Shared base fields are expressed by the consumer: `{ ...baseShape, ...childShape }` in validator-native style. No `z.ZodObject` / `.merge()` inside core.

@@ -4,7 +4,7 @@
 
 <h1 align="center">@rytejs/core</h1>
 
-<p align="center">Type-safe workflow engine with Zod validation and middleware pipelines.</p>
+<p align="center">Type-safe workflow engine driven by Standard Schema — works with Zod, Valibot, and ArkType.</p>
 
 <p align="center">
   <a href="https://github.com/helico-tech/rytejs/actions/workflows/ci.yml"><img src="https://github.com/helico-tech/rytejs/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -13,18 +13,22 @@
 
 ## Why Ryte?
 
-- **Fully typed from definition to dispatch** -- define your states, commands, events, and errors with Zod schemas. TypeScript infers everything automatically. State names, command payloads, event data, error codes -- all with full autocompletion, no manual type annotations.
-- **Checking `workflow.state` narrows `workflow.data`** -- TypeScript knows exactly which data shape each state has. Discriminated unions, not type casts.
-- **`ctx.error()` is type-checked** -- you can only raise error codes that exist in your definition, with the correct data shape. Domain failures are part of the contract.
-- **Koa-style middleware** -- global, state-scoped, and inline middleware with the onion model. Add auth, logging, or validation without touching handlers.
-- **Fluent builder API** -- chain `.state()`, `.on()`, `.use()` calls. Every method returns `this`.
-- **Composable routers** -- split handlers across files and compose them with `.use()`. Routers are routers.
-- **Zero platform lock-in** -- pure logic with no runtime dependencies beyond Zod. Works on Node.js, Bun, and Deno.
+- **Fully typed from definition to dispatch** — declare states, commands, events, and errors with any [Standard Schema](https://standardschema.dev) validator. TypeScript infers everything automatically.
+- **Checking `workflow.state` narrows `workflow.data`** — discriminated unions, not type casts.
+- **`ctx.error()` is type-checked** — only raise error codes that exist in your definition, with the correct data shape.
+- **Koa-style middleware** — global, state-scoped, and inline middleware, onion model.
+- **Composable routers** — split handlers across files, merge via `.use()`.
+- **Zero validator lock-in** — pick Zod, Valibot, or ArkType; mix them per state if you want. Core has no runtime dependency on any validator.
 
 ## Install
 
 ```bash
+# No required peers. Bring your own validator:
 pnpm add @rytejs/core zod
+# or
+pnpm add @rytejs/core valibot
+# or
+pnpm add @rytejs/core arktype
 ```
 
 ## Quick Example
@@ -49,29 +53,22 @@ const taskWorkflow = defineWorkflow("task", {
   },
 });
 
-const router = new WorkflowRouter(taskWorkflow)
-  .state("Todo", (state) => {
-    state.on("Complete", (ctx) => {
-      if (!ctx.data.assignee) {
-        ctx.error({ code: "NotAssigned", data: { title: ctx.data.title } });
-      }
-      ctx.transition("Done", {
-        title: ctx.data.title,
-        completedAt: new Date(),
-      });
-      ctx.emit({ type: "TaskCompleted", data: { taskId: ctx.workflow.id } });
-    });
+const router = new WorkflowRouter(taskWorkflow).state("Todo", ({ on }) => {
+  on("Complete", ({ data, workflow, error, transition, emit }) => {
+    if (!data.assignee) {
+      error("NotAssigned", { title: data.title });
+    }
+    transition("Done", { title: data.title, completedAt: new Date() });
+    emit("TaskCompleted", { taskId: workflow.id });
   });
+});
 
 const task = taskWorkflow.createWorkflow("task-1", {
   initialState: "Todo",
   data: { title: "Read the docs", assignee: "alice" },
 });
 
-const result = await router.dispatch(task, {
-  type: "Complete",
-  payload: {},
-});
+const result = await router.dispatch(task, "Complete", {});
 
 if (result.ok) {
   console.log(result.workflow.state); // "Done"
@@ -81,24 +78,47 @@ if (result.ok) {
 }
 ```
 
+## Using a different validator
+
+The same workflow expressed with Valibot — identical DSL, identical types:
+
+```ts
+import * as v from "valibot";
+import { defineWorkflow, WorkflowRouter } from "@rytejs/core";
+
+const taskWorkflow = defineWorkflow("task", {
+  states: {
+    Todo: v.object({ title: v.string(), assignee: v.optional(v.string()) }),
+    Done: v.object({ title: v.string(), completedAt: v.date() }),
+  },
+  commands: { Complete: v.object({}) },
+  events: { TaskCompleted: v.object({ taskId: v.string() }) },
+  errors: { NotAssigned: v.object({ title: v.string() }) },
+});
+```
+
+ArkType works identically via `type({...})`. Any validator that implements [Standard Schema v1](https://standardschema.dev) is supported — no adapters required.
+
 ## Type Safety Highlights
 
 Every part of the API is fully typed with zero manual annotations:
 
-- **State names** -- `router.state("Todo", ...)` only accepts states from your definition
-- **Command names** -- `state.on("Complete", ...)` only accepts commands from your definition
-- **Payload types** -- `ctx.command.payload` is typed based on the command's Zod schema
-- **State data** -- `ctx.data` is typed based on the current state's Zod schema
-- **Transitions** -- `ctx.transition("Done", data)` validates that `data` matches the target state's schema
-- **Events** -- `ctx.emit({ type, data })` validates both type and data against event schemas
-- **Errors** -- `ctx.error({ code, data })` only accepts error codes from your definition with matching data
-- **Discriminated unions** -- `if (workflow.state === "Todo") { workflow.data.title }` narrows automatically
+- **State names** — `router.state("Todo", ...)` only accepts states from your definition
+- **Command names** — `on("Complete", ...)` only accepts commands from your definition
+- **Payload types** — `command.payload` is typed from the command's schema
+- **State data** — `data` is typed from the current state's schema
+- **Transitions** — `transition("Done", data)` validates that `data` matches the target state's schema
+- **Events** — `emit("TaskCompleted", data)` validates both type and data against event schemas
+- **Errors** — `error("NotAssigned", data)` only accepts error codes from your definition with matching data
+- **Discriminated unions** — `if (workflow.state === "Todo") { workflow.data.title }` narrows automatically
 
 ## Documentation
 
 - [Getting Started](https://helico-tech.github.io/rytejs/guide/getting-started)
 - [Defining Workflows](https://helico-tech.github.io/rytejs/guide/defining-workflows)
 - [Routing Commands](https://helico-tech.github.io/rytejs/guide/routing-commands)
+- [Server Fields](https://helico-tech.github.io/rytejs/guide/server-fields)
+- [State Groups](https://helico-tech.github.io/rytejs/guide/state-groups)
 - [API Reference](https://helico-tech.github.io/rytejs/api/)
 
 ## License

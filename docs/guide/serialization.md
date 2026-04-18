@@ -18,7 +18,7 @@ The snapshot is `JSON.stringify`-safe — no classes, symbols, or circular refer
 
 Validation catches:
 - **Unknown states** — the snapshot references a state not in the current definition
-- **Schema mismatches** — the data doesn't match the state's Zod schema
+- **Schema mismatches** — the data doesn't match the state's schema
 
 ## Persistence
 

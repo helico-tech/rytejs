@@ -1,7 +1,8 @@
-import type { ZodType, z } from "zod";
-import type { ClientInfer } from "./server.js";
-import { deriveClientSchema, stripServerData } from "./server.js";
 import type { WorkflowSnapshot } from "./snapshot.js";
+import type { StandardSchemaV1 } from "./standard.js";
+import { validateSchema } from "./standard.js";
+import type { StateClientSchema, StateSchema } from "./state.js";
+import { resolveClientSchema, resolveSchema } from "./state.js";
 import type {
 	ClientWorkflow,
 	StateData,
@@ -38,28 +39,28 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 	 * @param stateName - The state name to look up
 	 * @throws If the state name is not found in the config
 	 */
-	getStateSchema(stateName: string): ZodType;
+	getStateSchema(stateName: string): StandardSchemaV1;
 	/**
-	 * Returns the Zod schema for a given command name.
+	 * Returns the schema for a given command name.
 	 *
 	 * @param commandName - The command name to look up
 	 * @throws If the command name is not found in the config
 	 */
-	getCommandSchema(commandName: string): ZodType;
+	getCommandSchema(commandName: string): StandardSchemaV1;
 	/**
-	 * Returns the Zod schema for a given event name.
+	 * Returns the schema for a given event name.
 	 *
 	 * @param eventName - The event name to look up
 	 * @throws If the event name is not found in the config
 	 */
-	getEventSchema(eventName: string): ZodType;
+	getEventSchema(eventName: string): StandardSchemaV1;
 	/**
-	 * Returns the Zod schema for a given error code.
+	 * Returns the schema for a given error code.
 	 *
 	 * @param errorCode - The error code to look up
 	 * @throws If the error code is not found in the config
 	 */
-	getErrorSchema(errorCode: string): ZodType;
+	getErrorSchema(errorCode: string): StandardSchemaV1;
 	/**
 	 * Returns `true` if the given state name exists in the config.
 	 *
@@ -106,13 +107,15 @@ export interface WorkflowDefinition<TConfig extends WorkflowConfig = WorkflowCon
 
 /**
  * A client-safe projection of a workflow definition.
- * State schemas have server-only fields removed. Returned by {@link WorkflowDefinition.forClient}.
+ * Server-declared fields are stripped by `serializeForClient()`; this projection
+ * deserialises snapshots without re-validation (snapshots come from a trusted
+ * server and should not be mutated in transit). Consumers wanting
+ * defence-in-depth should validate manually before calling `deserialize`.
  */
 export interface ClientWorkflowDefinition<TConfig extends WorkflowConfig = WorkflowConfig> {
-	/** The raw Zod schema configuration. */
+	/** The raw schema configuration. */
 	readonly config: TConfig;
 	readonly name: string;
-	getStateSchema(stateName: string): ZodType;
 	hasState(stateName: string): boolean;
 	deserialize(
 		snapshot: WorkflowSnapshot<TConfig>,
@@ -126,27 +129,34 @@ export interface ClientWorkflowDefinition<TConfig extends WorkflowConfig = Workf
  * @param config - Object with `states`, `commands`, `events`, `errors` — each a record of Zod schemas
  * @returns A {@link WorkflowDefinition} with methods for creating instances and accessing schemas
  */
-// Zod v4 uses conditional types for z.infer which TypeScript defers in deep
-// generic chains, breaking IDE completion. We pre-compute all inferred types
-// at this call site (where TConfig is concrete) and attach them as _resolved,
-// so downstream utility types can use direct indexed access instead.
+// Type inference flows through Standard Schema's `~standard.types.output`
+// rather than validator-specific helpers (z.infer, Valibot InferOutput, etc.).
+// A state entry can be either a plain schema or a `state({ schema, clientSchema? })`
+// config — the `StateSchema`/`StateClientSchema` helpers normalise both forms.
+/** Extracts the inferred output type of a schema, structural and non-recursive. */
+type InferOut<T> = T extends {
+	readonly "~standard": { readonly types?: { readonly output: infer O } | undefined };
+}
+	? O
+	: unknown;
+
+/** Full inferred data for a state entry (schema or config). */
+type StateFullData<E> = InferOut<StateSchema<E>>;
+/** Client-safe inferred data — `clientSchema` output if declared, else full data. */
+type StateClientData<E> = InferOut<StateClientSchema<E>>;
+
 export function defineWorkflow<const TConfig extends WorkflowConfigInput>(
 	name: string,
 	config: TConfig,
-): WorkflowDefinition<
-	TConfig & {
-		_resolved: {
-			states: { [K in keyof TConfig["states"]]: z.infer<TConfig["states"][K]> };
-			commands: { [K in keyof TConfig["commands"]]: z.infer<TConfig["commands"][K]> };
-			events: { [K in keyof TConfig["events"]]: z.infer<TConfig["events"][K]> };
-			errors: { [K in keyof TConfig["errors"]]: z.infer<TConfig["errors"][K]> };
-		};
-		_clientResolved: {
-			states: { [K in keyof TConfig["states"]]: ClientInfer<TConfig["states"][K]> };
-		};
-	}
->;
-// biome-ignore lint/suspicious/noExplicitAny: implementation overload — public signature above provides consumer-facing type safety; internally TConfig extends WorkflowConfigInput which lacks _resolved
+): WorkflowDefinition<{
+	modelVersion: TConfig["modelVersion"] extends number ? TConfig["modelVersion"] : 1;
+	states: { [K in keyof TConfig["states"]]: StateFullData<TConfig["states"][K]> };
+	commands: { [K in keyof TConfig["commands"]]: InferOut<TConfig["commands"][K]> };
+	events: { [K in keyof TConfig["events"]]: InferOut<TConfig["events"][K]> };
+	errors: { [K in keyof TConfig["errors"]]: InferOut<TConfig["errors"][K]> };
+	clientStates: { [K in keyof TConfig["states"]]: StateClientData<TConfig["states"][K]> };
+}>;
+// biome-ignore lint/suspicious/noExplicitAny: implementation overload — public signature above provides consumer-facing type safety
 export function defineWorkflow(name: string, config: WorkflowConfigInput): WorkflowDefinition<any> {
 	// biome-ignore lint/suspicious/noExplicitAny: memoized client definition — typed via public interface ClientWorkflowDefinition
 	let cachedClientDef: any = null;
@@ -156,12 +166,12 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 		name,
 
 		createWorkflow(id: string, wfConfig: { initialState: string; data: unknown }) {
-			const schema = config.states[wfConfig.initialState];
-			if (!schema) throw new Error(`Unknown state: ${wfConfig.initialState}`);
-			const result = schema.safeParse(wfConfig.data);
-			if (!result.success) {
+			const entry = config.states[wfConfig.initialState];
+			if (!entry) throw new Error(`Unknown state: ${wfConfig.initialState}`);
+			const result = validateSchema(resolveSchema(entry), wfConfig.data);
+			if (!result.ok) {
 				throw new Error(
-					`Invalid initial data for state '${wfConfig.initialState}': ${result.error.issues.map((i) => i.message).join(", ")}`,
+					`Invalid initial data for state '${wfConfig.initialState}': ${result.issues.map((i) => i.message).join(", ")}`,
 				);
 			}
 			const now = new Date();
@@ -169,35 +179,35 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 				id,
 				definitionName: name,
 				state: wfConfig.initialState,
-				data: result.data,
+				data: result.value,
 				createdAt: now,
 				updatedAt: now,
 				// biome-ignore lint/suspicious/noExplicitAny: narrowed by the public overload's generic S parameter
 			} as any;
 		},
 
-		getStateSchema(stateName: string): ZodType {
-			const schema = config.states[stateName];
-			if (!schema) throw new Error(`Unknown state: ${stateName}`);
-			return schema;
+		getStateSchema(stateName: string): StandardSchemaV1 {
+			const entry = config.states[stateName];
+			if (!entry) throw new Error(`Unknown state: ${stateName}`);
+			return resolveSchema(entry);
 		},
 
-		getCommandSchema(commandName: string): ZodType {
+		getCommandSchema(commandName: string): StandardSchemaV1 {
 			const schema = config.commands[commandName];
 			if (!schema) throw new Error(`Unknown command: ${commandName}`);
-			return schema;
+			return schema as StandardSchemaV1;
 		},
 
-		getEventSchema(eventName: string): ZodType {
+		getEventSchema(eventName: string): StandardSchemaV1 {
 			const schema = config.events[eventName];
 			if (!schema) throw new Error(`Unknown event: ${eventName}`);
-			return schema;
+			return schema as StandardSchemaV1;
 		},
 
-		getErrorSchema(errorCode: string): ZodType {
+		getErrorSchema(errorCode: string): StandardSchemaV1 {
 			const schema = config.errors[errorCode];
 			if (!schema) throw new Error(`Unknown error: ${errorCode}`);
-			return schema;
+			return schema as StandardSchemaV1;
 		},
 
 		hasState(stateName: string): boolean {
@@ -240,26 +250,21 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			createdAt: string;
 			updatedAt: string;
 		}) {
-			const stateSchema = config.states[snap.state];
-			if (!stateSchema) {
+			const entry = config.states[snap.state];
+			if (!entry) {
 				return {
 					ok: false,
 					error: new ValidationError("restore", [
-						{
-							code: "custom",
-							message: `Unknown state: ${snap.state}`,
-							input: snap.state,
-							path: ["state"],
-						},
+						{ message: `Unknown state: ${snap.state}`, path: ["state"] },
 					]),
 				};
 			}
 
-			const result = stateSchema.safeParse(snap.data);
-			if (!result.success) {
+			const result = validateSchema(resolveSchema(entry), snap.data);
+			if (!result.ok) {
 				return {
 					ok: false,
-					error: new ValidationError("restore", result.error.issues),
+					error: new ValidationError("restore", result.issues),
 				};
 			}
 
@@ -269,11 +274,11 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 					id: snap.id,
 					definitionName: snap.definitionName,
 					state: snap.state,
-					data: result.data,
+					data: result.value,
 					createdAt: new Date(snap.createdAt),
 					updatedAt: new Date(snap.updatedAt),
 				},
-				// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
+				// biome-ignore lint/suspicious/noExplicitAny: runtime narrow to Workflow<TConfig>; unknown data needs cast
 			} as any;
 		},
 
@@ -285,16 +290,29 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 			updatedAt: Date;
 			version?: number;
 		}) {
-			const stateSchema = config.states[workflow.state];
-			const strippedData = stateSchema
-				? stripServerData(stateSchema, workflow.data as Record<string, unknown>)
-				: workflow.data;
+			const entry = config.states[workflow.state];
+			const clientSchema = entry ? resolveClientSchema(entry) : undefined;
+			let clientData: unknown = workflow.data;
+			if (clientSchema) {
+				// Running the full data through the client schema strips unknown
+				// keys via the validator's default behaviour (Zod/Valibot strip by
+				// default; ArkType users need a loose schema). A failure here
+				// means the server-produced data doesn't conform to the declared
+				// client contract — a programming error, not a user-input problem.
+				const result = validateSchema(clientSchema, workflow.data);
+				if (!result.ok) {
+					throw new Error(
+						`serializeForClient: data for state '${workflow.state}' failed clientSchema validation: ${result.issues.map((i) => i.message).join(", ")}`,
+					);
+				}
+				clientData = result.value;
+			}
 
 			return {
 				id: workflow.id,
 				definitionName: name,
 				state: workflow.state,
-				data: strippedData,
+				data: clientData,
 				createdAt: workflow.createdAt.toISOString(),
 				updatedAt: workflow.updatedAt.toISOString(),
 				modelVersion: config.modelVersion ?? 1,
@@ -305,23 +323,12 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 		forClient() {
 			if (cachedClientDef) return cachedClientDef;
 
-			const clientSchemas: Record<string, ZodType> = {};
-			for (const [stateName, schema] of Object.entries(config.states)) {
-				clientSchemas[stateName] = deriveClientSchema(schema);
-			}
-
 			cachedClientDef = {
 				config,
 				name,
 
-				getStateSchema(stateName: string): ZodType {
-					const schema = clientSchemas[stateName];
-					if (!schema) throw new Error(`Unknown state: ${stateName}`);
-					return schema;
-				},
-
 				hasState(stateName: string): boolean {
-					return stateName in clientSchemas;
+					return stateName in config.states;
 				},
 
 				deserialize(snap: {
@@ -332,39 +339,41 @@ export function defineWorkflow(name: string, config: WorkflowConfigInput): Workf
 					createdAt: string;
 					updatedAt: string;
 				}) {
-					const stateSchema = clientSchemas[snap.state];
-					if (!stateSchema) {
+					const entry = config.states[snap.state];
+					if (!entry) {
 						return {
 							ok: false,
 							error: new ValidationError("restore", [
-								{
-									code: "custom",
-									message: `Unknown state: ${snap.state}`,
-									input: snap.state,
-									path: ["state"],
-								},
+								{ message: `Unknown state: ${snap.state}`, path: ["state"] },
 							]),
 						};
 					}
-
-					const result = stateSchema.safeParse(snap.data);
-					if (!result.success) {
-						return {
-							ok: false,
-							error: new ValidationError("restore", result.error.issues),
-						};
+					// Defence-in-depth: when a clientSchema is declared we
+					// re-validate the incoming snapshot against it. When no
+					// clientSchema is declared, server and client share the same
+					// shape and we trust the snapshot as-is (state name check only).
+					const clientSchema = resolveClientSchema(entry);
+					let data: unknown = snap.data;
+					if (clientSchema) {
+						const result = validateSchema(clientSchema, snap.data);
+						if (!result.ok) {
+							return {
+								ok: false,
+								error: new ValidationError("restore", result.issues),
+							};
+						}
+						data = result.value;
 					}
-
 					return {
 						ok: true,
 						workflow: {
 							id: snap.id,
 							definitionName: snap.definitionName,
 							state: snap.state,
-							data: result.data,
+							data,
 							createdAt: new Date(snap.createdAt),
 							updatedAt: new Date(snap.updatedAt),
-							// biome-ignore lint/suspicious/noExplicitAny: Prettify<any> produces { [x: string]: any } instead of any, making unknown data incompatible
+							// biome-ignore lint/suspicious/noExplicitAny: runtime narrow to ClientWorkflow<TConfig>
 						} as any,
 					};
 				},

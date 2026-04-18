@@ -5,6 +5,7 @@ import { HOOK_EVENTS, HookRegistry } from "./hooks.js";
 import type { GenericPlugin, Plugin } from "./plugin.js";
 import { isPlugin } from "./plugin.js";
 import type { ReadonlyContext } from "./readonly-context.js";
+import { validateSchema } from "./standard.js";
 import type {
 	Command,
 	CommandNames,
@@ -183,19 +184,27 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 	}
 
 	/**
-	 * Registers handlers for one or more states.
-	 * @param name - A state name or array of state names to register handlers for
+	 * Registers handlers for a single state.
+	 * @param name - State name to register handlers for
 	 * @param setup - Callback that receives a state builder to register commands and middleware
 	 */
-	state<P extends StateNames<TConfig> | readonly StateNames<TConfig>[]>(
-		name: P,
-		setup: (
-			state: StateBuilder<
-				TConfig,
-				TDeps,
-				P extends readonly (infer S)[] ? S & StateNames<TConfig> : P & StateNames<TConfig>
-			>,
-		) => void,
+	state<S extends StateNames<TConfig>>(
+		name: S,
+		setup: (state: StateBuilder<TConfig, TDeps, S>) => void,
+	): this;
+	/**
+	 * Registers handlers for multiple states.
+	 * @param names - Array of state names to register handlers for
+	 * @param setup - Callback that receives a state builder to register commands and middleware
+	 */
+	state<S extends StateNames<TConfig>>(
+		names: readonly S[],
+		setup: (state: StateBuilder<TConfig, TDeps, S>) => void,
+	): this;
+	state(
+		name: string | readonly string[],
+		// biome-ignore lint/suspicious/noExplicitAny: implementation signature — typed via overloads above
+		setup: (state: any) => void,
 	): this {
 		const names = Array.isArray(name) ? name : [name];
 		const isMulti = Array.isArray(name);
@@ -369,19 +378,19 @@ export class WorkflowRouter<TConfig extends WorkflowConfig, TDeps = {}> {
 		}
 
 		const commandSchema = this.definition.getCommandSchema(command.type);
-		const payloadResult = commandSchema.safeParse(command.payload);
-		if (!payloadResult.success) {
+		const payloadResult = validateSchema(commandSchema, command.payload);
+		if (!payloadResult.ok) {
 			return {
 				ok: false,
 				error: {
 					category: "validation",
 					source: "command",
-					issues: payloadResult.error.issues,
-					message: `Invalid command payload: ${payloadResult.error.issues.map((i) => i.message).join(", ")}`,
+					issues: payloadResult.issues,
+					message: `Invalid command payload: ${payloadResult.issues.map((i) => i.message).join(", ")}`,
 				},
 			};
 		}
-		const validatedCommand = { type: command.type, payload: payloadResult.data };
+		const validatedCommand = { type: command.type, payload: payloadResult.value };
 
 		const stateName = workflow.state;
 		const singleRouter = this.singleStateBuilders.get(stateName);

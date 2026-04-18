@@ -1,20 +1,21 @@
 # State Groups
 
-State groups let you define a set of related sub-states that share a common base schema, addressed by dot-separated names like `"Payment.Pending"` and `"Payment.Failed"`.
+State groups let you organise related sub-states under a common namespace prefix, addressed by dot-separated names like `"Payment.Pending"` and `"Payment.Failed"`.
 
-They solve three concrete problems:
+They solve two concrete problems:
 
 - **State-name explosion** — keep the top-level state list readable
 - **Shared handlers** — one handler for every `Payment.*` sub-state
-- **Shared data** — parent fields automatically on every sub-state, child fields extend them
 
-Groups are a pure schema helper. The engine sees flat states after the group is spread into the config; nothing about dispatch, snapshots, or migrations changes.
+Groups are a pure namespacing helper. The engine sees flat states after the group is spread into the config; nothing about dispatch, snapshots, or migrations changes.
 
 ## Defining a Group
 
-`defineGroup(name, base, children)` takes a prefix, a base `z.object()` schema, and a record of child schemas. Each child's schema is merged with the base.
+`defineGroup(name, children)` takes a prefix and a record of child schemas (or `state()` configs). The group itself does **not** merge schemas — you express shared fields at the call site by spreading a plain shape object into each child.
 
 <<< @/snippets/guide/state-groups.ts#define-group
+
+Why no magic merging? Keeping schemas intact makes groups **validator-agnostic** — the same pattern works with Valibot (`v.object({ ...baseV, ... })`) or ArkType. Schema merging is a validator-specific idiom; rytejs stays out of it.
 
 The returned value exposes:
 
@@ -30,13 +31,13 @@ After the spread, `"Payment.Pending"`, `"Payment.Failed"`, and `"Payment.Retryin
 
 ## Handlers on a Specific Sub-State
 
-Pass the string-literal accessor (e.g. `Payment.Pending`) to `router.state()`. Inside the handler, `ctx.data` has the full merged type — base fields plus child-specific fields.
+Pass the string-literal accessor (e.g. `Payment.Pending`) to `router.state()`. Inside the handler, `ctx.data` has the child's full inferred type — including any base fields you spread in.
 
 <<< @/snippets/guide/state-groups.ts#sub-state-handler
 
 ## Handlers on the Whole Group
 
-Pass `group.names` to `router.state()` to register a handler that fires in every sub-state. Inside the handler, `ctx.data` is the union of all sub-state data types — shared fields (from the base) are directly accessible, but child-specific fields require `ctx.match()` to narrow.
+Pass `group.names` to `router.state()` to register a handler that fires in every sub-state. Inside the handler, `ctx.data` is the union of all sub-state data types — fields shared across every child (because you spread the same base into all of them) are directly accessible, but child-specific fields require `ctx.match()` to narrow.
 
 <<< @/snippets/guide/state-groups.ts#group-handler
 
@@ -46,17 +47,33 @@ Sub-state-specific handlers take priority over group-wide handlers. If a command
 
 ## Transitioning
 
-Transitions work exactly as they do for flat states. `transition("Payment.Failed", data)` validates `data` against the merged schema — both base and child fields are required.
+Transitions work exactly as they do for flat states. `transition("Payment.Failed", data)` validates `data` against the child's schema — whatever base fields you spread in are required, plus the child's own fields.
+
+## Using `state()` Configs Inside a Group
+
+Group children can be `state({ schema, clientSchema })` entries, not just plain schemas. This composes naturally when a sub-state needs server-only fields:
+
+```ts
+const Payment = defineGroup("Payment", {
+    Pending: z.object({ ...basePayment, attempt: z.number() }),
+    Failed: state({
+        schema: z.object({
+            ...basePayment,
+            reason: z.string(),
+            internalErrorCode: z.string(), // server-only
+        }),
+        clientSchema: z.object({ ...basePayment, reason: z.string() }),
+    }),
+});
+```
 
 ## When NOT to Use Groups
 
-- **No shared base fields** — just use flat states. Groups only pay off when the base carries meaningful data.
-- **Non-object schemas** — `defineGroup` requires `z.object()` for both base and children. If you need `z.union`, `z.string`, or similar, register the states flatly under dot-separated names.
-- **Full statechart semantics** — Ryte doesn't support entry/exit actions, history pseudo-states, or automatic parent-handler fallthrough on missed commands. Groups are a naming-and-schema mechanism, not a hierarchical state machine.
+- **No repeated naming** — just use flat states. Groups only pay off when you have several closely related states you want to handle together.
+- **Full statechart semantics** — rytejs doesn't support entry/exit actions, history pseudo-states, or automatic parent-handler fallthrough on missed commands. Groups are a naming mechanism, not a hierarchical state machine.
 
 ## Limitations
 
-- Base and children must be `z.ZodObject` (i.e. `z.object({...})`)
 - Groups are flat — a child cannot itself be a group
-- On key collision, Zod's merge resolves child-wins (child schema overrides parent field type)
 - Spreading into `states` follows JS object-spread semantics — a later key overwrites an earlier one silently
+- Shared base fields are a consumer concern — validator-native spread/merge, not a framework feature

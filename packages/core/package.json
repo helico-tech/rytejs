@@ -1,7 +1,7 @@
 {
 	"name": "@rytejs/core",
 	"version": "0.10.0",
-	"description": "Type-safe workflow engine with Zod validation and middleware pipelines",
+	"description": "Type-safe workflow engine with Standard Schema validation (Zod, Valibot, ArkType) and middleware pipelines",
 	"license": "MIT",
 	"type": "module",
 	"exports": {
@@ -44,17 +44,19 @@
 		"workflow",
 		"state-machine",
 		"typescript",
+		"standard-schema",
 		"zod",
+		"valibot",
+		"arktype",
 		"middleware"
 	],
-	"peerDependencies": {
-		"zod": "^4.0.0"
-	},
 	"devDependencies": {
 		"@types/better-sqlite3": "^7.6.13",
+		"arktype": "^2.2.0",
 		"better-sqlite3": "^12.8.0",
 		"tsup": "^8.5.0",
 		"typescript": "^5.9.0",
+		"valibot": "^1.3.1",
 		"vitest": "^4.0.0",
 		"zod": "^4.3.0"
 	},

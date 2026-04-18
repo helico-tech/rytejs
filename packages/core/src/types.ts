@@ -1,41 +1,32 @@
-import type { ZodType, z } from "zod";
+import type { StandardSchemaV1 } from "./standard.js";
 
 /**
  * Shape of the configuration object passed to {@link defineWorkflow}.
- * Exported for internal package use only — not re-exported from index.ts.
+ * Uses `unknown` schema slots so TS doesn't structurally verify each schema
+ * against a validator-specific constraint. `defineWorkflow`'s generic pulls
+ * the output types via a defensive conditional that matches StandardSchemaV1
+ * at the inference site only — without recursively walking Zod's variance chain.
  */
 export interface WorkflowConfigInput {
 	/** Optional version number for schema migrations. Defaults to 1. */
 	modelVersion?: number;
-	/** Record of state names to Zod schemas defining their data shape. */
-	states: Record<string, ZodType>;
-	/** Record of command names to Zod schemas defining their payload shape. */
-	commands: Record<string, ZodType>;
-	/** Record of event names to Zod schemas defining their data shape. */
-	events: Record<string, ZodType>;
-	/** Record of error codes to Zod schemas defining their data shape. */
-	errors: Record<string, ZodType>;
+	states: Record<string, unknown>;
+	commands: Record<string, unknown>;
+	events: Record<string, unknown>;
+	errors: Record<string, unknown>;
 }
 
 /**
- * Workflow configuration with pre-resolved types for IDE completion.
- *
- * Extends {@link WorkflowConfigInput} with a `_resolved` phantom type that
- * caches `z.infer` results. This exists because Zod v4's `z.infer` uses
- * conditional types that TypeScript defers in deep generic chains, breaking
- * IDE autocomplete. The `_resolved` property is never set at runtime — it is
- * populated at the type level by {@link defineWorkflow}'s return type.
+ * Flattened workflow configuration — carries only already-resolved output shapes.
+ * No validator library types are threaded through router/context generics.
  */
-export interface WorkflowConfig extends WorkflowConfigInput {
-	_resolved: {
-		states: Record<string, unknown>;
-		commands: Record<string, unknown>;
-		events: Record<string, unknown>;
-		errors: Record<string, unknown>;
-	};
-	_clientResolved: {
-		states: Record<string, unknown>;
-	};
+export interface WorkflowConfig {
+	modelVersion?: number;
+	states: Record<string, unknown>;
+	commands: Record<string, unknown>;
+	events: Record<string, unknown>;
+	errors: Record<string, unknown>;
+	clientStates: Record<string, unknown>;
 }
 
 export type StateNames<T extends WorkflowConfig> = keyof T["states"] & string;
@@ -43,23 +34,19 @@ export type CommandNames<T extends WorkflowConfig> = keyof T["commands"] & strin
 export type EventNames<T extends WorkflowConfig> = keyof T["events"] & string;
 export type ErrorCodes<T extends WorkflowConfig> = keyof T["errors"] & string;
 
-/** Forces TypeScript to flatten a type for better IDE autocomplete. */
-type Prettify<T> = { [K in keyof T]: T[K] } & {};
-
 /** Discriminated union of all commands with typed payloads — narrows payload when checking type. */
 export type Command<T extends WorkflowConfig> = {
 	[C in CommandNames<T>]: { type: C; payload: CommandPayload<T, C> };
 }[CommandNames<T>];
 
 /** Resolves the data type for a given state from pre-computed types. */
-export type StateData<T extends WorkflowConfig, S extends StateNames<T>> = Prettify<
-	T["_resolved"]["states"][S]
->;
+export type StateData<T extends WorkflowConfig, S extends StateNames<T>> = T["states"][S];
 
 /** Resolves the client-safe data type for a given state (server fields stripped). */
-export type ClientStateData<T extends WorkflowConfig, S extends StateNames<T>> = Prettify<
-	T["_clientResolved"]["states"][S]
->;
+export type ClientStateData<
+	T extends WorkflowConfig,
+	S extends StateNames<T>,
+> = T["clientStates"][S];
 
 /** Client-side workflow narrowed to a specific known state. */
 export interface ClientWorkflowOf<TConfig extends WorkflowConfig, S extends StateNames<TConfig>> {
@@ -77,19 +64,13 @@ export type ClientWorkflow<TConfig extends WorkflowConfig = WorkflowConfig> = {
 }[StateNames<TConfig>];
 
 /** Resolves the payload type for a given command from pre-computed types. */
-export type CommandPayload<T extends WorkflowConfig, C extends CommandNames<T>> = Prettify<
-	T["_resolved"]["commands"][C]
->;
+export type CommandPayload<T extends WorkflowConfig, C extends CommandNames<T>> = T["commands"][C];
 
 /** Resolves the data type for a given event from pre-computed types. */
-export type EventData<T extends WorkflowConfig, E extends EventNames<T>> = Prettify<
-	T["_resolved"]["events"][E]
->;
+export type EventData<T extends WorkflowConfig, E extends EventNames<T>> = T["events"][E];
 
 /** Resolves the data type for a given error code from pre-computed types. */
-export type ErrorData<T extends WorkflowConfig, C extends ErrorCodes<T>> = Prettify<
-	T["_resolved"]["errors"][C]
->;
+export type ErrorData<T extends WorkflowConfig, C extends ErrorCodes<T>> = T["errors"][C];
 
 /** Workflow narrowed to a specific known state. */
 export interface WorkflowOf<TConfig extends WorkflowConfig, S extends StateNames<TConfig>> {
@@ -117,7 +98,7 @@ export type PipelineError<TConfig extends WorkflowConfig = WorkflowConfig> =
 	| {
 			category: "validation";
 			source: "command" | "state" | "event" | "transition" | "restore";
-			issues: z.core.$ZodIssue[];
+			issues: readonly StandardSchemaV1.Issue[];
 			message: string;
 	  }
 	| {
@@ -155,16 +136,16 @@ export type DispatchResult<TConfig extends WorkflowConfig = WorkflowConfig> =
 	  };
 
 /**
- * Thrown internally when Zod validation fails during dispatch.
+ * Thrown internally when schema validation fails during dispatch.
  * Caught by the router and returned as a validation error in {@link DispatchResult}.
  *
  * @param source - Which validation stage failed
- * @param issues - Array of Zod validation issues
+ * @param issues - Validator-agnostic issue array (Standard Schema shape)
  */
 export class ValidationError extends Error {
 	constructor(
 		public readonly source: "command" | "state" | "event" | "transition" | "restore",
-		public readonly issues: z.core.$ZodIssue[],
+		public readonly issues: readonly StandardSchemaV1.Issue[],
 	) {
 		super(`Validation failed (${source}): ${issues.map((i) => i.message).join(", ")}`);
 		this.name = "ValidationError";
